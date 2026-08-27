@@ -1,7 +1,7 @@
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
-from venus.config.settings import GEMINI_API_KEY, GROQ_API_KEY
+from venus_sdk.config.settings import GEMINI_API_KEY, GROQ_API_KEY
 # ==============================================================================
 # MODELOS E AGENTES  (sem checkpointer — a memória fica no grafo)
 # ==============================================================================
