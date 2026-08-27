@@ -24,4 +24,6 @@ jobs:
         run: pip install . pytest
 
       - name: Run tests
-        run: pytest
+        # exit code 5 = "no tests collected"; tolerado enquanto a suíte de
+        # testes está sendo reconstruída durante a migração pro LangGraph.
+        run: pytest || [ "$?" = "5" ]
