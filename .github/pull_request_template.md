@@ -1,41 +1,40 @@
 <!--
-  Fill in the sections below. Delete anything that does not apply.
-  PR title: follow the same convention as the commits, for example:
-  feat: add product page
-  fix: correct keyboard focus in modal
+  Preencha as seções abaixo. Apague o que não se aplicar.
+  Título do PR: siga a mesma convenção dos commits, por exemplo:
+  feat: adicionar agente de resumo
+  fix: corrigir carregamento do .env
 -->
 
-## What this PR does
+## O que este PR faz
 
-<!-- One or two sentences explaining the change, in plain language. -->
+<!-- Uma ou duas frases explicando a mudança, em linguagem simples. -->
 
-## Type of change
+## Tipo de mudança
 
-- [ ] `feat` new feature
-- [ ] `fix` bug fix
-- [ ] `refactor` internal change, no behavior difference
-- [ ] `docs` documentation
+- [ ] `feat` funcionalidade nova
+- [ ] `fix` correção de bug
+- [ ] `refactor` mudança interna, sem alterar comportamento
+- [ ] `docs` documentação
 
-## Evidence
+## Evidência
 
-<!-- Screenshot, screen recording, or link to the deployed environment.
-     Required whenever the change affects something visible. -->
+<!-- Log de execução, saída do teste manual, ou link do ambiente.
+     Obrigatório sempre que a mudança for observável em runtime
+     (novo agente/fluxo, mudança de config, etc.). -->
 
-## Author checklist
+## Checklist do autor
 
-- [ ] The title follows the conventional commits convention
-- [ ] I manually tested what changed and described how to reproduce it above
-- [ ] I left no `console.log` or commented-out code
-- [ ] I did not commit any key, password, or private URL
-- [ ] All new code in `src/` is `.ts` or `.tsx` and free of `any` types.
-- [ ] API calls are isolated in `src/services/` (no direct fetch in components).
-- [ ] `useEffect` dependency arrays are explicit and correct.
-- [ ] Dynamic lists use unique data identifiers as `key` (no `key={index}`).
-- [ ] Async operations have visual UI feedback (loading, success, error).
-- [ ] Basic accessibility is met (semantic `<button>`, `<label>`, image `alt`, and keyboard navigation works).
-- [ ] I updated the documentation, if needed
+- [ ] O título segue a convenção de conventional commits
+- [ ] Testei manualmente o que mudou e descrevi como reproduzir acima (ex: `python -c "from venus...."` ou execução de um exemplo em `examples/`)
+- [ ] Não deixei `print()` de debug nem código comentado sem necessidade
+- [ ] Não commitei nenhuma chave, senha ou URL privada (segredos ficam só no `.env`, que está no `.gitignore`)
+- [ ] Todo código novo em `src/` tem type hints e docstring
+- [ ] Novos agentes herdam de `BaseAgent` (`src/venus/agents/`) e novos fluxos de `BaseFlow` (`src/venus/flows/`), implementando os métodos abstratos exigidos
+- [ ] Se usei uma variável de ambiente nova, ela foi adicionada em `config/settings.py` (incluindo em `OBRIGATORIAS`, se for obrigatória) e documentada
+- [ ] Dependências novas foram adicionadas em `pyproject.toml`, não instaladas soltas na venv
+- [ ] Adicionei ou atualizei testes em `tests/` para a lógica nova
 
-## Notes for the reviewer
+## Notas para o revisor
 
-<!-- Anything that deserves special attention, an open question,
-     or a decision you would like to discuss. -->
+<!-- Qualquer coisa que mereça atenção especial, uma dúvida em aberto,
+     ou uma decisão que você gostaria de discutir. -->
