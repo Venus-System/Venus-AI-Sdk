@@ -9,7 +9,11 @@ description = "SDK que armazena os agentes e fluxo do sistema de IA"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-dependencies = []
+dependencies = [
+    "python-dotenv",
+    "langchain-google-genai",
+    "langchain-groq",
+]
 
 [project.optional-dependencies]
 dev = ["pytest"]
