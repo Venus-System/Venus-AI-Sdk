@@ -21,7 +21,7 @@ llm_groq = ChatGroq(
 llm_especialista = llm_gemini.with_fallbacks([llm_groq])   # se o Gemini falhar, o Groq assume
 
 llm_rapido = ChatGroq(
-    model="llama-3.3-70b-versatile",
+    model="openai/gpt-oss-20b",
     temperature=0.0,
     api_key=GROQ_API_KEY,
 )
