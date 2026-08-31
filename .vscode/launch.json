@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Venus: conversa manual (F5)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/examples/conversar_com_venus.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Venus: pytest (arquivo atual)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["${file}", "-v"],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}
