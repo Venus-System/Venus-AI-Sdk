@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from venus_sdk.llm.models import llm_especialista
+from venus_sdk.llm.models import get_llm_especialista
 from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 
@@ -26,6 +26,6 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
         entrada += "\n\n" + _NOTA_JUIZ_ESGOTADO
 
     mensagens = [("system", ORQUESTRADOR_PROMPT_COMPLETO), ("human", entrada)]
-    resposta = llm_especialista.invoke(mensagens)
+    resposta = get_llm_especialista().invoke(mensagens)
 
     return {"resposta_final": resposta.content}

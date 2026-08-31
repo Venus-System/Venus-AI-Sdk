@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 from venus_sdk.flows.agente_mcp import montar_agente_mcp
-from venus_sdk.llm.models import llm_especialista
+from venus_sdk.llm.models import get_llm_especialista
 from venus_sdk.prompts.faq import FAQ_PROMPT_COMPLETO
 from venus_sdk.prompts.ingrediente import ESP_INGREDIENTE_PROMPT_COMPLETO
 from venus_sdk.prompts.produto import ESP_PRODUTO_PROMPT_COMPLETO
@@ -23,7 +23,7 @@ _agentes_cache: dict[str, Any] = {}
 
 def _agente(nome: str, prompt: str) -> Any:
     if nome not in _agentes_cache:
-        _agentes_cache[nome] = montar_agente_mcp(llm_especialista, prompt=prompt)
+        _agentes_cache[nome] = montar_agente_mcp(get_llm_especialista(), prompt=prompt)
     return _agentes_cache[nome]
 
 

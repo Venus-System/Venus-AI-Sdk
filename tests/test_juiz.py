@@ -27,8 +27,8 @@ def test_decidir_pos_juiz(estado: dict, esperado: str) -> None:
 
 
 def test_no_agente_juiz_aprova() -> None:
-    with patch("venus_sdk.nodes.juiz.llm_rapido") as llm_mock:
-        llm_mock.invoke.return_value = _resposta_llm("RESULTADO=aprovado")
+    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm("RESULTADO=aprovado")
         resultado = no_agente_juiz(
             {
                 "pergunta_original": "pergunta",
@@ -44,8 +44,8 @@ def test_no_agente_juiz_aprova() -> None:
 
 def test_no_agente_juiz_reprova_com_feedback() -> None:
     texto_llm = "RESULTADO=reprovado\nFEEDBACK=faltou fonte para a afirmação."
-    with patch("venus_sdk.nodes.juiz.llm_rapido") as llm_mock:
-        llm_mock.invoke.return_value = _resposta_llm(texto_llm)
+    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm(texto_llm)
         resultado = no_agente_juiz(
             {
                 "pergunta_original": "pergunta",
@@ -60,8 +60,8 @@ def test_no_agente_juiz_reprova_com_feedback() -> None:
 
 
 def test_no_agente_juiz_acumula_tentativas() -> None:
-    with patch("venus_sdk.nodes.juiz.llm_rapido") as llm_mock:
-        llm_mock.invoke.return_value = _resposta_llm("RESULTADO=reprovado\nFEEDBACK=corrija x.")
+    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm("RESULTADO=reprovado\nFEEDBACK=corrija x.")
         resultado = no_agente_juiz(
             {
                 "pergunta_original": "pergunta",

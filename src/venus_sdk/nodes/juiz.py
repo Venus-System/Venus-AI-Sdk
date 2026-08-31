@@ -6,7 +6,7 @@ import json
 import re
 from typing import Literal
 
-from venus_sdk.llm.models import llm_rapido
+from venus_sdk.llm.models import get_llm_rapido
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 
@@ -28,7 +28,7 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         f"ESPECIALISTA_JSON={json.dumps(estado.get('resposta_especialista') or {}, ensure_ascii=False)}"
     )
     mensagens = [("system", JUIZ_PROMPT_COMPLETO), ("human", entrada)]
-    resposta = llm_rapido.invoke(mensagens)
+    resposta = get_llm_rapido().invoke(mensagens)
     texto = (resposta.content or "").strip()
 
     match_resultado = _RESULTADO_RE.search(texto)

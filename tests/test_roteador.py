@@ -31,19 +31,19 @@ def test_decidir_especialista(rota: str | None, esperado: str) -> None:
 
 def test_no_roteador_encaminha_para_especialista() -> None:
     texto_llm = "ROUTE=produto\nPERGUNTA_ORIGINAL=por que esse produto foi recomendado?"
-    with patch("venus_sdk.nodes.roteador.llm_rapido") as llm_mock:
-        llm_mock.invoke.return_value = _resposta_llm(texto_llm)
+    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm(texto_llm)
         resultado = no_roteador({"mensagem_usuario": "por que esse produto foi recomendado?"})
 
     assert resultado["rota"] == "produto"
     assert resultado["pergunta_original"] == "por que esse produto foi recomendado?"
-    llm_mock.invoke.assert_called_once()
+    get_llm_mock.return_value.invoke.assert_called_once()
 
 
 def test_no_roteador_responde_direto_em_small_talk() -> None:
     texto_llm = "Olá! Posso te ajudar com produtos, ingredientes ou rotina; por onde quer começar?"
-    with patch("venus_sdk.nodes.roteador.llm_rapido") as llm_mock:
-        llm_mock.invoke.return_value = _resposta_llm(texto_llm)
+    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm(texto_llm)
         resultado = no_roteador({"mensagem_usuario": "oi, tudo bem?"})
 
     assert resultado["rota"] is None

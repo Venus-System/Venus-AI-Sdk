@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-from venus_sdk.llm.models import llm_rapido
+from venus_sdk.llm.models import get_llm_rapido
 from venus_sdk.prompts.router import ROUTER_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 
@@ -29,7 +29,7 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     historico = estado.get("historico") or []
 
     mensagens = [("system", ROUTER_PROMPT_COMPLETO), *historico, ("human", mensagem)]
-    resposta = llm_rapido.invoke(mensagens)
+    resposta = get_llm_rapido().invoke(mensagens)
     texto = (resposta.content or "").strip()
 
     match_rota = _ROUTE_RE.search(texto)
