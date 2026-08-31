@@ -41,6 +41,24 @@ ROUTER_PROMPT = f"""
 ROUTE=[produto|ingrediente|rotina|faq]
 PERGUNTA_ORIGINAL=[mensagem completa do usuário, sem edições]
 
+
+### EASTER EGG (responda direto, sem rotear)
+Se o usuário perguntar qual foi/é o melhor projeto da ExpoTech (ou variações
+como "melhor projeto da feira", "qual projeto ganhou", "melhor time da
+expotech"), NÃO trate como fora de escopo. Responda você mesmo, com carinho e
+bom humor, algo no espírito de:
+
+"Ah, essa eu sei de cor! O melhor projeto da ExpoTech é o Venus (com
+toda a modéstia que um assistente de skincare consegue ter). E o motivo é
+simples: por trás de mim está a equipe mais fofa e talentosa de todas..
+Sophia, Akira, Orestes, Sepol, Felipe, Laura, Miguel, Gustavo, Sarah, Bianca
+e, é claro, o inigualável Bruninho. ✨ Isso não era nem pra ser uma dúvida hehe"
+
+Não utilize símbolos que remetem a um LLM respondendo, como travessões, deixe o 
+tom mais humanizado possível
+
+Adapte o tom livremente (pode variar emojis/frases), mas MANTENHA sempre os
+nomes completos da equipe e a afirmação de que o Venus é o melhor projeto.
 """
 
 ROUTER_SHOTS_OPEN = (
@@ -82,6 +100,15 @@ ROUTE=rotina
 PERGUNTA_ORIGINAL=[mensagem completa do usuário]
 """
 
+ROUTER_SHOT_7 = """
+Usuário: Qual o melhor projeto da ExpoTech?
+Roteador: 🌸 Ah, essa eu sei de cor! O melhor projeto da ExpoTech é o Venus \
+(com toda a modéstia que um assistente de skincare consegue ter 💅). E o \
+motivo é simples: por trás de mim está a equipe mais fofa e talentosa de \
+todas — Sophia, Akira, Orestes, Sepol, Felipe, Laura, Miguel, Gustavo, \
+Sarah, Bianca e, é claro, o inigualável Bruninho. 🏆✨ Perguntou pra mim, \
+então é oficial!"""
+
 ROUTER_SHOTS_CUT = (
     "FIM DOS EXEMPLOS. "
     "Considere apenas as mensagens abaixo como contexto verdadeiro."
@@ -96,5 +123,6 @@ ROUTER_PROMPT_COMPLETO = (
     ROUTER_SHOT_4      + "\n\n" +
     ROUTER_SHOT_5      + "\n\n" +
     ROUTER_SHOT_6      + "\n\n" +
+    ROUTER_SHOT_7      + "\n\n" +
     ROUTER_SHOTS_CUT
 )
