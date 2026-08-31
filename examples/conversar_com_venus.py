@@ -20,10 +20,11 @@ Uso:
 
 from __future__ import annotations
 
-from langchain_core.messages import BaseMessage
+import uuid
 
 from venus_sdk.config.settings import validar_config
 from venus_sdk.flows.venus_flow import compilar_grafo_venus
+from venus_sdk.memory import criar_checkpointer_em_memoria
 
 
 def main() -> None:
@@ -34,10 +35,13 @@ def main() -> None:
             print(f"  - {problema}")
         return
 
-    grafo = compilar_grafo_venus()
+    # checkpointer em memória + thread_id fixo por execução: o grafo lembra
+    # sozinho do histórico entre as mensagens desta conversa (ver
+    # `memory/checkpointer.py`) — não precisamos mais montar a lista à mão.
+    grafo = compilar_grafo_venus(checkpointer=criar_checkpointer_em_memoria())
+    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
     print("Venus (teste manual) — digite 'sair' para encerrar.\n")
 
-    historico: list[BaseMessage] = []
     while True:
         try:
             mensagem = input("Você: ").strip()
@@ -51,7 +55,7 @@ def main() -> None:
             continue
 
         try:
-            estado = grafo.invoke({"mensagem_usuario": mensagem, "historico": historico})
+            estado = grafo.invoke({"mensagem_usuario": mensagem}, config=config)
         except NotImplementedError as erro:
             print(f"[ainda não implementado] {erro}\n")
             continue
