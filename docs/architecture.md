@@ -17,7 +17,7 @@ Visão geral dos módulos do SDK Venus (`src/venus_sdk/`):
 - **guardrail_rules.py** — regras puras de guardrail (`guardrail_entrada`, `guardrail_saida`, `anonimizar_entrada`), sem dependência do grafo/estado.
 - **llm/** — clients e wrappers de integração com provedores de LLM (Gemini, Groq).
 - **config/** — configurações e variáveis de ambiente do SDK.
-- **memory/** — persistência de contexto/histórico entre execuções.
+- **memory/** — `criar_checkpointer_em_memoria()`, o checkpointer do grafo principal (histórico por `thread_id`, hoje só em RAM — ver `memory/checkpointer.py` para trocar por um backend persistente).
 
 Os nós em `nodes/` ainda são um esqueleto (levantam `NotImplementedError`);
 a topologia do grafo em `flows/venus_flow.py` já reflete o fluxo descrito
