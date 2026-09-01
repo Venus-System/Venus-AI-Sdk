@@ -20,11 +20,16 @@ Uso:
 
 from __future__ import annotations
 
-import uuid
-
 from venus_sdk.config.settings import validar_config
 from venus_sdk.flows.venus_flow import compilar_grafo_venus
-from venus_sdk.memory import criar_checkpointer_em_memoria
+from venus_sdk.memory import criar_checkpointer_mongo
+
+# thread_id fixo (em vez de um uuid novo a cada execução): assim dá pra
+# fechar o script e rodar de novo que a conversa continua de onde parou —
+# prova de que o checkpointer Mongo sobrevive a um restart do processo
+# (o `InMemorySaver` não sobreviveria). Pra começar uma conversa do zero,
+# troque este valor (ou apague o banco `venus` no Mongo).
+THREAD_ID_LOCAL = "conversa-local"
 
 
 def main() -> None:
@@ -35,11 +40,19 @@ def main() -> None:
             print(f"  - {problema}")
         return
 
-    # checkpointer em memória + thread_id fixo por execução: o grafo lembra
-    # sozinho do histórico entre as mensagens desta conversa (ver
-    # `memory/checkpointer.py`) — não precisamos mais montar a lista à mão.
-    grafo = compilar_grafo_venus(checkpointer=criar_checkpointer_em_memoria())
-    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    # checkpointer em Mongo + thread_id fixo: o grafo lembra sozinho do
+    # histórico entre as mensagens desta conversa (ver
+    # `memory/checkpointer.py`) — e, diferente do checkpointer em memória,
+    # o histórico persiste no MongoDB (`MONGODB_URL` no `.env`) mesmo se
+    # você fechar e abrir o script de novo.
+    try:
+        checkpointer = criar_checkpointer_mongo()
+    except (ImportError, ValueError) as erro:
+        print(f"Não foi possível criar o checkpointer Mongo: {erro}")
+        return
+
+    grafo = compilar_grafo_venus(checkpointer=checkpointer)
+    config = {"configurable": {"thread_id": THREAD_ID_LOCAL}}
     print("Venus (teste manual) — digite 'sair' para encerrar.\n")
 
     while True:
