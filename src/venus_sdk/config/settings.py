@@ -13,13 +13,13 @@ load_dotenv(BASE_DIR / ".env")          # o único load_dotenv() do projeto
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GROQ_API_KEY   = os.getenv("GROQ_API_KEY")
 # DATABASE_URL   = os.getenv("#")
-# MONGODB_URI    = os.getenv("MONGODB_URL", "#")
+MONGODB_URI    = os.getenv("MONGODB_URL")  # opcional — só usado por criar_checkpointer_mongo()
 
 OBRIGATORIAS = {
     "GEMINI_API_KEY": GEMINI_API_KEY,
    "GROQ_API_KEY":   GROQ_API_KEY,
     # "DATABASE_URL":   DATABASE_URL,
-   # "MONGODB_URI":    MONGODB_URI,
+   # MONGODB_URI é opcional, não entra em OBRIGATORIAS.
 }
 
 def validar_config() -> list[str]:
