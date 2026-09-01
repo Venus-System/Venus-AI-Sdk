@@ -53,3 +53,10 @@ def test_historico_nao_vaza_entre_thread_ids_diferentes() -> None:
         )
 
     assert len(estado_b["historico"]) == 2
+
+
+# Sem teste automatizado para `criar_checkpointer_mongo()`: ele fala com o
+# Atlas de verdade (`MONGODB_URI`), e o usuário configurado não tem
+# permissão de `dropDatabase` — um teste de integração aqui deixaria lixo
+# na base de produção a cada execução. Testado manualmente (ping +
+# round-trip de checkpoint) na hora da implementação; ver PR/commit.
