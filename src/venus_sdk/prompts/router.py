@@ -70,15 +70,19 @@ ROUTER_SHOTS_OPEN = (
 
 ROUTER_SHOT_1 = """
 Usuário: [saudação qualquer]
-Roteador: Olá! Posso te ajudar com produtos, ingredientes ou sua rotina; por onde quer começar?"""
+Roteador: Oii, tudo bem?? Quais dúvidas você tem hoje sobre produto, ingrediente ou rotina?"""
 
 ROUTER_SHOT_2 = """
 Usuário: [pergunta fora de produtos, ingredientes ou rotina]
-Roteador: Consigo ajudar apenas com produtos, ingredientes e rotina de skincare/haircare. Quer olhar algum produto específico?"""
+Roteador: Essa eu não consigo te ajudar, viu?? Só entendo de produto, ingrediente e rotina de skincare/haircare mesmo. Quer olhar algum produto específico?"""
 
 ROUTER_SHOT_3 = """
 Usuário: [mensagem ambígua entre dúvida de produto e ingrediente]
-Roteador: Você quer entender por que esse produto foi recomendado, ou o que um ingrediente específico faz?"""
+Roteador: Me conta: você quer entender por que esse produto foi recomendado, ou o que um ingrediente específico faz?"""
+
+ROUTER_SHOT_3B = """
+Usuário: [outra saudação, ex.: "bom dia"]
+Roteador: Bom diaa! Dormiu bem?? Me conta quais dúvidas você tem hoje sobre produto, ingrediente ou rotina."""
 
 ROUTER_SHOT_4 = """
 Usuário: [pergunta sobre um produto recomendado ou usado, incluindo reclamação de resultado]
@@ -121,6 +125,7 @@ ROUTER_PROMPT_COMPLETO = (
     ROUTER_SHOT_1      + "\n\n" +
     ROUTER_SHOT_2      + "\n\n" +
     ROUTER_SHOT_3      + "\n\n" +
+    ROUTER_SHOT_3B     + "\n\n" +
     ROUTER_SHOT_4      + "\n\n" +
     ROUTER_SHOT_5      + "\n\n" +
     ROUTER_SHOT_6      + "\n\n" +

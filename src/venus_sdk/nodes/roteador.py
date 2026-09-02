@@ -24,8 +24,8 @@ DecisaoRoteador = Literal["produto", "ingrediente", "rotina", "faq", "direto"]
 # modelo). Evita cair na mensagem genérica de saída bloqueada por algo tão
 # simples quanto uma saudação.
 _RESPOSTA_DIRETA_FALLBACK = (
-    "Oi! Posso te ajudar com produtos, ingredientes ou sua rotina de "
-    "skincare/haircare — por onde quer começar?"
+    "Oii, tudo bem?? Posso te ajudar com produto, ingrediente ou rotina de "
+    "skincare/haircare — quais dúvidas você tem hoje??"
 )
 
 
