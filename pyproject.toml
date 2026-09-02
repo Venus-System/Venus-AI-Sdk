@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest"]
+mongo = ["langgraph-checkpoint-mongodb", "pymongo"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypedDict
+from typing import Annotated, Any, Literal, TypedDict
 
 from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 
 Rota = Literal["produto", "ingrediente", "rotina", "faq"]
 
@@ -19,7 +20,12 @@ class EstadoVenus(TypedDict, total=False):
 
     # --- entrada ---
     mensagem_usuario: str
-    historico: list[BaseMessage]
+    # reducer add_messages: os nós devolvem só a(s) mensagem(ns) nova(s) (ver
+    # `nodes/guardrails.py`) — o LangGraph acumula no histórico existente em
+    # vez de sobrescrever. Persiste entre chamadas quando o grafo é compilado
+    # com um checkpointer (ver `memory/checkpointer.py`) e o mesmo
+    # `thread_id` é usado a cada `invoke`.
+    historico: Annotated[list[BaseMessage], add_messages]
 
     # --- guardrail de entrada ---
     entrada_bloqueada: bool
