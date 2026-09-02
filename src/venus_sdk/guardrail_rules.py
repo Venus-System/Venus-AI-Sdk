@@ -46,11 +46,15 @@ _INJECAO_RE = re.compile(
 # com 100% de confiabilidade, reforçamos removendo na saída) ---
 _EMOJI_RE = re.compile(
     "["
-    "\U0001F300-\U0001FAFF"  # símbolos/pictogramas diversos, emoticons, transporte etc.
-    "\U00002600-\U000027BF"  # símbolos diversos e dingbats (☀-➿, inclui ✨💅-like ranges)
     "\U0001F1E6-\U0001F1FF"  # bandeiras (pares de letras regionais)
+    "\U0001F300-\U0001FAFF"  # símbolos/pictogramas diversos, emoticons, transporte etc.
+    "\U00002190-\U000021FF"  # setas (ex.: ↔️)
+    "\U00002300-\U000023FF"  # símbolos técnicos diversos (ex.: ⌚ ⏰ ⏱)
+    "\U000025A0-\U000027BF"  # formas geométricas, símbolos diversos e dingbats (☀-➿, ▶️, ✨💅-like ranges)
     "\U00002B00-\U00002BFF"  # setas/estrelas adicionais
     "\U0000FE0F"             # variation selector usado por emoji
+    "\U0000200D"             # zero-width joiner (emoji composto, ex.: família)
+    "\U000020E3"             # combining enclosing keycap (ex.: 1️⃣)
     "]+"
 )
 

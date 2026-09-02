@@ -78,3 +78,21 @@ def test_no_roteador_usa_fallback_quando_llm_falha_duas_vezes() -> None:
     assert resultado["rota"] is None
     assert resultado["resposta_final"]  # nunca vazio
     assert get_llm_mock.return_value.invoke.call_count == 2
+
+
+def test_no_roteador_reparseia_rota_no_retry() -> None:
+    """Se a 1ª chamada vier vazia mas o retry vier com um ROUTE= válido, o
+    retry precisa ser roteado normalmente — não pode virar texto cru
+    devolvido como resposta_final ao usuário."""
+    texto_retry = "ROUTE=ingrediente\nPERGUNTA_ORIGINAL=ácido hialurônico é seguro?"
+    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.side_effect = [
+            _resposta_llm(""),
+            _resposta_llm(texto_retry),
+        ]
+        resultado = no_roteador({"mensagem_usuario": "ácido hialurônico é seguro?"})
+
+    assert resultado["rota"] == "ingrediente"
+    assert resultado["pergunta_original"] == "ácido hialurônico é seguro?"
+    assert "resposta_final" not in resultado
+    assert get_llm_mock.return_value.invoke.call_count == 2

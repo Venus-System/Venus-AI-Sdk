@@ -29,6 +29,11 @@ _RESPOSTA_DIRETA_FALLBACK = (
 )
 
 
+def _invocar_roteador(mensagens: list) -> str:
+    resposta = get_llm_rapido().invoke(mensagens)
+    return (resposta.content or "").strip()
+
+
 def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     """Chama o LLM roteador com `ROUTER_PROMPT_COMPLETO` e extrai o
     protocolo `ROUTE=.../PERGUNTA_ORIGINAL=...` (ou responde diretamente em
@@ -36,10 +41,14 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     """
     mensagem = estado.get("mensagem_anonimizada") or estado.get("mensagem_usuario", "")
     historico = estado.get("historico") or []
-
     mensagens = [("system", ROUTER_PROMPT_COMPLETO), *historico, ("human", mensagem)]
-    resposta = get_llm_rapido().invoke(mensagens)
-    texto = (resposta.content or "").strip()
+
+    texto = _invocar_roteador(mensagens)
+    if not texto:
+        # Falha pontual do LLM (conteúdo vazio); tenta mais uma vez antes de
+        # decidir — o retry passa pelo mesmo parsing de ROUTE= abaixo, então
+        # se ele vier com uma rota válida isso não vira texto cru pro usuário.
+        texto = _invocar_roteador(mensagens)
 
     match_rota = _ROUTE_RE.search(texto)
     rota = match_rota.group(1).strip().lower() if match_rota else None
@@ -47,11 +56,6 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     if rota not in _ROTAS_VALIDAS:
         # Small talk ou fora de escopo: o próprio roteador já formulou a
         # resposta final ao usuário — segue direto para o guardrail de saída.
-        if not texto:
-            # Falha pontual do LLM (conteúdo vazio); tenta mais uma vez
-            # antes de cair no fallback fixo.
-            resposta_retry = get_llm_rapido().invoke(mensagens)
-            texto = (resposta_retry.content or "").strip()
         return {"rota": None, "resposta_final": texto or _RESPOSTA_DIRETA_FALLBACK}
 
     match_pergunta = _PERGUNTA_RE.search(texto)

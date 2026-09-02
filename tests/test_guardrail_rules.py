@@ -18,6 +18,13 @@ from venus_sdk.guardrail_rules import guardrail_saida, remover_emojis
         ("sem nenhum emoji aqui", "sem nenhum emoji aqui"),
         ("", ""),
         (None, ""),
+        # blocos fora do range original (Arrows, Misc Technical, Geometric
+        # Shapes) e a marca de keycap combinante — ver achado do code-review.
+        ("não esqueça do protetor solar ⏰", "não esqueça do protetor solar"),
+        ("dormiu bem ⌚?", "dormiu bem?"),
+        ("assista o vídeo ▶️ antes de aplicar", "assista o vídeo antes de aplicar"),
+        ("dia ↔️ noite, use produtos diferentes", "dia noite, use produtos diferentes"),
+        ("faça isso 1️⃣ antes de dormir", "faça isso 1 antes de dormir"),
     ],
 )
 def test_remover_emojis(entrada: str | None, esperado: str) -> None:
