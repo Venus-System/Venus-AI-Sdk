@@ -100,10 +100,11 @@ def montar_grafo_venus() -> StateGraph:
 def compilar_grafo_venus(checkpointer: Any | None = None) -> Any:
     """Compila o grafo principal do Venus.
 
-    `checkpointer` é opcional (ex.: `MemorySaver` ou um saver persistente) —
-    passe um valor quando precisar manter memória entre execuções separadas
-    do grafo para a mesma conversa (`thread_id`); sem ele, o grafo roda
-    stateless, e o histórico deve ser passado via `EstadoVenus.historico` a
-    cada chamada.
+    `checkpointer` é opcional (ex.: `memory.criar_checkpointer_em_memoria()`
+    ou um saver persistente) — passe um valor quando precisar manter memória
+    entre execuções separadas do grafo para a mesma conversa (`thread_id`,
+    passado em `config={"configurable": {"thread_id": ...}}` no `invoke`);
+    sem ele, o grafo roda stateless, e o histórico deve ser passado via
+    `EstadoVenus.historico` a cada chamada.
     """
     return montar_grafo_venus().compile(checkpointer=checkpointer)
