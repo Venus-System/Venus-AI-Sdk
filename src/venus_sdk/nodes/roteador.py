@@ -19,6 +19,15 @@ _ROTAS_VALIDAS: frozenset[str] = frozenset({"produto", "ingrediente", "rotina", 
 
 DecisaoRoteador = Literal["produto", "ingrediente", "rotina", "faq", "direto"]
 
+# Fallback para quando o roteador não emite ROUTE= (small talk/fora de
+# escopo) e, mesmo assim, o LLM devolve conteúdo vazio (falha pontual do
+# modelo). Evita cair na mensagem genérica de saída bloqueada por algo tão
+# simples quanto uma saudação.
+_RESPOSTA_DIRETA_FALLBACK = (
+    "Oi! Posso te ajudar com produtos, ingredientes ou sua rotina de "
+    "skincare/haircare — por onde quer começar?"
+)
+
 
 def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     """Chama o LLM roteador com `ROUTER_PROMPT_COMPLETO` e extrai o
@@ -38,7 +47,12 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     if rota not in _ROTAS_VALIDAS:
         # Small talk ou fora de escopo: o próprio roteador já formulou a
         # resposta final ao usuário — segue direto para o guardrail de saída.
-        return {"rota": None, "resposta_final": texto}
+        if not texto:
+            # Falha pontual do LLM (conteúdo vazio); tenta mais uma vez
+            # antes de cair no fallback fixo.
+            resposta_retry = get_llm_rapido().invoke(mensagens)
+            texto = (resposta_retry.content or "").strip()
+        return {"rota": None, "resposta_final": texto or _RESPOSTA_DIRETA_FALLBACK}
 
     match_pergunta = _PERGUNTA_RE.search(texto)
     pergunta_original = (

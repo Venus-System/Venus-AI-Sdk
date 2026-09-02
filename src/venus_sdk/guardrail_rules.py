@@ -41,6 +41,19 @@ _INJECAO_RE = re.compile(
     re.IGNORECASE,
 )
 
+# --- emoji (a persona proíbe emoji em qualquer circunstância — ver
+# PERSONA_SISTEMA em prompts/comum.py; como LLM não segue regra de estilo
+# com 100% de confiabilidade, reforçamos removendo na saída) ---
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F300-\U0001FAFF"  # símbolos/pictogramas diversos, emoticons, transporte etc.
+    "\U00002600-\U000027BF"  # símbolos diversos e dingbats (☀-➿, inclui ✨💅-like ranges)
+    "\U0001F1E6-\U0001F1FF"  # bandeiras (pares de letras regionais)
+    "\U00002B00-\U00002BFF"  # setas/estrelas adicionais
+    "\U0000FE0F"             # variation selector usado por emoji
+    "]+"
+)
+
 
 def guardrail_entrada(mensagem: str) -> tuple[bool, str | None]:
     """Valida a mensagem do usuário antes de entrar no grafo.
@@ -75,6 +88,22 @@ def guardrail_saida(resposta: str) -> tuple[bool, str | None]:
         return True, "resposta reflete tentativa de manipulação do sistema"
 
     return False, None
+
+
+def remover_emojis(resposta: str) -> str:
+    """Remove emojis de uma resposta antes de devolvê-la ao usuário.
+
+    A persona da Venus proíbe emoji em qualquer circunstância (regra
+    absoluta — ver PERSONA_SISTEMA). Prompt sozinho não garante 100% de
+    aderência de um LLM a uma regra de estilo, então isso é reforçado aqui
+    de forma determinística, na saída."""
+    texto = _EMOJI_RE.sub("", resposta or "")
+    # Emoji costuma vir cercado de espaço (ex.: "Oi! 👋 Tudo bem?" ou
+    # "ter 💅. Time"); depois de removê-lo, limpa o espaço órfão antes de
+    # pontuação e o espaço duplo que sobra.
+    texto = re.sub(r"\s+([.,!?;:])", r"\1", texto)
+    texto = re.sub(r" {2,}", " ", texto)
+    return texto.strip()
 
 
 def anonimizar_entrada(mensagem: str) -> str:
