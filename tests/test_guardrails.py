@@ -54,11 +54,32 @@ def test_no_guardrail_saida_libera_e_grava_historico() -> None:
     resultado = no_guardrail_saida({"resposta_final": "aqui está sua rotina sugerida"})
 
     assert resultado["saida_bloqueada"] is False
-    assert "resposta_final" not in resultado
+    assert resultado["resposta_final"] == "aqui está sua rotina sugerida"
 
     [mensagem] = resultado["historico"]
     assert isinstance(mensagem, AIMessage)
     assert mensagem.content == "aqui está sua rotina sugerida"
+
+
+def test_no_guardrail_saida_remove_emoji_sem_bloquear() -> None:
+    resultado = no_guardrail_saida({"resposta_final": "Oi! 👋 Como posso ajudar?"})
+
+    assert resultado["saida_bloqueada"] is False
+    assert resultado["resposta_final"] == "Oi! Como posso ajudar?"
+
+    [mensagem] = resultado["historico"]
+    assert isinstance(mensagem, AIMessage)
+    assert mensagem.content == "Oi! Como posso ajudar?"
+
+
+def test_no_guardrail_saida_bloqueia_resposta_vazia() -> None:
+    resultado = no_guardrail_saida({"resposta_final": ""})
+
+    assert resultado["saida_bloqueada"] is True
+    assert resultado["resposta_final"] == MENSAGEM_SAIDA_BLOQUEADA
+
+    [mensagem] = resultado["historico"]
+    assert mensagem.content == MENSAGEM_SAIDA_BLOQUEADA
 
 
 def test_no_guardrail_saida_bloqueia_vazamento_de_dado_sensivel() -> None:

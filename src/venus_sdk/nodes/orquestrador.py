@@ -14,6 +14,14 @@ _NOTA_JUIZ_ESGOTADO = (
     "transparência, sem alarmismo."
 )
 
+# Fallback para quando o LLM devolve conteúdo vazio mesmo após o retry (falha
+# pontual do modelo) — evita cair na mensagem genérica de saída bloqueada
+# depois de já termos passado por especialista + Agente Juiz de verdade.
+_RESPOSTA_ORQUESTRADOR_FALLBACK = (
+    "Consegui analisar sua pergunta, mas tive um problema pra formular a "
+    "resposta agora — pode perguntar de novo?"
+)
+
 
 def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
     """Chama o LLM orquestrador com `ORQUESTRADOR_PROMPT_COMPLETO` e
@@ -26,6 +34,10 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
         entrada += "\n\n" + _NOTA_JUIZ_ESGOTADO
 
     mensagens = [("system", ORQUESTRADOR_PROMPT_COMPLETO), ("human", entrada)]
-    resposta = get_llm_especialista().invoke(mensagens)
+    texto = (get_llm_especialista().invoke(mensagens).content or "").strip()
+    if not texto:
+        # Falha pontual do LLM (conteúdo vazio); tenta mais uma vez antes de
+        # cair no fallback fixo.
+        texto = (get_llm_especialista().invoke(mensagens).content or "").strip()
 
-    return {"resposta_final": resposta.content}
+    return {"resposta_final": texto or _RESPOSTA_ORQUESTRADOR_FALLBACK}

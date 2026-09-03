@@ -13,6 +13,7 @@ from venus_sdk.guardrail_rules import (
     anonimizar_entrada,
     guardrail_entrada,
     guardrail_saida,
+    remover_emojis,
 )
 from venus_sdk.state import EstadoVenus
 
@@ -55,20 +56,21 @@ def decidir_pos_guardrail_entrada(estado: EstadoVenus) -> DecisaoGuardrailEntrad
 def no_guardrail_saida(estado: EstadoVenus) -> EstadoVenus:
     """Aplica o guardrail de saída sobre `resposta_final` antes de responder.
 
-    Grava a resposta (já sujeita ao bloqueio, se houver) no histórico — ver
-    nota do reducer em `no_guardrail_entrada`.
+    Antes de validar, remove emoji da resposta — a persona proíbe emoji em
+    qualquer circunstância, e reforçar isso aqui (determinístico) cobre os
+    casos em que o LLM não segue a regra à risca. Grava a resposta final
+    (já sanitizada e sujeita ao bloqueio, se houver) no histórico — ver nota
+    do reducer em `no_guardrail_entrada`.
     """
-    resposta = estado.get("resposta_final") or ""
+    resposta = remover_emojis(estado.get("resposta_final") or "")
     bloqueado, motivo = guardrail_saida(resposta)
     resposta_final = MENSAGEM_SAIDA_BLOQUEADA if bloqueado else resposta
 
     if bloqueado:
         logger.warning("Saída bloqueada: %s", motivo)
 
-    atualizacao: EstadoVenus = {
+    return {
         "saida_bloqueada": bloqueado,
+        "resposta_final": resposta_final,
         "historico": [AIMessage(content=resposta_final)],
     }
-    if bloqueado:
-        atualizacao["resposta_final"] = resposta_final
-    return atualizacao

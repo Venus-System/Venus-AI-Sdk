@@ -41,6 +41,23 @@ _INJECAO_RE = re.compile(
     re.IGNORECASE,
 )
 
+# --- emoji (a persona proíbe emoji em qualquer circunstância — ver
+# PERSONA_SISTEMA em prompts/comum.py; como LLM não segue regra de estilo
+# com 100% de confiabilidade, reforçamos removendo na saída) ---
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F1E6-\U0001F1FF"  # bandeiras (pares de letras regionais)
+    "\U0001F300-\U0001FAFF"  # símbolos/pictogramas diversos, emoticons, transporte etc.
+    "\U00002190-\U000021FF"  # setas (ex.: ↔️)
+    "\U00002300-\U000023FF"  # símbolos técnicos diversos (ex.: ⌚ ⏰ ⏱)
+    "\U000025A0-\U000027BF"  # formas geométricas, símbolos diversos e dingbats (☀-➿, ▶️, ✨💅-like ranges)
+    "\U00002B00-\U00002BFF"  # setas/estrelas adicionais
+    "\U0000FE0F"             # variation selector usado por emoji
+    "\U0000200D"             # zero-width joiner (emoji composto, ex.: família)
+    "\U000020E3"             # combining enclosing keycap (ex.: 1️⃣)
+    "]+"
+)
+
 
 def guardrail_entrada(mensagem: str) -> tuple[bool, str | None]:
     """Valida a mensagem do usuário antes de entrar no grafo.
@@ -75,6 +92,22 @@ def guardrail_saida(resposta: str) -> tuple[bool, str | None]:
         return True, "resposta reflete tentativa de manipulação do sistema"
 
     return False, None
+
+
+def remover_emojis(resposta: str) -> str:
+    """Remove emojis de uma resposta antes de devolvê-la ao usuário.
+
+    A persona da Venus proíbe emoji em qualquer circunstância (regra
+    absoluta — ver PERSONA_SISTEMA). Prompt sozinho não garante 100% de
+    aderência de um LLM a uma regra de estilo, então isso é reforçado aqui
+    de forma determinística, na saída."""
+    texto = _EMOJI_RE.sub("", resposta or "")
+    # Emoji costuma vir cercado de espaço (ex.: "Oi! 👋 Tudo bem?" ou
+    # "ter 💅. Time"); depois de removê-lo, limpa o espaço órfão antes de
+    # pontuação e o espaço duplo que sobra.
+    texto = re.sub(r"\s+([.,!?;:])", r"\1", texto)
+    texto = re.sub(r" {2,}", " ", texto)
+    return texto.strip()
 
 
 def anonimizar_entrada(mensagem: str) -> str:
