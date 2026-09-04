@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Literal
 
@@ -40,6 +41,10 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     caso de small talk/fora de escopo).
     """
     mensagem = estado.get("mensagem_anonimizada") or estado.get("mensagem_usuario", "")
+    memorias = estado.get("memorias_usuario")
+    if memorias:
+        mensagem = f"MEMORIA_USUARIO={json.dumps(memorias, ensure_ascii=False)}\n{mensagem}"
+
     historico = estado.get("historico") or []
     mensagens = [("system", ROUTER_PROMPT_COMPLETO), *historico, ("human", mensagem)]
 

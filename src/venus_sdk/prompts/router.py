@@ -5,13 +5,16 @@ encaminhamento em texto puro. NÃO responde ao usuário (exceto small talk e
 fora de escopo).
 """
 
-from venus_sdk.prompts.comum import CONTEXTO_TEMPORAL, PERSONA_SISTEMA
+from venus_sdk.prompts.comum import CONTEXTO_TEMPORAL, MEMORIA_USUARIO_NOTA, PERSONA_SISTEMA
 
 ROUTER_PROMPT = f"""
 {PERSONA_SISTEMA}
 
 
 {CONTEXTO_TEMPORAL}
+
+
+{MEMORIA_USUARIO_NOTA}
 
 
 ### PAPEL
