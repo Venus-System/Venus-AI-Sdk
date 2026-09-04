@@ -35,6 +35,9 @@ def _montar_entrada(estado: EstadoVenus) -> str:
         f"ROUTE={estado.get('rota')}",
         f"PERGUNTA_ORIGINAL={estado.get('pergunta_original') or estado.get('mensagem_usuario', '')}",
     ]
+    memorias = estado.get("memorias_usuario")
+    if memorias:
+        partes.append(f"MEMORIA_USUARIO={json.dumps(memorias, ensure_ascii=False)}")
     feedback = estado.get("feedback_juiz")
     if feedback:
         partes.append(
