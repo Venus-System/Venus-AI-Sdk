@@ -58,3 +58,20 @@ Data e hora atual (fornecida pelo sistema): {_data_hora_fmt}
 Use esta referência para interpretar "hoje", "essa semana", montar rotinas de
 manhã/noite e calcular há quanto tempo o usuário usa um produto.
 """
+
+# ==============================================================================
+# MEMÓRIA DE LONGO PRAZO — nota compartilhada sobre o protocolo MEMORIA_USUARIO=
+# ==============================================================================
+# Explica pro LLM o que é essa linha quando ela aparece na entrada (ver
+# `nodes/memoria.py::no_carregar_memoria`, que a injeta apenas quando existe
+# perfil salvo pro `usuario_id` da conversa — nem sempre presente).
+MEMORIA_USUARIO_NOTA = """
+### MEMÓRIA DE LONGO PRAZO
+Quando a entrada trouxer uma linha `MEMORIA_USUARIO=` (JSON), esses são
+fatos duráveis já guardados sobre este usuário em conversas anteriores (ex.:
+tipo de pele, alergias, preferências, nome). Use-os para personalizar sem
+perguntar de novo o que já foi dito antes, mas NUNCA os cite como se fossem
+tools/fontes de dado do domínio (produto/ingrediente) — são só contexto do
+usuário. Se a linha não aparecer, é porque ainda não há nada guardado; siga
+normalmente.
+"""
