@@ -19,6 +19,11 @@ class EstadoVenus(TypedDict, total=False):
     """
 
     # --- entrada ---
+    # Identificador estável do usuário (distinto do thread_id de conversa) —
+    # chave da memória de longo prazo em `memory/store.py`. Sem ele, os nós
+    # de `nodes/memoria.py` não leem nem gravam nada (conversa segue sem
+    # memória de longo prazo, como antes desse campo existir).
+    usuario_id: str | None
     mensagem_usuario: str
     # reducer add_messages: os nós devolvem só a(s) mensagem(ns) nova(s) (ver
     # `nodes/guardrails.py`) — o LangGraph acumula no histórico existente em
@@ -31,6 +36,12 @@ class EstadoVenus(TypedDict, total=False):
     entrada_bloqueada: bool
     motivo_bloqueio: str | None
     mensagem_anonimizada: str | None
+
+    # --- memória de longo prazo (ver nodes/memoria.py) ---
+    # Perfil carregado do `store` no início do turno (None se o usuário é
+    # novo ou não há `store`/`usuario_id`); pode ser atualizado no fim do
+    # turno com fatos novos extraídos desta troca.
+    memorias_usuario: dict[str, Any] | None
 
     # --- roteador ---
     rota: Rota | None
