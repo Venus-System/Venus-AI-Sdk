@@ -5,12 +5,11 @@ Colunas/FKs conferidas direto no catálogo do Postgres de teste (`DATABASE_URL`)
 em 2026-09-05 — a PK de cada tabela é `<tabela>_id` (`product_id`,
 `brand_id`...), não `id` genérico como a documentação resumida sugeria.
 
-IMPORTANTE: as queries abaixo ainda NÃO foram validadas contra dado real —
-o usuário configurado no `.env` (`api_ia`) lê o catálogo mas recebe
-`permission denied for schema venus` em qualquer `SELECT`. Validar assim que
-alguém com acesso de admin rodar:
-    GRANT USAGE ON SCHEMA venus TO api_ia;
-    GRANT SELECT ON ALL TABLES IN SCHEMA venus TO api_ia;
+Validado manualmente em 2026-09-05 contra o Postgres de teste real (as 4
+tools, com dado de verdade — produto com/sem score, com/sem ingrediente
+cadastrado). Sem teste automatizado no CI pela mesma razão do checkpointer/
+store Mongo (ver `tests/test_tools_produto_ingrediente.py`): evita bater
+num serviço externo de verdade a cada execução da suíte.
 """
 
 from __future__ import annotations

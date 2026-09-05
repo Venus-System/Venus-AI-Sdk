@@ -1,9 +1,8 @@
 """Tool compartilhada entre produto, ingrediente e rotina.
 
 Schema real conferido direto no Postgres de teste (`venus.user_allergies` /
-`venus.allergies`) — não a notação comprimida do doc; ver nota em
-`tools/produto.py` sobre a query ainda não ter sido validada contra dado
-real (usuário do banco sem SELECT liberado no schema `venus`)."""
+`venus.allergies`) — não a notação comprimida do doc. Validado manualmente
+em 2026-09-05 contra dado real; ver nota em `tools/produto.py`."""
 
 from __future__ import annotations
 

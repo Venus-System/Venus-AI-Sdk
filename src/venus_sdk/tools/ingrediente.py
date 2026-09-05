@@ -7,9 +7,10 @@ estruturada por ID/termo a tabelas já povoadas. RAG de verdade (o sentido
 cobrado pela disciplina) é o `faq_retriever`, ainda não implementado (ver
 `mcp/tools.py`).
 
-Mesma ressalva de `tools/produto.py`: queries não validadas contra dado real
-ainda — falta `GRANT SELECT ON ALL TABLES IN SCHEMA venus TO api_ia` (ou
-usuário equivalente) no Postgres de teste.
+Validado manualmente em 2026-09-05 contra o Postgres de teste real (as 5
+tools, com dado de verdade — busca por termo, ingrediente com/sem
+regulação). Mesma nota de `tools/produto.py` sobre não ter teste
+automatizado no CI.
 """
 
 from __future__ import annotations

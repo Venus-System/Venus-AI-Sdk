@@ -17,7 +17,7 @@ Visão geral dos módulos do SDK Venus (`src/venus_sdk/`):
   - `produto.py` — `montar_tools_produto(pool)`: `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`.
   - `ingrediente.py` — `montar_tools_ingrediente(pool)`: `search_ingredient`, `get_ingredient_summary`, `get_ingredient_properties`, `get_ingredient_effects`, `get_ingredient_regulations`.
   - `compartilhadas.py` — `montar_tools_compartilhadas(pool)`: `get_user_allergies` (usada por produto e ingrediente; rotina também vai usar quando for implementada).
-  - Ainda não validadas contra dado real — o usuário do Postgres de teste (`api_ia`) não tem `SELECT` liberado no schema `venus` (só lê catálogo); falta `GRANT` de quem administra o banco.
+  - Validadas manualmente em 2026-09-05 contra o Postgres de teste real, com dado de verdade (as 9 tools) — sem teste automatizado no CI, mesma razão do checkpointer/store Mongo.
 - **prompts/** — os prompts de cada agente (`router.py`, `produto.py`, `ingrediente.py`, `rotina.py`, `faq.py`, `orquestrador.py`, `memoria.py`), com a persona/contexto compartilhados em `comum.py`.
 - **mcp/tools.py** — `get_mcp_tools()` e o client MCP genérico, ainda stub — hoje só usado por rotina/FAQ (produto/ingrediente já migraram pra `tools/`, acima). RAG de verdade (fonte externa, requisito da disciplina) é o `faq_retriever` planejado ali, ainda não implementado.
 - **guardrail_rules.py** — regras puras de guardrail (`guardrail_entrada`, `guardrail_saida`, `anonimizar_entrada`), sem dependência do grafo/estado.

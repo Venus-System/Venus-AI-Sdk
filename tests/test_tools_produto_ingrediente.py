@@ -1,10 +1,12 @@
 """Testes das tools de Produto/Ingrediente/Compartilhada (`tools/`).
 
 Usa um pool `asyncpg` falso (sem rede) — valida a forma da query/resposta de
-cada tool, não o SQL contra um Postgres real. Sem teste automatizado contra
-o Postgres real: o usuário do `.env` (`api_ia`) tem `permission denied for
-schema venus` em qualquer `SELECT` hoje (falta `GRANT` de quem administra o
-banco) — ver `tools/produto.py` para o `GRANT` necessário."""
+cada tool, não o SQL contra um Postgres real. As 9 tools foram validadas
+manualmente contra o Postgres de teste real em 2026-09-05 (dado de
+verdade — produto com/sem score, ingrediente com/sem regulação, usuário
+com alergia); sem teste automatizado no CI pra não bater num serviço
+externo a cada execução da suíte (mesma razão do checkpointer/store Mongo,
+ver `tests/test_memoria.py`/`tests/test_memoria_longo_prazo.py`)."""
 
 from __future__ import annotations
 
