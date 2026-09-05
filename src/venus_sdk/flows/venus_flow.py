@@ -27,9 +27,9 @@ from typing import Any
 from langgraph.graph import END, StateGraph
 
 from venus_sdk.nodes.especialistas import (
+    montar_no_agente_ingrediente,
+    montar_no_agente_produto,
     no_agente_faq,
-    no_agente_ingrediente,
-    no_agente_produto,
     no_agente_rotina,
 )
 from venus_sdk.nodes.guardrails import (
@@ -44,16 +44,24 @@ from venus_sdk.nodes.roteador import decidir_especialista, no_roteador
 from venus_sdk.state import EstadoVenus
 
 
-def montar_grafo_venus() -> StateGraph:
+def montar_grafo_venus(*, pool: Any | None = None) -> StateGraph:
     """Fábrica do grafo principal do Venus (não compilado — use
-    `compilar_grafo_venus()` para obter um grafo executável)."""
+    `compilar_grafo_venus()` para obter um grafo executável).
+
+    `pool` é o pool do Postgres (`asyncpg`, ver `tools/produto.py` e
+    `tools/ingrediente.py`) — quem monta o grafo cria e gerencia o pool
+    (nunca o SDK), igual `checkpointer`/`store` em `compilar_grafo_venus()`.
+    Sem `pool`, os nós de produto/ingrediente ainda entram no grafo (o
+    roteamento funciona), mas levantam `ValueError` se forem de fato
+    invocados — só nesse momento, nunca aqui na montagem.
+    """
     grafo = StateGraph(EstadoVenus)
 
     grafo.add_node("guardrail_entrada", no_guardrail_entrada)
     grafo.add_node("carregar_memoria", no_carregar_memoria)
     grafo.add_node("roteador", no_roteador)
-    grafo.add_node("agente_produto", no_agente_produto)
-    grafo.add_node("agente_ingrediente", no_agente_ingrediente)
+    grafo.add_node("agente_produto", montar_no_agente_produto(pool))
+    grafo.add_node("agente_ingrediente", montar_no_agente_ingrediente(pool))
     grafo.add_node("agente_rotina", no_agente_rotina)
     grafo.add_node("agente_faq", no_agente_faq)
     grafo.add_node("agente_juiz", no_agente_juiz)
@@ -109,7 +117,9 @@ def montar_grafo_venus() -> StateGraph:
     return grafo
 
 
-def compilar_grafo_venus(checkpointer: Any | None = None, store: Any | None = None) -> Any:
+def compilar_grafo_venus(
+    checkpointer: Any | None = None, store: Any | None = None, pool: Any | None = None
+) -> Any:
     """Compila o grafo principal do Venus.
 
     `checkpointer` é opcional (ex.: `memory.criar_checkpointer_em_memoria()`
@@ -126,5 +136,10 @@ def compilar_grafo_venus(checkpointer: Any | None = None, store: Any | None = No
     `thread_id`, desde que o `usuario_id` seja o mesmo. Sem `store` (ou sem
     `usuario_id` no estado), os nós de memória de longo prazo são no-ops e o
     grafo se comporta como antes deles existirem.
+
+    `pool` é opcional (um pool `asyncpg` já conectado) — as tools de
+    produto/ingrediente (`tools/produto.py`, `tools/ingrediente.py`) o usam
+    pra consultar o Postgres. Sem ele, produto/ingrediente levantam
+    `ValueError` se forem invocados (ver `montar_grafo_venus`).
     """
-    return montar_grafo_venus().compile(checkpointer=checkpointer, store=store)
+    return montar_grafo_venus(pool=pool).compile(checkpointer=checkpointer, store=store)
