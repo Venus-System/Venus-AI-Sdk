@@ -10,16 +10,19 @@ from langgraph.prebuilt import create_react_agent
 from venus_sdk.mcp.tools import get_mcp_tools
 
 
-def montar_agente_mcp(llm: BaseChatModel, *, prompt: str | None = None) -> Any:
-    """Monta um agente ReAct reutilizável com as tools MCP disponíveis.
+def montar_agente_mcp(
+    llm: BaseChatModel, *, prompt: str | None = None, tools: list[Any] | None = None
+) -> Any:
+    """Monta um agente ReAct reutilizável com as tools disponíveis.
 
-    Usado pelos nós em `nodes/especialistas.py` para consultar as tools de
-    produto/ingrediente/rotina/FAQ conforme o prompt de cada especialista
-    exigir.
+    `tools`, se informado, é usado diretamente — é o caminho usado por
+    produto/ingrediente hoje (`tools/produto.py`/`tools/ingrediente.py`,
+    Postgres via asyncpg, montadas com o pool em
+    `nodes/especialistas.py::montar_no_agente_produto`/
+    `montar_no_agente_ingrediente`).
 
-    TODO: definir se cada especialista monta sua própria instância
-    (filtrando as tools por domínio) ou se um único agente MCP genérico é
-    reutilizado entre eles.
+    Sem `tools`, cai no client MCP genérico (`get_mcp_tools()`) — ainda um
+    stub (`NotImplementedError`), usado hoje por rotina e FAQ enquanto suas
+    tools (Mongo/Qdrant) não são implementadas.
     """
-    tools = get_mcp_tools()
-    return create_react_agent(llm, tools=tools, prompt=prompt)
+    return create_react_agent(llm, tools=tools if tools is not None else get_mcp_tools(), prompt=prompt)
