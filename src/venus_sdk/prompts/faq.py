@@ -4,13 +4,16 @@ Entrada : protocolo de texto do Roteador.
 Saída   : resposta direta com base no FAQ oficial (não passa pelo Agente Juiz).
 """
 
-from venus_sdk.prompts.comum import MEMORIA_USUARIO_NOTA, PERSONA_SISTEMA
+from venus_sdk.prompts.comum import HIERARQUIA_INSTRUCOES, MEMORIA_USUARIO_NOTA, PERSONA_SISTEMA
 
 FAQ_PROMPT = f"""
 {PERSONA_SISTEMA}
 
 
 {MEMORIA_USUARIO_NOTA}
+
+
+{HIERARQUIA_INSTRUCOES}
 
 
 ### ENTRADA
