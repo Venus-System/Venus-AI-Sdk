@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from venus_sdk.prompts.comum import HIERARQUIA_INSTRUCOES, RACIOCINIO_INTERNO
+from venus_sdk.prompts.comum import HIERARQUIA_INSTRUCOES, PERSONA_SISTEMA, RACIOCINIO_INTERNO
 from venus_sdk.prompts.faq import FAQ_PROMPT_COMPLETO
 from venus_sdk.prompts.ingrediente import ESP_INGREDIENTE_PROMPT_COMPLETO
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
@@ -51,3 +51,12 @@ def test_juiz_tem_shot_de_injecao_refletida_na_resposta() -> None:
 
 def test_router_tem_shot_de_recusa_a_jailbreak() -> None:
     assert "isso eu não posso fazer" in ROUTER_PROMPT_COMPLETO.lower()
+
+
+def test_router_tem_secao_de_reacao_a_ofensa() -> None:
+    """A exceção deliberada à regra de "nunca fingir sentimento" (só pra
+    xingamento/ofensa) precisa estar documentada nos dois lugares: na
+    regra em si (comum.py) e na seção que a aplica (router.py)."""
+    assert "EXCEÇÃO deliberada" in PERSONA_SISTEMA
+    assert "REAÇÃO A OFENSA/XINGAMENTO" in ROUTER_PROMPT_COMPLETO
+    assert "desculpa se fiz algo que te incomodou" in ROUTER_PROMPT_COMPLETO.lower()
