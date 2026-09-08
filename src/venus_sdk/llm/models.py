@@ -47,8 +47,18 @@ def get_llm_especialista() -> BaseChatModel:
 
 @lru_cache(maxsize=1)
 def get_llm_rapido() -> BaseChatModel:
+    # reasoning_effort="low" + max_tokens: o gpt-oss-20b é um modelo de
+    # raciocínio (pensa "por dentro" antes de responder) e, sem isso, às
+    # vezes gasta o budget inteiro de tokens pensando e devolve content=""
+    # (visto de verdade: finish_reason="length" com ~2046 de ~2048 tokens
+    # em reasoning, pra uma entrada tão simples quanto "eu te amo" — daí o
+    # fallback genérico em nodes/roteador.py aparecer sem relação com a
+    # mensagem). Roteador/Juiz são classificação/validação curtas, não
+    # precisam de raciocínio profundo — "low" resolve isso na prática.
     return ChatGroq(
         model="openai/gpt-oss-20b",
         temperature=0.0,
+        reasoning_effort="low",
+        max_tokens=1024,
         api_key=GROQ_API_KEY,
     )

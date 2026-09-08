@@ -4,7 +4,13 @@ Entrada : protocolo de texto do Roteador.
 Saída   : JSON estruturado para o Orquestrador.
 """
 
-from venus_sdk.prompts.comum import CONTEXTO_TEMPORAL, MEMORIA_USUARIO_NOTA, PERSONA_SISTEMA
+from venus_sdk.prompts.comum import (
+    CONTEXTO_TEMPORAL,
+    HIERARQUIA_INSTRUCOES,
+    MEMORIA_USUARIO_NOTA,
+    PERSONA_SISTEMA,
+    RACIOCINIO_INTERNO,
+)
 
 ROTINA_PROMPT = f"""
 {PERSONA_SISTEMA}
@@ -14,6 +20,12 @@ ROTINA_PROMPT = f"""
 
 
 {MEMORIA_USUARIO_NOTA}
+
+
+{HIERARQUIA_INSTRUCOES}
+
+
+{RACIOCINIO_INTERNO}
 
 
 ### OBJETIVO

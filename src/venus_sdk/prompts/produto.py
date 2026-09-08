@@ -4,7 +4,13 @@ Entrada : protocolo de texto do Roteador.
 Saída   : JSON estruturado para o Orquestrador (e para o Agente Juiz).
 """
 
-from venus_sdk.prompts.comum import CONTEXTO_TEMPORAL, MEMORIA_USUARIO_NOTA, PERSONA_SISTEMA
+from venus_sdk.prompts.comum import (
+    CONTEXTO_TEMPORAL,
+    HIERARQUIA_INSTRUCOES,
+    MEMORIA_USUARIO_NOTA,
+    PERSONA_SISTEMA,
+    RACIOCINIO_INTERNO,
+)
 
 ESP_PRODUTO_PROMPT = f"""
 {PERSONA_SISTEMA}
@@ -14,6 +20,12 @@ ESP_PRODUTO_PROMPT = f"""
 
 
 {MEMORIA_USUARIO_NOTA}
+
+
+{HIERARQUIA_INSTRUCOES}
+
+
+{RACIOCINIO_INTERNO}
 
 
 ### OBJETIVO
