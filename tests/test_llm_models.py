@@ -15,9 +15,10 @@ despercebida."""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from venus_sdk.llm.models import get_llm_rapido
+from venus_sdk.llm.models import extrair_texto_resposta, get_llm_rapido
 
 
 def test_get_llm_rapido_limita_o_raciocinio_interno() -> None:
@@ -31,3 +32,45 @@ def test_get_llm_rapido_limita_o_raciocinio_interno() -> None:
     _, kwargs = chat_groq_mock.call_args
     assert kwargs["reasoning_effort"] == "low"
     assert kwargs["max_tokens"] == 1024
+
+
+# --- extrair_texto_resposta ---
+#
+# Regressão pro bug de verdade rodando o grafo completo em 2026-09-08: o
+# gemini-3.6-flash (usado por get_llm_especialista/get_llm_gemini) devolve
+# `content` como uma LISTA de blocos com "thought signature" em vez da
+# string simples que gemini-2.5-flash devolvia — `.strip()`/`json.loads()`
+# direto nisso quebrava com AttributeError/TypeError em orquestrador.py e
+# descartava a resposta de verdade do especialista em especialistas.py.
+
+
+def test_extrair_texto_resposta_com_content_string() -> None:
+    """Formato antigo (a maioria dos modelos) — passa direto."""
+    assert extrair_texto_resposta(SimpleNamespace(content="RESULTADO=aprovado")) == "RESULTADO=aprovado"
+
+
+def test_extrair_texto_resposta_com_content_lista_de_blocos() -> None:
+    """Formato do gemini-3.6-flash: lista de blocos, com metadado de
+    assinatura misturado — extrai só o texto e ignora o resto."""
+    resposta = SimpleNamespace(
+        content=[
+            {"type": "text", "text": '{"dominio":"produto"}', "extras": {"signature": "abc123"}},
+        ]
+    )
+    assert extrair_texto_resposta(resposta) == '{"dominio":"produto"}'
+
+
+def test_extrair_texto_resposta_concatena_varios_blocos_de_texto() -> None:
+    resposta = SimpleNamespace(content=[{"text": "parte 1 "}, {"text": "parte 2"}])
+    assert extrair_texto_resposta(resposta) == "parte 1 parte 2"
+
+
+def test_extrair_texto_resposta_ignora_bloco_sem_texto() -> None:
+    resposta = SimpleNamespace(content=[{"type": "signature", "extras": {}}, {"text": "resposta real"}])
+    assert extrair_texto_resposta(resposta) == "resposta real"
+
+
+def test_extrair_texto_resposta_content_vazio() -> None:
+    assert extrair_texto_resposta(SimpleNamespace(content="")) == ""
+    assert extrair_texto_resposta(SimpleNamespace(content=None)) == ""
+    assert extrair_texto_resposta(SimpleNamespace(content=[])) == ""

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -20,10 +21,40 @@ from venus_sdk.config.settings import GEMINI_API_KEY, GROQ_API_KEY
 # o runner do CI.
 
 
+def extrair_texto_resposta(resposta: Any) -> str:
+    """Normaliza `AIMessage.content` pra string simples.
+
+    `get_llm_gemini()`/`get_llm_especialista()` (gemini-3.6-flash, ver
+    abaixo) às vezes devolvem `content` como uma LISTA de blocos —
+    `[{"type": "text", "text": "...", "extras": {"signature": "..."}}]`,
+    a "thought signature" desse modelo — em vez da string simples que
+    `gemini-2.5-flash` devolvia. Chamar `.strip()`/`json.loads()` direto
+    nisso quebra com `AttributeError`/`TypeError` (visto de verdade rodando
+    o grafo completo em 2026-09-08). Extrai só o texto de cada bloco
+    (ignora blocos sem `"text"`, como o de assinatura) e concatena — usada
+    em todo lugar que lê `resposta.content` como texto (roteador, juiz,
+    orquestrador, memória, especialistas).
+    """
+    conteudo = resposta.content
+    if isinstance(conteudo, str):
+        return conteudo
+    if isinstance(conteudo, list):
+        partes = [
+            bloco if isinstance(bloco, str) else bloco.get("text", "")
+            for bloco in conteudo
+            if isinstance(bloco, str) or isinstance(bloco, dict)
+        ]
+        return "".join(partes)
+    return str(conteudo) if conteudo else ""
+
+
 @lru_cache(maxsize=1)
 def get_llm_gemini() -> BaseChatModel:
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        # gemini-2.5-flash foi descontinuado pro Google pra contas novas
+        # (404 NOT_FOUND em produção, 2026-09-08) — substituído conforme a
+        # própria mensagem de erro da API.
+        model="gemini-3.6-flash",
         temperature=0.7,
         top_p=0.95,
         api_key=GEMINI_API_KEY,

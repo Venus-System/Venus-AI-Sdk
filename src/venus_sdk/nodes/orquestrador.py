@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from venus_sdk.llm.models import get_llm_especialista
+from venus_sdk.llm.models import extrair_texto_resposta, get_llm_especialista
 from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 
@@ -34,10 +34,10 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
         entrada += "\n\n" + _NOTA_JUIZ_ESGOTADO
 
     mensagens = [("system", ORQUESTRADOR_PROMPT_COMPLETO), ("human", entrada)]
-    texto = (get_llm_especialista().invoke(mensagens).content or "").strip()
+    texto = extrair_texto_resposta(get_llm_especialista().invoke(mensagens)).strip()
     if not texto:
         # Falha pontual do LLM (conteúdo vazio); tenta mais uma vez antes de
         # cair no fallback fixo.
-        texto = (get_llm_especialista().invoke(mensagens).content or "").strip()
+        texto = extrair_texto_resposta(get_llm_especialista().invoke(mensagens)).strip()
 
     return {"resposta_final": texto or _RESPOSTA_ORQUESTRADOR_FALLBACK}

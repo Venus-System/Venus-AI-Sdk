@@ -80,6 +80,68 @@ def test_no_roteador_usa_fallback_quando_llm_falha_duas_vezes() -> None:
     assert get_llm_mock.return_value.invoke.call_count == 2
 
 
+class _ErroToolCallAlucinada(Exception):
+    """Emula `groq.BadRequestError` (tem `.body` com o mesmo formato do
+    corpo de erro real da Groq) sem depender do pacote `groq` no teste."""
+
+    def __init__(self, failed_generation: str) -> None:
+        super().__init__("Tool choice is none, but model called a tool")
+        self.body = {
+            "error": {
+                "message": "Tool choice is none, but model called a tool",
+                "code": "tool_use_failed",
+                "failed_generation": failed_generation,
+            }
+        }
+
+
+def test_no_roteador_recupera_de_tool_call_alucinada() -> None:
+    """Groq rejeita com 400 quando o gpt-oss-20b alucina uma tool call
+    nativa pro protocolo ROUTE=/PERGUNTA_ORIGINAL= — o roteador recupera a
+    decisão do `failed_generation` embutido no erro em vez de só tentar de
+    novo (e só numa chamada, sem gastar o retry)."""
+    erro = _ErroToolCallAlucinada(
+        '{"name": "router", "arguments": '
+        '{"ROUTE": "ingrediente", "PERGUNTA_ORIGINAL": "ácido hialurônico é seguro?"}}'
+    )
+    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.side_effect = erro
+        resultado = no_roteador({"mensagem_usuario": "ácido hialurônico é seguro?"})
+
+    assert resultado["rota"] == "ingrediente"
+    assert resultado["pergunta_original"] == "ácido hialurônico é seguro?"
+    get_llm_mock.return_value.invoke.assert_called_once()
+
+
+def test_no_roteador_recupera_de_tool_call_alucinada_no_retry() -> None:
+    """Mesma recuperação, mas quando a alucinação só acontece na 2ª
+    tentativa (1ª falhou por outro motivo transitório)."""
+    erro_generico = Exception("timeout")
+    erro_alucinado = _ErroToolCallAlucinada(
+        '{"name": "router", "arguments": '
+        '{"ROUTE": "produto", "PERGUNTA_ORIGINAL": "esse produto é bom pra pele oleosa?"}}'
+    )
+    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.side_effect = [erro_generico, erro_alucinado]
+        resultado = no_roteador({"mensagem_usuario": "esse produto é bom pra pele oleosa?"})
+
+    assert resultado["rota"] == "produto"
+    assert resultado["pergunta_original"] == "esse produto é bom pra pele oleosa?"
+    assert get_llm_mock.return_value.invoke.call_count == 2
+
+
+def test_no_roteador_usa_fallback_quando_excecao_nao_e_recuperavel() -> None:
+    """Uma exceção sem o formato do erro de tool call (ex.: rate limit,
+    timeout) continua caindo no retry normal e, se persistir, no fallback —
+    não deve levantar."""
+    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.side_effect = Exception("rate limit exceeded")
+        resultado = no_roteador({"mensagem_usuario": "oi"})
+
+    assert resultado["rota"] is None
+    assert resultado["resposta_final"]  # fallback fixo, nunca vazio
+
+
 def test_no_roteador_reparseia_rota_no_retry() -> None:
     """Se a 1ª chamada vier vazia mas o retry vier com um ROUTE= válido, o
     retry precisa ser roteado normalmente — não pode virar texto cru
