@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Literal
 
 from venus_sdk.llm.models import get_llm_rapido
 from venus_sdk.prompts.router import ROUTER_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
+
+logger = logging.getLogger(__name__)
 
 # ROUTE= e PERGUNTA_ORIGINAL= são emitidos pelo LLM só quando o caso é de
 # especialista; small talk/fora de escopo respondem em texto livre (ver
@@ -30,8 +33,65 @@ _RESPOSTA_DIRETA_FALLBACK = (
 )
 
 
+def _recuperar_de_tool_call_alucinada(erro: Exception) -> str | None:
+    """Recupera ROUTE=/PERGUNTA_ORIGINAL= de dentro do erro 400 da Groq
+    quando o gpt-oss-20b alucina uma tool call nativa (ex.: um "tool"
+    chamado "router" tentando emitir o protocolo como argumentos) mesmo sem
+    nenhuma tool vinculada ao client — a Groq rejeita a chamada inteira com
+    `400 "Tool choice is none, but model called a tool"` (`code ==
+    "tool_use_failed"`) nesse caso.
+
+    Em vez de só tentar de novo (a alucinação não é 100% determinística nem
+    a `temperature=0.0` — retries às vezes se repetem, cada um consumindo
+    mais uma chamada da cota), a Groq devolve o `failed_generation` no corpo
+    do erro com a decisão que o modelo já tinha tomado; extrai ela dali e
+    reconstrói o protocolo em texto puro, evitando desperdiçar a resposta.
+
+    Devolve `None` (nunca levanta) se o erro não for esse caso específico ou
+    se o corpo não tiver o formato esperado — quem chama cai no retry normal.
+    """
+    corpo = getattr(erro, "body", None)
+    if not isinstance(corpo, dict):
+        return None
+    detalhe = corpo.get("error")
+    if not isinstance(detalhe, dict) or detalhe.get("code") != "tool_use_failed":
+        return None
+    bruto = detalhe.get("failed_generation")
+    if not bruto:
+        return None
+    try:
+        argumentos = json.loads(bruto)["arguments"]
+        rota = argumentos["ROUTE"]
+        pergunta = argumentos["PERGUNTA_ORIGINAL"]
+    except (TypeError, ValueError, KeyError):
+        return None
+
+    logger.warning(
+        "LLM roteador alucinou uma tool call (ROUTE=%s); recuperando do corpo do "
+        "erro em vez de tentar de novo",
+        rota,
+    )
+    return f"ROUTE={rota}\nPERGUNTA_ORIGINAL={pergunta}"
+
+
 def _invocar_roteador(mensagens: list) -> str:
-    resposta = get_llm_rapido().invoke(mensagens)
+    # Bug de content vazio: ver `get_llm_rapido`. Tenta mais uma vez antes de
+    # desistir, em vez de deixar a exceção derrubar o grafo inteiro.
+    try:
+        resposta = get_llm_rapido().invoke(mensagens)
+    except Exception as erro:
+        recuperado = _recuperar_de_tool_call_alucinada(erro)
+        if recuperado is not None:
+            return recuperado
+        logger.warning("Falha ao chamar o LLM roteador; tentando novamente uma vez", exc_info=True)
+        try:
+            resposta = get_llm_rapido().invoke(mensagens)
+        except Exception as erro2:
+            recuperado = _recuperar_de_tool_call_alucinada(erro2)
+            if recuperado is not None:
+                return recuperado
+            logger.exception("Segunda tentativa do LLM roteador também falhou")
+            return ""
     return (resposta.content or "").strip()
 
 
@@ -45,7 +105,17 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     if memorias:
         mensagem = f"MEMORIA_USUARIO={json.dumps(memorias, ensure_ascii=False)}\n{mensagem}"
 
-    historico = estado.get("historico") or []
+    # `historico` já inclui a mensagem deste turno — `no_guardrail_entrada`
+    # grava `mensagem_anonimizada` nele (reducer `add_messages`, ver
+    # `state.py`) antes do roteador rodar, no mesmo `invoke`. Descartamos a
+    # última entrada aqui pra não duplicá-la no prompt do LLM (ela reaparece
+    # logo abaixo, já com o prefixo MEMORIA_USUARIO= quando houver); isso
+    # vale tanto na primeira passagem quanto num retry vindo do Agente Juiz
+    # ("reprovado" -> volta pro roteador sem o guardrail rodar de novo), já
+    # que `mensagem_anonimizada` não muda entre essas tentativas.
+    historico = list(estado.get("historico") or [])
+    if historico:
+        historico = historico[:-1]
     mensagens = [("system", ROUTER_PROMPT_COMPLETO), *historico, ("human", mensagem)]
 
     texto = _invocar_roteador(mensagens)
