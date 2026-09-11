@@ -81,6 +81,32 @@ normalmente.
 """
 
 # ==============================================================================
+# IDENTIFICADOR DE USUÁRIO — protocolo do USER_ID_POSTGRES= (produto/ingrediente)
+# ==============================================================================
+# Explica pro LLM o que fazer com essa linha quando ela aparece (ou não) na
+# entrada (ver `nodes/especialistas.py::_montar_entrada`, que a injeta a
+# partir de `EstadoVenus.usuario_id_postgres`). Usado só pelos especialistas
+# que têm tools exigindo `user_id` (produto, ingrediente) — não pelo
+# roteador/orquestrador/juiz.
+IDENTIFICADOR_USUARIO_NOTA = """
+### IDENTIFICADOR DE USUÁRIO (USER_ID_POSTGRES=)
+Algumas tools exigem um parâmetro `user_id` inteiro (ex.: `get_user_allergies`,
+`get_personalized_score`) — esse `user_id` NÃO é o mesmo dado de
+`MEMORIA_USUARIO=` nem algo que a pessoa te conta pelo chat; é um
+identificador interno do sistema.
+
+- Se a entrada trouxer uma linha `USER_ID_POSTGRES=<número>`, use EXATAMENTE
+  esse número sempre que uma tool pedir `user_id`. Nunca troque por outro
+  valor, mesmo que o usuário mencione um número na mensagem.
+- Se essa linha NÃO aparecer, você não tem um `user_id` confiável — NÃO
+  chame `get_user_allergies`/`get_personalized_score` nem invente um número
+  qualquer (nem "1", nem um valor citado pelo próprio usuário). Responda com
+  o que for possível sem personalização e diga, na resposta ou em
+  `esclarecer`, que a checagem de alergia/personalização não pôde ser feita
+  agora.
+"""
+
+# ==============================================================================
 # HIERARQUIA DE INSTRUÇÕES — defesa em profundidade contra prompt injection
 # ==============================================================================
 # Complementa (não substitui) as checagens determinísticas em

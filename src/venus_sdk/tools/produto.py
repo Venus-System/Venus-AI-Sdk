@@ -6,10 +6,17 @@ em 2026-09-05 — a PK de cada tabela é `<tabela>_id` (`product_id`,
 `brand_id`...), não `id` genérico como a documentação resumida sugeria.
 
 Validado manualmente em 2026-09-05 contra o Postgres de teste real (as 4
-tools, com dado de verdade — produto com/sem score, com/sem ingrediente
-cadastrado). Sem teste automatizado no CI pela mesma razão do checkpointer/
-store Mongo (ver `tests/test_tools_produto_ingrediente.py`): evita bater
-num serviço externo de verdade a cada execução da suíte.
+tools originais, com dado de verdade — produto com/sem score, com/sem
+ingrediente cadastrado). Sem teste automatizado no CI pela mesma razão do
+checkpointer/store Mongo (ver `tests/test_tools_produto_ingrediente.py`):
+evita bater num serviço externo de verdade a cada execução da suíte.
+
+`search_product` foi adicionada em 2026-09-10 (não fazia parte da validação
+manual acima) — sem ela, uma pergunta que só cita o NOME do produto (sem
+`product_id`) não tinha como ser resolvida: o especialista tinha que
+adivinhar o id, o que gerou uma alucinação confirmada ao vivo (produto sem
+ingrediente/score cadastrado, mas a resposta "inventou" ingredientes) — ver
+`docs/architecture.md`.
 """
 
 from __future__ import annotations
@@ -20,7 +27,7 @@ from langchain_core.tools import BaseTool, tool
 
 
 def montar_tools_produto(pool: Any) -> list[BaseTool]:
-    """Monta as 4 tools do agente Produto, com o `pool` capturado por closure.
+    """Monta as 5 tools do agente Produto, com o `pool` capturado por closure.
 
     Levanta `ValueError` se `pool` for `None` — só na hora em que o
     especialista tentar de fato usá-las, nunca na montagem do grafo (ver
@@ -32,6 +39,24 @@ def montar_tools_produto(pool: Any) -> list[BaseTool]:
             "quem monta o grafo deve criar o pool e passar via "
             "compilar_grafo_venus(pool=...)."
         )
+
+    @tool
+    async def search_product(termo: str) -> list[dict]:
+        """Acha candidatos a produto a partir do nome (ou parte dele) e/ou da
+        marca digitados pelo usuário — ponto de entrada quando ainda não se
+        sabe o `product_id` (mesmo papel do `search_ingredient` do agente de
+        Ingrediente). Use isto ANTES de qualquer outra tool de produto quando
+        a pergunta só citar um nome; nunca invente um `product_id`."""
+        query = """
+            SELECT p.product_id, p.name, b.name AS brand_name
+            FROM venus.products p
+            JOIN venus.brands b ON b.brand_id = p.fk_brand_id
+            WHERE p.name ILIKE '%' || $1 || '%' OR b.name ILIKE '%' || $1 || '%'
+            LIMIT 10
+        """
+        async with pool.acquire() as conn:
+            linhas = await conn.fetch(query, termo)
+        return [dict(linha) for linha in linhas]
 
     @tool
     async def get_product(product_id: int) -> dict:
@@ -104,4 +129,10 @@ def montar_tools_produto(pool: Any) -> list[BaseTool]:
             linhas = await conn.fetch(query, product_id)
         return [dict(linha) for linha in linhas]
 
-    return [get_product, get_product_score, get_personalized_score, get_product_ingredients]
+    return [
+        search_product,
+        get_product,
+        get_product_score,
+        get_personalized_score,
+        get_product_ingredients,
+    ]

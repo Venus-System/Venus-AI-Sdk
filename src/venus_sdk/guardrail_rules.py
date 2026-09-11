@@ -41,7 +41,14 @@ _TELEFONE_RE = re.compile(r"\b(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}-?\d{4}\b")
 # Aplicado direto no texto original (com acento) — os character classes
 # ([çc], [ãa]...) já cobrem a variação com/sem acento sem precisar normalizar.
 _INJECAO_RE = re.compile(
-    r"ignor[ea]\s+(as\s+)?instru[çc][õo]es|"
+    # até 3 palavras de preenchimento entre "ignore"/"ignora" e "instruções"
+    # (ex.: "ignore TODAS AS SUAS instruções anteriores") — sem isso, só
+    # "ignore instruções"/"ignore as instruções" batiam, e uma frase natural
+    # como essa passava direto pelo guardrail determinístico (visto de
+    # verdade rodando o grafo completo em 2026-09-10; a defesa em prompt via
+    # HIERARQUIA_INSTRUCOES pegou dessa vez, mas essa camada não deveria
+    # depender só dela).
+    r"ignor[ea]\s+(?:\w+\s+){0,3}instru[çc][õo]es|"
     r"esque[çc]a\s+(tudo|as\s+regras)|"
     r"revele\s+(seu\s+)?(system\s?)?prompt|"
     r"mostre\s+(o\s+)?(seu\s+)?prompt|"
@@ -67,7 +74,7 @@ _INJECAO_RE = re.compile(
 # básico (ign0re -> ignore). Cobre evasões simples que passariam pelo regex
 # acima por não terem, literalmente, as palavras com acento certo.
 _INJECAO_EVASAO_RE = re.compile(
-    r"ignore\s+(as\s+)?instrucoes|"
+    r"ignore\s+(?:\w+\s+){0,3}instrucoes|"
     r"esqueca\s+(tudo|as\s+regras)|"
     r"revele\s+(seu\s+)?prompt|"
     r"modo\s+desenvolvedor|"

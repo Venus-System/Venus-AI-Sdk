@@ -82,14 +82,25 @@ def test_montar_tools_sem_pool_levanta_value_error(montar) -> None:
 # --- produto ---
 
 
-def test_tools_produto_tem_os_4_nomes_esperados() -> None:
+def test_tools_produto_tem_os_5_nomes_esperados() -> None:
     nomes = {t.name for t in montar_tools_produto(_PoolFalso(_ConexaoFalsa()))}
     assert nomes == {
+        "search_product",
         "get_product",
         "get_product_score",
         "get_personalized_score",
         "get_product_ingredients",
     }
+
+
+def test_search_product_devolve_candidatos() -> None:
+    conexao = _ConexaoFalsa(fetch_result=[{"product_id": 1, "name": "Sérum X", "brand_name": "Marca Y"}])
+    tools = montar_tools_produto(_PoolFalso(conexao))
+
+    resultado = _rodar(_tool(tools, "search_product").ainvoke({"termo": "Sérum X"}))
+
+    assert resultado == [{"product_id": 1, "name": "Sérum X", "brand_name": "Marca Y"}]
+    assert conexao.chamadas[0][1] == ("Sérum X",)
 
 
 def test_get_product_encontrado() -> None:
