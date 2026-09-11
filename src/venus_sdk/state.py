@@ -24,6 +24,18 @@ class EstadoVenus(TypedDict, total=False):
     # de `nodes/memoria.py` não leem nem gravam nada (conversa segue sem
     # memória de longo prazo, como antes desse campo existir).
     usuario_id: str | None
+    # ID inteiro do usuário no Postgres (`venus.users.user_id`) — DISTINTO de
+    # `usuario_id` acima (chave string da memória de longo prazo). Tools que
+    # exigem `user_id` (`get_user_allergies`, `get_personalized_score`, ver
+    # `tools/compartilhadas.py`/`tools/produto.py`) precisam dele; sem este
+    # campo, os especialistas não têm como saber o `user_id` real e não devem
+    # chamar essas tools (ver `USER_ID_POSTGRES=` em
+    # `nodes/especialistas.py::_montar_entrada` e a nota compartilhada em
+    # `prompts/comum.py::IDENTIFICADOR_USUARIO_NOTA`) — achado de um teste de
+    # conversa real em 2026-09-10: sem esse campo, o especialista chamava
+    # `get_user_allergies` com um `user_id` inventado em vez de admitir que
+    # não tinha essa informação.
+    usuario_id_postgres: int | None
     mensagem_usuario: str
     # reducer add_messages: os nós devolvem só a(s) mensagem(ns) nova(s) (ver
     # `nodes/guardrails.py`) — o LangGraph acumula no histórico existente em
@@ -49,6 +61,15 @@ class EstadoVenus(TypedDict, total=False):
 
     # --- especialista (produto | ingrediente | rotina | faq) ---
     resposta_especialista: dict[str, Any] | None
+    # Saída bruta de cada tool chamada pelo especialista nesta tentativa
+    # (nome + retorno, ver `nodes/especialistas.py::_resposta_agente`) — dá
+    # ao Agente Juiz (`nodes/juiz.py`) algo pra cruzar contra as afirmações
+    # de `resposta_especialista`/`fontes_usadas`, em vez de só julgar se o
+    # JSON "parece" coerente. Sem isto, um especialista podia citar uma tool
+    # em `fontes_usadas` e inventar um dado que ela nunca devolveu (achado de
+    # um teste de conversa real em 2026-09-10 — produto sem ingrediente
+    # cadastrado, resposta "inventou" ingredientes, e o Juiz aprovou).
+    evidencias_tools: list[dict[str, Any]] | None
 
     # --- agente juiz ---
     tentativas_juiz: int

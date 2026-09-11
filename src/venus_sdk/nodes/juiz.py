@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Literal
 
 from venus_sdk.llm.models import get_llm_rapido
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
+
+logger = logging.getLogger(__name__)
 
 ResultadoJuiz = Literal["aprovado", "reprovado", "esgotado"]
 
@@ -27,8 +30,29 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         f"PERGUNTA_ORIGINAL={estado.get('pergunta_original', '')}\n"
         f"ESPECIALISTA_JSON={json.dumps(estado.get('resposta_especialista') or {}, ensure_ascii=False)}"
     )
+    # Evidência bruta das tools chamadas nesta tentativa (ver
+    # `nodes/especialistas.py::_extrair_evidencias_tools`) — sem isto, o
+    # Juiz só via o JSON final e não tinha como notar quando uma tool citada
+    # em `fontes_usadas` não sustentava, de verdade, a afirmação feita
+    # (achado de um teste de conversa real em 2026-09-10: produto sem
+    # ingrediente cadastrado, resposta "inventou" ingredientes, aprovado).
+    evidencias = estado.get("evidencias_tools")
+    if evidencias:
+        entrada += f"\nRESULTADOS_TOOLS={json.dumps(evidencias, ensure_ascii=False)}"
     mensagens = [("system", JUIZ_PROMPT_COMPLETO), ("human", entrada)]
-    resposta = get_llm_rapido().invoke(mensagens)
+
+    try:
+        resposta = get_llm_rapido().invoke(mensagens)
+    except Exception:
+        # LLM do Juiz indisponível — não deixa isso subir cru até o
+        # `.ainvoke()` do grafo principal. Trata como reprovação silenciosa
+        # (sem feedback específico pro especialista tentar de novo): reusa o
+        # fluxo normal de retry/`esgotado` em `decidir_pos_juiz`, que depois
+        # de `MAX_TENTATIVAS_JUIZ` segue pro orquestrador com a nota de
+        # transparência de sempre — em vez de travar a conversa inteira.
+        logger.exception("Falha ao chamar o LLM do Agente Juiz")
+        tentativas = estado.get("tentativas_juiz", 0) + 1
+        return {"aprovado_juiz": False, "feedback_juiz": None, "tentativas_juiz": tentativas}
     texto = (resposta.content or "").strip()
 
     match_resultado = _RESULTADO_RE.search(texto)

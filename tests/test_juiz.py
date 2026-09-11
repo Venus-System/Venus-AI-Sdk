@@ -71,3 +71,62 @@ def test_no_agente_juiz_acumula_tentativas() -> None:
         )
 
     assert resultado["tentativas_juiz"] == 2
+
+
+def test_no_agente_juiz_inclui_evidencias_tools_na_entrada_do_llm() -> None:
+    """Sem `RESULTADOS_TOOLS=` na entrada, o Juiz só via o JSON final do
+    especialista e não tinha como cruzar contra o que a tool citada em
+    `fontes_usadas` realmente devolveu (achado do teste de conversa real em
+    2026-09-10 — ver `EstadoVenus.evidencias_tools`)."""
+    evidencias = [{"tool": "get_product_ingredients", "resultado": "[]"}]
+    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm("RESULTADO=aprovado")
+        no_agente_juiz(
+            {
+                "pergunta_original": "pergunta",
+                "resposta_especialista": {"dominio": "produto"},
+                "evidencias_tools": evidencias,
+                "tentativas_juiz": 0,
+            }
+        )
+
+    mensagens = get_llm_mock.return_value.invoke.call_args[0][0]
+    entrada_human = mensagens[1][1]
+    assert "RESULTADOS_TOOLS=" in entrada_human
+    assert "get_product_ingredients" in entrada_human
+
+
+def test_no_agente_juiz_sem_evidencias_nao_inclui_resultados_tools() -> None:
+    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm("RESULTADO=aprovado")
+        no_agente_juiz(
+            {
+                "pergunta_original": "pergunta",
+                "resposta_especialista": {"dominio": "produto"},
+                "tentativas_juiz": 0,
+            }
+        )
+
+    mensagens = get_llm_mock.return_value.invoke.call_args[0][0]
+    entrada_human = mensagens[1][1]
+    assert "RESULTADOS_TOOLS=" not in entrada_human
+
+
+def test_no_agente_juiz_trata_falha_do_llm_como_reprovado_sem_derrubar_o_grafo() -> None:
+    """Se o LLM do Juiz falhar (provedor indisponível), o nó não deve deixar
+    a exceção subir crua até o `.ainvoke()` do grafo principal — vira uma
+    reprovação sem feedback específico, reaproveitando o fluxo normal de
+    retry/`esgotado` (ver `decidir_pos_juiz`)."""
+    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.side_effect = RuntimeError("provedor indisponível")
+        resultado = no_agente_juiz(
+            {
+                "pergunta_original": "pergunta",
+                "resposta_especialista": {"dominio": "produto"},
+                "tentativas_juiz": 0,
+            }
+        )
+
+    assert resultado["aprovado_juiz"] is False
+    assert resultado["feedback_juiz"] is None
+    assert resultado["tentativas_juiz"] == 1

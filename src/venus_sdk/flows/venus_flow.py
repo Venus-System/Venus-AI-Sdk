@@ -137,6 +137,14 @@ def compilar_grafo_venus(
     `usuario_id` no estado), os nós de memória de longo prazo são no-ops e o
     grafo se comporta como antes deles existirem.
 
+    Note que `EstadoVenus.usuario_id` (acima) é distinto de
+    `EstadoVenus.usuario_id_postgres` — o ID inteiro real do usuário no
+    Postgres, exigido pelas tools de produto/ingrediente que checam alergia/
+    personalização (`get_user_allergies`, `get_personalized_score`). Quem
+    invoca o grafo deve passar os dois quando disponíveis; sem
+    `usuario_id_postgres`, essas tools não são chamadas (ver
+    `prompts/comum.py::IDENTIFICADOR_USUARIO_NOTA`).
+
     `pool` é opcional (um pool `asyncpg` já conectado) — as tools de
     produto/ingrediente (`tools/produto.py`, `tools/ingrediente.py`) o usam
     pra consultar o Postgres. Sem ele, produto/ingrediente levantam

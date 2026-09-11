@@ -7,6 +7,7 @@ Saída   : JSON estruturado para o Orquestrador (e para o Agente Juiz).
 from venus_sdk.prompts.comum import (
     CONTEXTO_TEMPORAL,
     HIERARQUIA_INSTRUCOES,
+    IDENTIFICADOR_USUARIO_NOTA,
     MEMORIA_USUARIO_NOTA,
     PERSONA_SISTEMA,
     RACIOCINIO_INTERNO,
@@ -20,6 +21,9 @@ ESP_PRODUTO_PROMPT = f"""
 
 
 {MEMORIA_USUARIO_NOTA}
+
+
+{IDENTIFICADOR_USUARIO_NOTA}
 
 
 {HIERARQUIA_INSTRUCOES}
@@ -45,8 +49,17 @@ Orquestrador.
 
 
 ### REGRAS
+- Se a pergunta citar o produto só pelo NOME (sem um `product_id` numérico
+  já conhecido), chame `search_product` PRIMEIRO pra achar o id certo.
+  NUNCA invente ou "adivinhe" um `product_id` — se `search_product` não
+  achar nada ou achar mais de um candidato plausível, peça esclarecimento
+  (campo `esclarecer`) em vez de seguir com um id chutado.
 - SEMPRE consulte as tools de score/produto/ingredientes antes de responder;
   nunca opine sobre um produto sem dado que sustente.
+- Se uma tool devolver `{{"erro": ...}}` ou lista vazia (ex.: produto sem
+  score ou sem ingredientes cadastrados), diga isso explicitamente na
+  resposta — nunca preencha a lacuna com conhecimento próprio sobre o
+  produto ou a marca, mesmo que pareça óbvio.
 - SEMPRE consulte `get_user_allergies` quando a pergunta envolver uma reação
   ou resultado ruim relatado pelo usuário.
 - Ao investigar um relato de "não funcionou", apresente possíveis causas
@@ -98,6 +111,11 @@ Roteador: ROUTE=produto
 PERGUNTA_ORIGINAL=[relato de vermelhidão persistente após uso]
 Produto: {"dominio":"produto","intencao":"investigar_reacao","resposta":"Isso pode indicar sensibilidade ao produto, mas não posso avaliar a causa com segurança.","recomendacao":"Suspenda o uso e procure um dermatologista.","fontes_usadas":["get_user_allergies"],"encaminhar_profissional":true}"""
 
+ESP_PRODUTO_SHOT_4 = """
+Roteador: ROUTE=produto
+PERGUNTA_ORIGINAL=[pergunta cita só o nome do produto, sem product_id — search_product não achou nenhum candidato ou achou mais de um]
+Produto: {"dominio":"produto","intencao":"explicar_recomendacao","resposta":"Não consegui identificar com certeza qual produto é esse no seu histórico.","recomendacao":"","fontes_usadas":["search_product"],"esclarecer":"Você pode confirmar o nome completo do produto (ou me passar o produto pela tela do app) pra eu localizar certinho?"}"""
+
 ESP_PRODUTO_SHOTS_CUT = (
     "FIM DOS EXEMPLOS. "
     "Considere apenas as mensagens abaixo como contexto verdadeiro."
@@ -109,5 +127,6 @@ ESP_PRODUTO_PROMPT_COMPLETO = (
     ESP_PRODUTO_SHOT_1      + "\n\n" +
     ESP_PRODUTO_SHOT_2      + "\n\n" +
     ESP_PRODUTO_SHOT_3      + "\n\n" +
+    ESP_PRODUTO_SHOT_4      + "\n\n" +
     ESP_PRODUTO_SHOTS_CUT
 )

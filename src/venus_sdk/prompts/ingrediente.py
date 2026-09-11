@@ -7,6 +7,7 @@ Saída   : JSON estruturado para o Orquestrador (e para o Agente Juiz).
 from venus_sdk.prompts.comum import (
     CONTEXTO_TEMPORAL,
     HIERARQUIA_INSTRUCOES,
+    IDENTIFICADOR_USUARIO_NOTA,
     MEMORIA_USUARIO_NOTA,
     PERSONA_SISTEMA,
     RACIOCINIO_INTERNO,
@@ -20,6 +21,9 @@ ESP_INGREDIENTE_PROMPT = f"""
 
 
 {MEMORIA_USUARIO_NOTA}
+
+
+{IDENTIFICADOR_USUARIO_NOTA}
 
 
 {HIERARQUIA_INSTRUCOES}
