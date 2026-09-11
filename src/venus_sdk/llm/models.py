@@ -54,9 +54,12 @@ def get_llm_gemini() -> BaseChatModel:
         # gemini-2.5-flash foi descontinuado pro Google pra contas novas
         # (404 NOT_FOUND em produção, 2026-09-08) — substituído conforme a
         # própria mensagem de erro da API.
+        #
+        # Sem temperature/top_p de propósito: gemini-3.6-flash usa sampling
+        # fixo e ignora os dois (UserWarning do langchain_google_genai a
+        # cada chamada se passados) — omitir não muda o comportamento, só
+        # tira o warning.
         model="gemini-3.6-flash",
-        temperature=0.7,
-        top_p=0.95,
         api_key=GEMINI_API_KEY,
     )
 
