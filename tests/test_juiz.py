@@ -112,6 +112,39 @@ def test_no_agente_juiz_sem_evidencias_nao_inclui_resultados_tools() -> None:
     assert "RESULTADOS_TOOLS=" not in entrada_human
 
 
+def test_no_agente_juiz_tolera_colchetes_no_resultado_aprovado() -> None:
+    """O prompt mostra o protocolo como `RESULTADO=[aprovado|reprovado]`
+    (ver `prompts/juiz.py`); se o LLM ecoar o colchete ao pé da letra
+    (`RESULTADO=[aprovado]`), o parser não pode tratar isso como reprovado."""
+    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm("RESULTADO=[aprovado]")
+        resultado = no_agente_juiz(
+            {
+                "pergunta_original": "pergunta",
+                "resposta_especialista": {"dominio": "produto"},
+                "tentativas_juiz": 0,
+            }
+        )
+
+    assert resultado["aprovado_juiz"] is True
+
+
+def test_no_agente_juiz_tolera_colchetes_no_feedback() -> None:
+    texto_llm = "RESULTADO=[reprovado]\nFEEDBACK=[faltou fonte para a afirmação.]"
+    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm(texto_llm)
+        resultado = no_agente_juiz(
+            {
+                "pergunta_original": "pergunta",
+                "resposta_especialista": {"dominio": "produto"},
+                "tentativas_juiz": 0,
+            }
+        )
+
+    assert resultado["aprovado_juiz"] is False
+    assert resultado["feedback_juiz"] == "faltou fonte para a afirmação."
+
+
 def test_no_agente_juiz_trata_falha_do_llm_como_reprovado_sem_derrubar_o_grafo() -> None:
     """Se o LLM do Juiz falhar (provedor indisponível), o nó não deve deixar
     a exceção subir crua até o `.ainvoke()` do grafo principal — vira uma

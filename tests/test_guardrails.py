@@ -44,6 +44,25 @@ def test_no_guardrail_entrada_anonimiza_antes_de_gravar_historico() -> None:
     assert "[EMAIL]" in mensagem.content
 
 
+def test_no_guardrail_entrada_zera_estado_do_juiz() -> None:
+    """`tentativas_juiz` persiste por `thread_id` via checkpointer — sem
+    zerar aqui (entry point do grafo, roda 1x por turno), o resíduo de um
+    turno anterior podia disparar "esgotado" logo no início de um turno
+    novo. Simula um estado chegando com resíduo de um turno anterior."""
+    resultado = no_guardrail_entrada(
+        {
+            "mensagem_usuario": "outra pergunta",
+            "tentativas_juiz": 2,
+            "aprovado_juiz": False,
+            "feedback_juiz": "resíduo do turno anterior",
+        }
+    )
+
+    assert resultado["tentativas_juiz"] == 0
+    assert resultado["aprovado_juiz"] is None
+    assert resultado["feedback_juiz"] is None
+
+
 def test_decidir_pos_guardrail_entrada() -> None:
     assert decidir_pos_guardrail_entrada({"entrada_bloqueada": True}) == "bloqueado"
     assert decidir_pos_guardrail_entrada({"entrada_bloqueada": False}) == "liberado"

@@ -28,6 +28,14 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
     Grava a mensagem (anonimizada) no histórico — o campo usa o reducer
     `add_messages` (ver `state.py`), então isto soma à conversa acumulada em
     vez de sobrescrevê-la.
+
+    Também zera o estado do Agente Juiz (`tentativas_juiz`/`aprovado_juiz`/
+    `feedback_juiz`) — este nó é o entry point do grafo e roda uma única vez
+    por turno (nunca de novo durante um retry do Juiz dentro do mesmo turno,
+    que volta direto pro especialista sem passar por aqui), então é o lugar
+    certo pra isso. Sem isto, `tentativas_juiz` persistia entre turnos via
+    checkpointer e podia disparar "esgotado" logo na 1ª rodada de um turno
+    novo, com o resíduo de um turno anterior.
     """
     mensagem = estado.get("mensagem_usuario", "") or ""
     bloqueado, motivo = guardrail_entrada(mensagem)
@@ -41,6 +49,9 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
         "motivo_bloqueio": motivo,
         "mensagem_anonimizada": mensagem_anonimizada,
         "historico": [HumanMessage(content=mensagem_anonimizada)],
+        "tentativas_juiz": 0,
+        "aprovado_juiz": None,
+        "feedback_juiz": None,
     }
     if bloqueado:
         atualizacao["resposta_final"] = MENSAGEM_ENTRADA_BLOQUEADA

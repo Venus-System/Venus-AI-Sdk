@@ -62,9 +62,14 @@ do domínio.
 
 
 ### PROTOCOLO DE SAÍDA
-RESULTADO=[aprovado|reprovado]
-FEEDBACK=[somente se reprovado: o que corrigir, em 1-2 frases objetivas e
-acionáveis para o especialista tentar de novo]
+Responda EXATAMENTE nesse formato, sem colchetes, sem markdown, sem texto
+antes ou depois:
+
+RESULTADO=aprovado
+(ou, se reprovado:)
+RESULTADO=reprovado
+FEEDBACK=o que corrigir, em 1-2 frases objetivas e acionáveis para o
+especialista tentar de novo
 """
 
 JUIZ_SHOTS_OPEN = (

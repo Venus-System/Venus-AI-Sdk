@@ -63,7 +63,11 @@ def no_atualizar_memoria(estado: EstadoVenus, *, store: BaseStore) -> EstadoVenu
     if store is None or not usuario_id:
         return {}
 
-    pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario", "")
+    # `pergunta_original` é a reformulação feita pelo LLM roteador (ver
+    # `nodes/roteador.py`), não a mensagem real do usuário — usar
+    # `mensagem_anonimizada` (a entrada de fato, já sem dado sensível) evita
+    # extrair fatos de longo prazo a partir de uma paráfrase.
+    pergunta = estado.get("mensagem_anonimizada") or estado.get("mensagem_usuario", "")
     resposta = estado.get("resposta_final") or ""
     perfil_atual = estado.get("memorias_usuario") or {}
 
