@@ -17,12 +17,20 @@ def _resposta_llm(texto: str) -> SimpleNamespace:
 @pytest.mark.parametrize(
     "estado, esperado",
     [
-        ({"aprovado_juiz": True, "tentativas_juiz": 1}, "aprovado"),
-        ({"aprovado_juiz": False, "tentativas_juiz": 1}, "reprovado"),
-        ({"aprovado_juiz": False, "tentativas_juiz": MAX_TENTATIVAS_JUIZ}, "esgotado"),
+        ({"aprovado_juiz": True, "tentativas_juiz": 1, "rota": "produto"}, "aprovado"),
+        ({"aprovado_juiz": False, "tentativas_juiz": 1, "rota": "produto"}, "reprovado_produto"),
+        ({"aprovado_juiz": False, "tentativas_juiz": 1, "rota": "ingrediente"}, "reprovado_ingrediente"),
+        ({"aprovado_juiz": False, "tentativas_juiz": 1, "rota": "rotina"}, "reprovado_rotina"),
+        (
+            {"aprovado_juiz": False, "tentativas_juiz": MAX_TENTATIVAS_JUIZ, "rota": "produto"},
+            "esgotado",
+        ),
     ],
 )
 def test_decidir_pos_juiz(estado: dict, esperado: str) -> None:
+    """Reprovado volta DIRETO pro nó do especialista que gerou a resposta
+    (não mais pro roteador) — ver `nodes/juiz.py::decidir_pos_juiz` e
+    `flows/venus_flow.py`."""
     assert decidir_pos_juiz(estado) == esperado  # type: ignore[arg-type]
 
 

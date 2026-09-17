@@ -13,7 +13,9 @@ from venus_sdk.state import EstadoVenus
 
 logger = logging.getLogger(__name__)
 
-ResultadoJuiz = Literal["aprovado", "reprovado", "esgotado"]
+ResultadoJuiz = Literal[
+    "aprovado", "reprovado_produto", "reprovado_ingrediente", "reprovado_rotina", "esgotado"
+]
 
 # Nº máximo de vezes que o Agente Juiz pode mandar o especialista tentar de
 # novo (via roteador) antes de seguir mesmo assim para o orquestrador.
@@ -73,12 +75,21 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
 def decidir_pos_juiz(estado: EstadoVenus) -> ResultadoJuiz:
     """Aresta condicional pós-juiz.
 
-    Devolve "reprovado" enquanto houver tentativas disponíveis (volta para o
-    roteador/especialista), e "esgotado" quando as tentativas acabarem
-    (segue para o orquestrador mesmo sem aprovação total).
+    Devolve "reprovado_<dominio>" (produto/ingrediente/rotina) enquanto
+    houver tentativas disponíveis — volta DIRETO pro nó do especialista que
+    gerou a resposta (ver `flows/venus_flow.py`), não mais pro roteador:
+    reprovar não muda a intenção/rota já classificada, só pede pro mesmo
+    especialista tentar de novo com o feedback do Juiz (já lido de
+    `feedback_juiz` em `nodes/especialistas.py::_montar_entrada`,
+    independente de por onde se chega até ele). Antes, isso gastava uma
+    chamada de LLM a mais no roteador a cada retry e podia até re-rotear pra
+    um especialista diferente do que gerou a resposta reprovada.
+
+    Devolve "esgotado" quando as tentativas acabarem (segue para o
+    orquestrador mesmo sem aprovação total).
     """
     if estado.get("aprovado_juiz"):
         return "aprovado"
     if estado.get("tentativas_juiz", 0) >= MAX_TENTATIVAS_JUIZ:
         return "esgotado"
-    return "reprovado"
+    return f"reprovado_{estado.get('rota')}"  # type: ignore[return-value]

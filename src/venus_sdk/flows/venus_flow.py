@@ -13,6 +13,11 @@ dois desvios previstos pelos próprios prompts dos agentes:
 O FAQ é a outra exceção: responde direto e vai para o guardrail de saída sem
 passar pelo Agente Juiz (ver `prompts/faq.py`).
 
+Reprovação do Juiz (produto/ingrediente/rotina) volta DIRETO pro nó do
+especialista que gerou a resposta — não pro roteador (ver
+`nodes/juiz.py::decidir_pos_juiz`): reprovar não muda a rota já
+classificada, só pede uma nova tentativa com o feedback do Juiz.
+
 `carregar_memoria`/`atualizar_memoria` (`nodes/memoria.py`) são a memória de
 LONGO PRAZO, por `usuario_id` — distinta do checkpointer por `thread_id`
 (`memory/checkpointer.py`, que guarda o histórico bruto de uma conversa).
@@ -105,7 +110,11 @@ def montar_grafo_venus(*, pool: Any | None = None) -> StateGraph:
         decidir_pos_juiz,
         {
             "aprovado": "orquestrador",
-            "reprovado": "roteador",
+            # Reprovado volta DIRETO pro especialista que gerou a resposta,
+            # não pro roteador — ver `nodes/juiz.py::decidir_pos_juiz`.
+            "reprovado_produto": "agente_produto",
+            "reprovado_ingrediente": "agente_ingrediente",
+            "reprovado_rotina": "agente_rotina",
             "esgotado": "orquestrador",
         },
     )
