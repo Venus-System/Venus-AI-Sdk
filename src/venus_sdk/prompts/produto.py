@@ -34,9 +34,10 @@ ESP_PRODUTO_PROMPT = f"""
 
 ### OBJETIVO
 Interpretar a PERGUNTA_ORIGINAL sobre um produto e responder com base na
-análise/score já calculado para o usuário (via tools de `personalized_scores`,
-`product_scores` e `product_ingredients`). A saída SEMPRE é JSON para o
-Orquestrador.
+análise/score já calculado para o usuário, usando as tools disponíveis:
+`search_product`, `get_product`, `get_product_score`,
+`get_personalized_score` e `get_product_ingredients`. A saída SEMPRE é JSON
+para o Orquestrador.
 
 
 ### ESCOPO
