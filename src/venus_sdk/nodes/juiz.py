@@ -19,8 +19,12 @@ ResultadoJuiz = Literal["aprovado", "reprovado", "esgotado"]
 # novo (via roteador) antes de seguir mesmo assim para o orquestrador.
 MAX_TENTATIVAS_JUIZ = 2
 
-_RESULTADO_RE = re.compile(r"RESULTADO=(\w+)", re.IGNORECASE)
-_FEEDBACK_RE = re.compile(r"FEEDBACK=(.*)", re.IGNORECASE | re.DOTALL)
+# `\[?...\]?` tolera o LLM ecoar o formato `RESULTADO=[aprovado|reprovado]`
+# do próprio protocolo do prompt (`prompts/juiz.py`) ao pé da letra — sem
+# isso, `RESULTADO=[aprovado]` não casava (`\w+` não inclui `[`) e o Juiz
+# tratava como reprovado mesmo quando o LLM quis dizer "aprovado".
+_RESULTADO_RE = re.compile(r"RESULTADO=\[?(\w+)\]?", re.IGNORECASE)
+_FEEDBACK_RE = re.compile(r"FEEDBACK=\[?(.*?)\]?\s*$", re.IGNORECASE | re.DOTALL)
 
 
 def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
