@@ -98,6 +98,29 @@ def test_atualizar_memoria_grava_fatos_novos_e_mescla_com_perfil_atual() -> None
     assert store.get(("memorias", "u1"), "perfil").value == esperado
 
 
+def test_atualizar_memoria_usa_mensagem_anonimizada_nao_pergunta_reformulada() -> None:
+    """`pergunta_original` é a reformulação do LLM roteador (ver
+    `nodes/roteador.py`), não a mensagem real do usuário — a extração de
+    memória deve usar `mensagem_anonimizada` (a entrada de fato)."""
+    store = criar_store_em_memoria()
+    with patch("venus_sdk.nodes.memoria.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm('{"tipo_pele": "oleosa"}')
+        no_atualizar_memoria(
+            {
+                "usuario_id": "u1",
+                "mensagem_anonimizada": "tenho pele oleosa, mensagem real",
+                "pergunta_original": "reformulação do roteador, não deve ser usada",
+                "resposta_final": "Anotado!",
+            },
+            store=store,
+        )
+
+    mensagens = get_llm_mock.return_value.invoke.call_args[0][0]
+    entrada_human = mensagens[1][1]
+    assert "tenho pele oleosa, mensagem real" in entrada_human
+    assert "reformulação do roteador" not in entrada_human
+
+
 def test_atualizar_memoria_concatena_listas_em_vez_de_sobrescrever() -> None:
     """Alergias declaradas em turnos diferentes têm que se acumular — um
     merge raso (`{**atual, **novos}`) perdia a alergia do turno anterior

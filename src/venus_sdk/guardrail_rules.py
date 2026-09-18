@@ -33,9 +33,29 @@ MENSAGEM_SAIDA_BLOQUEADA = (
 _CPF_RE = re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b")
 _RG_RE = re.compile(r"\b\d{1,2}\.\d{3}\.\d{3}-[\dXx]\b")
 _CEP_RE = re.compile(r"\b\d{5}-?\d{3}\b")
+# Candidato a cartão: só a contagem de dígitos (13-19) não é filtro nenhum —
+# batia em qualquer sequência longa de dígitos (ex.: código de barras EAN-13
+# de produto, CEP+número concatenado). O regex aqui só encontra candidatos;
+# quem decide se é cartão de verdade é `_eh_cartao_valido` (checksum de Luhn),
+# chamado em cima de cada match antes de bloquear/mascarar.
 _CARTAO_RE = re.compile(r"\b(?:\d[ -]?){13,19}\b")
 _EMAIL_RE = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
 _TELEFONE_RE = re.compile(r"\b(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}-?\d{4}\b")
+
+
+def _eh_cartao_valido(candidato: str) -> bool:
+    """Checksum de Luhn — filtra os falsos positivos do `_CARTAO_RE` (que só
+    conta dígitos). Um código de barras/CEP/ID longo passa pela contagem mas
+    quase nunca fecha o checksum de Luhn; um cartão real, sim."""
+    digitos = [int(c) for c in candidato if c.isdigit()]
+    soma = 0
+    for i, digito in enumerate(reversed(digitos)):
+        if i % 2 == 1:
+            digito *= 2
+            if digito > 9:
+                digito -= 9
+        soma += digito
+    return soma % 10 == 0
 
 # --- tentativa de manipulação do sistema (prompt injection / jailbreak) ---
 # Aplicado direto no texto original (com acento) — os character classes
@@ -129,11 +149,15 @@ def _eh_flood(texto: str) -> bool:
     return bool(_FLOOD_CARACTERE_RE.search(texto) or _FLOOD_PALAVRA_RE.search(texto))
 
 
+def _tem_cartao(texto: str) -> bool:
+    return any(_eh_cartao_valido(m.group()) for m in _CARTAO_RE.finditer(texto))
+
+
 def _tem_dado_sensivel_critico(texto: str) -> bool:
     """CPF/RG/cartão — dados que nunca devem sair na resposta. CEP fica de
     fora daqui (baixo risco, mas gera falso positivo com mais frequência;
     ver `anonimizar_entrada`, que mascara CEP na entrada mesmo assim)."""
-    return bool(_CPF_RE.search(texto) or _RG_RE.search(texto) or _CARTAO_RE.search(texto))
+    return bool(_CPF_RE.search(texto) or _RG_RE.search(texto) or _tem_cartao(texto))
 
 
 def guardrail_entrada(mensagem: str) -> tuple[bool, str | None]:
@@ -196,7 +220,7 @@ def anonimizar_entrada(mensagem: str) -> str:
     texto = _CPF_RE.sub("[CPF]", texto)
     texto = _RG_RE.sub("[RG]", texto)
     texto = _EMAIL_RE.sub("[EMAIL]", texto)
-    texto = _CARTAO_RE.sub("[CARTAO]", texto)
+    texto = _CARTAO_RE.sub(lambda m: "[CARTAO]" if _eh_cartao_valido(m.group()) else m.group(), texto)
     texto = _CEP_RE.sub("[CEP]", texto)
     texto = _TELEFONE_RE.sub("[TELEFONE]", texto)
     return texto

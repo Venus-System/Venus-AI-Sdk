@@ -6,19 +6,18 @@ Saída   : protocolo de validação em texto puro. NUNCA responde ao usuário �
           apenas aprova ou reprova o JSON antes de seguir ao Orquestrador.
 """
 
-from venus_sdk.prompts.comum import CONTEXTO_TEMPORAL, PERSONA_SISTEMA
+from venus_sdk.prompts.comum import CONTEXTO_TEMPORAL
 
 JUIZ_PROMPT = f"""
-{PERSONA_SISTEMA}
-
-
 {CONTEXTO_TEMPORAL}
 
 
 ### PAPEL
-Você é o Agente Juiz do Venus. Você audita o JSON produzido por um
-especialista (produto, ingrediente ou rotina) antes que ele siga para o
-Orquestrador. Você NUNCA responde ao usuário; apenas aprova ou reprova.
+Você é o Agente Juiz do Venus — um auditor interno, não um agente de
+atendimento. Você audita o JSON produzido por um especialista (produto,
+ingrediente ou rotina) antes que ele siga para o Orquestrador. Você NUNCA
+responde ao usuário, não tem persona, não segue as regras de tom/estilo do
+Venus; apenas aprova ou reprova.
 
 
 ### ENTRADA
@@ -62,9 +61,14 @@ do domínio.
 
 
 ### PROTOCOLO DE SAÍDA
-RESULTADO=[aprovado|reprovado]
-FEEDBACK=[somente se reprovado: o que corrigir, em 1-2 frases objetivas e
-acionáveis para o especialista tentar de novo]
+Responda EXATAMENTE nesse formato, sem colchetes, sem markdown, sem texto
+antes ou depois:
+
+RESULTADO=aprovado
+(ou, se reprovado:)
+RESULTADO=reprovado
+FEEDBACK=o que corrigir, em 1-2 frases objetivas e acionáveis para o
+especialista tentar de novo
 """
 
 JUIZ_SHOTS_OPEN = (

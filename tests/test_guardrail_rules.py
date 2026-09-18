@@ -141,3 +141,46 @@ def test_anonimizar_entrada_mascara_cep() -> None:
 
     assert "01310-930" not in resultado
     assert "[CEP]" in resultado
+
+
+# --- cartão: contagem de dígitos (13-19) não é filtro nenhum sozinha; o
+# checksum de Luhn (`_eh_cartao_valido`) é quem decide se é cartão de
+# verdade, pra não bloquear/mascarar código de barras, CEP+número etc. ---
+
+
+def test_guardrail_saida_bloqueia_numero_de_cartao_valido() -> None:
+    bloqueado, motivo = guardrail_saida("seu cartão é 4111 1111 1111 1111")
+
+    assert bloqueado is True
+    assert "cart" in (motivo or "").lower()
+
+
+def test_guardrail_saida_nao_bloqueia_codigo_de_barras_de_produto() -> None:
+    """EAN-13 de produto tem 13 dígitos — bate na contagem do `_CARTAO_RE`
+    mas não fecha o checksum de Luhn, então não deve ser tratado como
+    vazamento de cartão."""
+    bloqueado, motivo = guardrail_saida("o código de barras do produto é 7891000100103")
+
+    assert bloqueado is False
+    assert motivo is None
+
+
+def test_guardrail_saida_nao_bloqueia_cep_concatenado_com_numero() -> None:
+    bloqueado, motivo = guardrail_saida("endereço: CEP 01310930, número 1234")
+
+    assert bloqueado is False
+    assert motivo is None
+
+
+def test_anonimizar_entrada_mascara_cartao_valido() -> None:
+    resultado = anonimizar_entrada("meu cartão é 4111 1111 1111 1111, pode salvar?")
+
+    assert "4111 1111 1111 1111" not in resultado
+    assert "[CARTAO]" in resultado
+
+
+def test_anonimizar_entrada_nao_mascara_codigo_de_barras_como_cartao() -> None:
+    resultado = anonimizar_entrada("o código de barras é 7891000100103")
+
+    assert "7891000100103" in resultado
+    assert "[CARTAO]" not in resultado
