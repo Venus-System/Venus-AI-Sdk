@@ -18,6 +18,7 @@ from venus_sdk.nodes.especialistas import (
     _extrair_evidencias_tools,
     _montar_entrada,
     no_agente_faq,
+    no_agente_rotina,
 )
 
 
@@ -127,17 +128,29 @@ def test_executar_especialista_excecao_no_llm_cai_no_erro_tecnico_sem_derrubar_o
     assert resultado["evidencias_tools"] is None
 
 
-# --- no_agente_faq: stub (NotImplementedError) x falha de LLM ---
+# --- no_agente_faq/no_agente_rotina: stub (NotImplementedError) x falha de LLM ---
 
 
-def test_no_agente_faq_propaga_not_implemented_error_do_stub() -> None:
-    """Enquanto `mcp/tools.py` for stub, `NotImplementedError` na MONTAGEM
-    do agente precisa continuar propagando crua — é o sinal que
-    `examples/conversar_com_venus.py` espera pra imprimir "[ainda não
-    implementado]", não uma falha de LLM (ver `no_agente_faq`)."""
+def test_no_agente_faq_degrada_graciosamente_quando_stub() -> None:
+    """`NotImplementedError` na MONTAGEM do agente (client MCP ainda stub,
+    `mcp/tools.py`) precisa virar uma resposta educada, não derrubar a
+    conversa — o roteador (Groq) de vez em quando alucina uma rota errada
+    (ver `nodes/roteador.py::_recuperar_de_tool_call_alucinada`) e manda
+    small talk inofensivo pra cá; deixar isso crashar é pior que avisar que
+    a funcionalidade ainda não existe (ver `no_agente_faq`)."""
     with patch("venus_sdk.nodes.especialistas._agente", side_effect=NotImplementedError("TODO: mcp")):
-        with pytest.raises(NotImplementedError):
-            _rodar(no_agente_faq({"mensagem_usuario": "qual a política de privacidade?"}))
+        resultado = _rodar(no_agente_faq({"mensagem_usuario": "qual a política de privacidade?"}))
+
+    assert resultado["resposta_final"]  # nunca vazio, nunca levanta
+
+
+def test_no_agente_rotina_degrada_graciosamente_quando_stub() -> None:
+    with patch("venus_sdk.nodes.especialistas._agente", side_effect=NotImplementedError("TODO: mcp")):
+        resultado = _rodar(no_agente_rotina({"mensagem_usuario": "monta uma rotina pra mim"}))
+
+    assert resultado["resposta_especialista"]["intencao"] == "indisponivel"
+    assert resultado["resposta_especialista"]["resposta"]
+    assert resultado["evidencias_tools"] is None
 
 
 def test_no_agente_faq_usa_fallback_quando_llm_falha_apos_agente_montado() -> None:

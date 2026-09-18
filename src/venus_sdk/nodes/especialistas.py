@@ -39,6 +39,28 @@ _RESPOSTA_FAQ_FALLBACK = (
     "Não consegui buscar essa informação agora — pode tentar de novo em instantes?"
 )
 
+# Rotina/FAQ ainda são stub (client MCP genérico, `mcp/tools.py`) — usadas
+# quando `_agente(...)` levanta `NotImplementedError` na montagem. Distinta
+# dos fallbacks acima (que são sobre uma falha pontual de LLM/tool): aqui a
+# funcionalidade em si não existe ainda. Achado ao vivo em 2026-09-18: o
+# roteador (Groq, `openai/gpt-oss-20b`) de vez em quando alucina uma tool
+# call nativa (ver `nodes/roteador.py::_recuperar_de_tool_call_alucinada`) e
+# a rota recuperada nem sempre bate com a mensagem — ex.: um simples "oi"
+# caindo em `ROUTE=rotina`. Antes disso, `rotina`/`faq` deixavam o
+# `NotImplementedError` propagar cru de propósito (sinal pro teste manual
+# de que falta implementar); agora que qualquer mensagem pode cair ali por
+# engano, deixar a conversa inteira quebrar por isso é pior que avisar que
+# a funcionalidade ainda não existe.
+_RESPOSTA_ROTINA_INDISPONIVEL = (
+    "Ainda não consigo montar ou ajustar rotinas por aqui — essa parte está "
+    "em desenvolvimento. Posso ajudar com dúvidas sobre produto ou ingrediente?"
+)
+_RESPOSTA_FAQ_INDISPONIVEL = (
+    "Ainda não consigo buscar informações sobre o Venus por aqui — essa "
+    "parte está em desenvolvimento. Posso ajudar com dúvidas sobre produto "
+    "ou ingrediente?"
+)
+
 # Cada agente ReAct é montado sob demanda (uma vez) e reaproveitado entre
 # chamadas — montá-lo carrega as tools, que fazem I/O na primeira vez.
 # Usado só por rotina/faq hoje, que ainda não têm tools reais (Mongo/Qdrant
@@ -219,7 +241,21 @@ def montar_no_agente_ingrediente(pool: Any) -> Callable[[EstadoVenus], Awaitable
 async def no_agente_rotina(estado: EstadoVenus) -> EstadoVenus:
     """Idem, usando `ROTINA_PROMPT_COMPLETO` — ainda via o client MCP
     genérico (stub); tools de rotina (MongoDB) pendentes."""
-    return await _executar_especialista(estado, "rotina", _agente("rotina", ROTINA_PROMPT_COMPLETO))
+    try:
+        agente = _agente("rotina", ROTINA_PROMPT_COMPLETO)
+    except NotImplementedError:
+        logger.warning("Agente de rotina indisponível — client MCP ainda é stub (mcp/tools.py)")
+        return {
+            "resposta_especialista": {
+                "dominio": "rotina",
+                "intencao": "indisponivel",
+                "resposta": _RESPOSTA_ROTINA_INDISPONIVEL,
+                "recomendacao": "",
+                "fontes_usadas": [],
+            },
+            "evidencias_tools": None,
+        }
+    return await _executar_especialista(estado, "rotina", agente)
 
 
 async def no_agente_faq(estado: EstadoVenus) -> EstadoVenus:
@@ -227,11 +263,11 @@ async def no_agente_faq(estado: EstadoVenus) -> EstadoVenus:
     `resposta_final` (o FAQ não passa pelo Agente Juiz). Ainda via o client
     MCP genérico (stub); tool `faq_retriever` (Qdrant) pendente."""
     entrada = _montar_entrada(estado)
-    # `_agente(...)` fica FORA do try: enquanto `mcp/tools.py` for stub, ela
-    # levanta `NotImplementedError` na montagem (ver `flows/agente_mcp.py`)
-    # e isso deve propagar cru — é o sinal que `examples/conversar_com_venus.py`
-    # espera pra imprimir "[ainda não implementado]", não uma falha de LLM.
-    agente = _agente("faq", FAQ_PROMPT_COMPLETO)
+    try:
+        agente = _agente("faq", FAQ_PROMPT_COMPLETO)
+    except NotImplementedError:
+        logger.warning("Agente de FAQ indisponível — client MCP ainda é stub (mcp/tools.py)")
+        return {"resposta_final": _RESPOSTA_FAQ_INDISPONIVEL}
     try:
         texto, _evidencias = await _resposta_agente(agente, entrada)
     except Exception:
