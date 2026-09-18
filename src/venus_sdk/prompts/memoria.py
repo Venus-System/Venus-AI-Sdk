@@ -45,9 +45,22 @@ NÃO guarde:
 
 ### PROTOCOLO DE SAÍDA
 Se houver algo novo ou atualizado a guardar, responda APENAS com um objeto
-JSON plano (chave -> valor curto em string), só com os campos NOVOS ou
-ATUALIZADOS — não repita o que já está idêntico em PERFIL_ATUAL:
+JSON plano, só com os campos NOVOS ou ATUALIZADOS — não repita o que já está
+idêntico em PERFIL_ATUAL:
 {{"campo": "valor"}}
+
+Campos que podem ter MAIS DE UM valor ao longo do tempo (hoje: "alergias")
+são sempre uma LISTA de strings, mesmo quando só há um valor novo nesta
+troca — ex.: {{"alergias": ["fragrância"]}}, nunca {{"alergias": "fragrância"}}.
+Isso importa porque quem funde o perfil (`nodes/memoria.py`) concatena listas
+em vez de sobrescrever, então uma alergia nova não pode apagar uma anterior.
+Se PERFIL_ATUAL já tiver "alergias" como lista, inclua só a(s) NOVA(s) — a
+fusão com a lista existente é feita por fora, você não precisa repetir as
+que já estão lá.
+
+Os demais campos (nome, tipo_pele, objetivo, preferências...) continuam
+string simples — ali um valor novo SUBSTITUI o antigo (é uma atualização,
+não um acúmulo).
 
 Se não houver nada durável a guardar nesta troca, responda exatamente:
 NADA
@@ -78,7 +91,14 @@ PERFIL_ATUAL={"nome": "Sophia"}
 PERGUNTA_USUARIO=descobri que sou alérgica a óleo essencial de lavanda
 RESPOSTA_VENUS=[resposta confirmando que vai levar isso em conta]
 Extrator:
-{"alergias": "óleo essencial de lavanda"}"""
+{"alergias": ["óleo essencial de lavanda"]}"""
+
+MEMORIA_SHOT_4 = """
+PERFIL_ATUAL={"nome": "Sophia", "alergias": ["óleo essencial de lavanda"]}
+PERGUNTA_USUARIO=ah, e também sou alérgica a fragrância sintética
+RESPOSTA_VENUS=[resposta confirmando que vai levar isso em conta também]
+Extrator:
+{"alergias": ["fragrância sintética"]}"""
 
 MEMORIA_SHOTS_CUT = (
     "FIM DOS EXEMPLOS. "
@@ -91,5 +111,6 @@ MEMORIA_PROMPT_COMPLETO = (
     MEMORIA_SHOT_1      + "\n\n" +
     MEMORIA_SHOT_2      + "\n\n" +
     MEMORIA_SHOT_3      + "\n\n" +
+    MEMORIA_SHOT_4      + "\n\n" +
     MEMORIA_SHOTS_CUT
 )

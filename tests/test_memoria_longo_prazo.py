@@ -121,6 +121,53 @@ def test_atualizar_memoria_usa_mensagem_anonimizada_nao_pergunta_reformulada() -
     assert "reformulação do roteador" not in entrada_human
 
 
+def test_atualizar_memoria_concatena_listas_em_vez_de_sobrescrever() -> None:
+    """Alergias declaradas em turnos diferentes têm que se acumular — um
+    merge raso (`{**atual, **novos}`) perdia a alergia do turno anterior
+    sempre que uma nova era declarada (ver `nodes/memoria.py::_mesclar_perfil`
+    e `prompts/memoria.py`, que instrui o extrator a emitir "alergias" como
+    lista)."""
+    store = criar_store_em_memoria()
+    store.put(("memorias", "u1"), "perfil", {"alergias": ["óleo essencial de lavanda"]})
+
+    with patch("venus_sdk.nodes.memoria.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm('{"alergias": ["fragrância sintética"]}')
+        resultado = no_atualizar_memoria(
+            {
+                "usuario_id": "u1",
+                "memorias_usuario": {"alergias": ["óleo essencial de lavanda"]},
+                "mensagem_anonimizada": "também sou alérgica a fragrância sintética",
+                "resposta_final": "Anotado!",
+            },
+            store=store,
+        )
+
+    esperado = {"alergias": ["óleo essencial de lavanda", "fragrância sintética"]}
+    assert resultado == {"memorias_usuario": esperado}
+    assert store.get(("memorias", "u1"), "perfil").value == esperado
+
+
+def test_atualizar_memoria_campo_escalar_continua_sobrescrevendo() -> None:
+    """Campo escalar (ex.: `tipo_pele`) não é lista — uma atualização
+    substitui o valor antigo, não acumula (comportamento inalterado)."""
+    store = criar_store_em_memoria()
+    store.put(("memorias", "u1"), "perfil", {"tipo_pele": "mista"})
+
+    with patch("venus_sdk.nodes.memoria.get_llm_rapido") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm('{"tipo_pele": "oleosa"}')
+        resultado = no_atualizar_memoria(
+            {
+                "usuario_id": "u1",
+                "memorias_usuario": {"tipo_pele": "mista"},
+                "mensagem_anonimizada": "na verdade minha pele é oleosa, não mista",
+                "resposta_final": "Anotado!",
+            },
+            store=store,
+        )
+
+    assert resultado == {"memorias_usuario": {"tipo_pele": "oleosa"}}
+
+
 def test_atualizar_memoria_ignora_texto_que_nao_e_json_nem_nada() -> None:
     store = criar_store_em_memoria()
     with patch("venus_sdk.nodes.memoria.get_llm_rapido") as get_llm_mock:

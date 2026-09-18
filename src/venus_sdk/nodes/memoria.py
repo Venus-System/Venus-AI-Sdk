@@ -88,7 +88,7 @@ def no_atualizar_memoria(estado: EstadoVenus, *, store: BaseStore) -> EstadoVenu
     if not fatos_novos:
         return {}
 
-    perfil_atualizado = {**perfil_atual, **fatos_novos}
+    perfil_atualizado = _mesclar_perfil(perfil_atual, fatos_novos)
     store.put(_namespace(usuario_id), CHAVE_PERFIL, perfil_atualizado)
     return {"memorias_usuario": perfil_atualizado}
 
@@ -102,3 +102,22 @@ def _extrair_fatos_novos(texto: str) -> dict[str, Any] | None:
         logger.warning("Extrator de memória não devolveu JSON válido: %r", texto)
         return None
     return fatos if isinstance(fatos, dict) and fatos else None
+
+
+def _mesclar_perfil(atual: dict[str, Any], novos: dict[str, Any]) -> dict[str, Any]:
+    """Funde `novos` (fatos desta troca) em `atual` (perfil salvo).
+
+    Quando o mesmo campo já existe nos dois lados como LISTA (ex.:
+    "alergias" — ver `prompts/memoria.py`), concatena e deduplica em vez de
+    sobrescrever: um `{**atual, **novos}` simples perdia a alergia
+    mencionada num turno anterior sempre que uma alergia NOVA era declarada
+    num turno seguinte. Campo escalar (ex.: "tipo_pele") continua
+    sobrescrevendo — ali a atualização/correção é o comportamento certo."""
+    mesclado = dict(atual)
+    for chave, valor_novo in novos.items():
+        valor_atual = mesclado.get(chave)
+        if isinstance(valor_atual, list) and isinstance(valor_novo, list):
+            mesclado[chave] = valor_atual + [v for v in valor_novo if v not in valor_atual]
+        else:
+            mesclado[chave] = valor_novo
+    return mesclado

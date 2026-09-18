@@ -109,10 +109,10 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     # grava `mensagem_anonimizada` nele (reducer `add_messages`, ver
     # `state.py`) antes do roteador rodar, no mesmo `invoke`. Descartamos a
     # última entrada aqui pra não duplicá-la no prompt do LLM (ela reaparece
-    # logo abaixo, já com o prefixo MEMORIA_USUARIO= quando houver); isso
-    # vale tanto na primeira passagem quanto num retry vindo do Agente Juiz
-    # ("reprovado" -> volta pro roteador sem o guardrail rodar de novo), já
-    # que `mensagem_anonimizada` não muda entre essas tentativas.
+    # logo abaixo, já com o prefixo MEMORIA_USUARIO= quando houver). O
+    # roteador só roda 1x por turno agora — um retry do Agente Juiz volta
+    # direto pro especialista, não mais pro roteador (ver
+    # `nodes/juiz.py::decidir_pos_juiz`).
     historico = list(estado.get("historico") or [])
     if historico:
         historico = historico[:-1]
