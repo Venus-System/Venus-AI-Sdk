@@ -49,7 +49,7 @@ def test_reprovacao_do_juiz_volta_direto_pro_especialista_sem_re_rotear() -> Non
         # quebra com `ValidationError` (API key) em qualquer ambiente sem
         # GEMINI_API_KEY configurada (ex.: CI, ver `.github/workflows/ci.yaml`).
         patch("venus_sdk.nodes.especialistas.get_llm_especialista", return_value=None),
-        patch("venus_sdk.nodes.roteador.get_llm_rapido") as roteador_mock,
+        patch("venus_sdk.nodes.roteador.get_llm_roteador") as roteador_mock,
         patch("venus_sdk.nodes.juiz.get_llm_rapido") as juiz_mock,
     ):
         roteador_mock.return_value.invoke.return_value = _resposta_llm(

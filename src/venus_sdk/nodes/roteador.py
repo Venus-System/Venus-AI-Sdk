@@ -7,7 +7,7 @@ import logging
 import re
 from typing import Literal
 
-from venus_sdk.llm.models import get_llm_rapido
+from venus_sdk.llm.models import get_llm_roteador
 from venus_sdk.prompts.router import ROUTER_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 
@@ -34,12 +34,14 @@ _RESPOSTA_DIRETA_FALLBACK = (
 
 
 def _recuperar_de_tool_call_alucinada(erro: Exception) -> str | None:
-    """Recupera ROUTE=/PERGUNTA_ORIGINAL= de dentro do erro 400 da Groq
-    quando o gpt-oss-20b alucina uma tool call nativa (ex.: um "tool"
-    chamado "router" tentando emitir o protocolo como argumentos) mesmo sem
-    nenhuma tool vinculada ao client — a Groq rejeita a chamada inteira com
-    `400 "Tool choice is none, but model called a tool"` (`code ==
-    "tool_use_failed"`) nesse caso.
+    """Recupera ROUTE=/PERGUNTA_ORIGINAL= de dentro do erro 400 da Groq, pro
+    caso raro do LLM do roteador (`get_llm_roteador()`) ainda assim tentar
+    emitir uma tool call nativa mesmo sem nenhuma tool vinculada ao client —
+    a Groq rejeita a chamada inteira com `400 "Tool choice is none, but
+    model called a tool"` (`code == "tool_use_failed"`) nesse caso. Era
+    frequente com o `openai/gpt-oss-20b` (treinado pra chamar tool de forma
+    agressiva); trocamos pro `qwen/qwen3.8-27b` por isso (ver
+    `get_llm_roteador`), mas mantemos esta rede de segurança.
 
     Em vez de só tentar de novo (a alucinação não é 100% determinística nem
     a `temperature=0.0` — retries às vezes se repetem, cada um consumindo
@@ -75,17 +77,17 @@ def _recuperar_de_tool_call_alucinada(erro: Exception) -> str | None:
 
 
 def _invocar_roteador(mensagens: list) -> str:
-    # Bug de content vazio: ver `get_llm_rapido`. Tenta mais uma vez antes de
-    # desistir, em vez de deixar a exceção derrubar o grafo inteiro.
+    # Tenta mais uma vez antes de desistir, em vez de deixar a exceção
+    # derrubar o grafo inteiro.
     try:
-        resposta = get_llm_rapido().invoke(mensagens)
+        resposta = get_llm_roteador().invoke(mensagens)
     except Exception as erro:
         recuperado = _recuperar_de_tool_call_alucinada(erro)
         if recuperado is not None:
             return recuperado
         logger.warning("Falha ao chamar o LLM roteador; tentando novamente uma vez", exc_info=True)
         try:
-            resposta = get_llm_rapido().invoke(mensagens)
+            resposta = get_llm_roteador().invoke(mensagens)
         except Exception as erro2:
             recuperado = _recuperar_de_tool_call_alucinada(erro2)
             if recuperado is not None:

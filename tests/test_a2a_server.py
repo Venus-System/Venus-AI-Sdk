@@ -80,7 +80,7 @@ def test_task_ponta_a_ponta_bate_com_ainvoke_direto() -> None:
     async def cenario() -> str:
         return await _perguntar(app, "oi", context_id="conversa-a2a-1")
 
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm("Oi! Como posso ajudar?")
         resposta = asyncio.run(cenario())
 
@@ -98,7 +98,7 @@ def test_falha_do_llm_nao_derruba_a_resposta_a2a() -> None:
     async def cenario() -> str:
         return await _perguntar(app, "oi", context_id="conversa-a2a-erro")
 
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.side_effect = RuntimeError("provedor indisponível")
         resposta = asyncio.run(cenario())
 
@@ -115,7 +115,7 @@ def test_context_ids_diferentes_nao_vazam_historico() -> None:
         await _perguntar(app, "oi", context_id="sessao-x")
         return await _perguntar(app, "oi de novo", context_id="sessao-y")
 
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.side_effect = [
             _resposta_llm("Oi!"),
             _resposta_llm("Olá!"),

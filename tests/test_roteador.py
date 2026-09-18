@@ -31,7 +31,7 @@ def test_decidir_especialista(rota: str | None, esperado: str) -> None:
 
 def test_no_roteador_encaminha_para_especialista() -> None:
     texto_llm = "ROUTE=produto\nPERGUNTA_ORIGINAL=por que esse produto foi recomendado?"
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm(texto_llm)
         resultado = no_roteador({"mensagem_usuario": "por que esse produto foi recomendado?"})
 
@@ -42,7 +42,7 @@ def test_no_roteador_encaminha_para_especialista() -> None:
 
 def test_no_roteador_responde_direto_em_small_talk() -> None:
     texto_llm = "Olá! Posso te ajudar com produtos, ingredientes ou rotina; por onde quer começar?"
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm(texto_llm)
         resultado = no_roteador({"mensagem_usuario": "oi, tudo bem?"})
 
@@ -55,7 +55,7 @@ def test_no_roteador_tenta_de_novo_quando_llm_devolve_vazio() -> None:
     genérica de saída bloqueada para algo simples como uma saudação —
     o roteador tenta mais uma vez antes de cair no fallback fixo."""
     texto_llm = "Oi! Como posso ajudar hoje?"
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.side_effect = [
             _resposta_llm(""),
             _resposta_llm(texto_llm),
@@ -68,7 +68,7 @@ def test_no_roteador_tenta_de_novo_quando_llm_devolve_vazio() -> None:
 
 
 def test_no_roteador_usa_fallback_quando_llm_falha_duas_vezes() -> None:
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.side_effect = [
             _resposta_llm(""),
             _resposta_llm("   "),
@@ -104,7 +104,7 @@ def test_no_roteador_recupera_de_tool_call_alucinada() -> None:
         '{"name": "router", "arguments": '
         '{"ROUTE": "ingrediente", "PERGUNTA_ORIGINAL": "ácido hialurônico é seguro?"}}'
     )
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.side_effect = erro
         resultado = no_roteador({"mensagem_usuario": "ácido hialurônico é seguro?"})
 
@@ -121,7 +121,7 @@ def test_no_roteador_recupera_de_tool_call_alucinada_no_retry() -> None:
         '{"name": "router", "arguments": '
         '{"ROUTE": "produto", "PERGUNTA_ORIGINAL": "esse produto é bom pra pele oleosa?"}}'
     )
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.side_effect = [erro_generico, erro_alucinado]
         resultado = no_roteador({"mensagem_usuario": "esse produto é bom pra pele oleosa?"})
 
@@ -134,7 +134,7 @@ def test_no_roteador_usa_fallback_quando_excecao_nao_e_recuperavel() -> None:
     """Uma exceção sem o formato do erro de tool call (ex.: rate limit,
     timeout) continua caindo no retry normal e, se persistir, no fallback —
     não deve levantar."""
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.side_effect = Exception("rate limit exceeded")
         resultado = no_roteador({"mensagem_usuario": "oi"})
 
@@ -147,7 +147,7 @@ def test_no_roteador_reparseia_rota_no_retry() -> None:
     retry precisa ser roteado normalmente — não pode virar texto cru
     devolvido como resposta_final ao usuário."""
     texto_retry = "ROUTE=ingrediente\nPERGUNTA_ORIGINAL=ácido hialurônico é seguro?"
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.side_effect = [
             _resposta_llm(""),
             _resposta_llm(texto_retry),

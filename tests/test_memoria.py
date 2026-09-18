@@ -25,7 +25,7 @@ def test_historico_persiste_entre_invokes_do_mesmo_thread_id() -> None:
     grafo = compilar_grafo_venus(checkpointer=criar_checkpointer_em_memoria())
     config = {"configurable": {"thread_id": "conversa-1"}}
 
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm("Oi! Como posso ajudar?")
         grafo.invoke({"mensagem_usuario": "oi"}, config=config)
 
@@ -43,7 +43,7 @@ def test_historico_persiste_entre_invokes_do_mesmo_thread_id() -> None:
 def test_historico_nao_vaza_entre_thread_ids_diferentes() -> None:
     grafo = compilar_grafo_venus(checkpointer=criar_checkpointer_em_memoria())
 
-    with patch("venus_sdk.nodes.roteador.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.roteador.get_llm_roteador") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm("Oi!")
         grafo.invoke({"mensagem_usuario": "oi"}, config={"configurable": {"thread_id": "a"}})
 

@@ -80,6 +80,34 @@ def get_llm_especialista() -> BaseChatModel:
 
 
 @lru_cache(maxsize=1)
+def get_llm_roteador() -> BaseChatModel:
+    """LLM dedicado ao Roteador — separado de `get_llm_rapido()` porque o
+    `openai/gpt-oss-20b` é treinado pra chamar tool de forma agressiva, e o
+    protocolo do roteador (`ROUTE=[produto|ingrediente|rotina|faq]`) tem
+    cara de esquema de function-call. Na prática, o modelo às vezes tenta
+    emitir uma tool call NATIVA mesmo sem nenhuma tool vinculada ao client,
+    e a Groq rejeita com `400 tool_use_failed` — visto ao vivo em
+    2026-09-18: um simples "oi" (small talk, nunca deveria acionar nada)
+    alucinava `ROUTE=rotina`. Existe uma recuperação pra esse erro
+    (`nodes/roteador.py::_recuperar_de_tool_call_alucinada`), mas ela só
+    trata o sintoma (não derrubar o grafo) — o roteador continuava
+    classificando errado.
+
+    `qwen/qwen3.8-27b` não tem esse viés de tool-calling e segue o
+    protocolo em texto puro de forma confiável — validado ao vivo no mesmo
+    dia: 3 saudações sem alucinar + 4 perguntas roteadas certo (uma por
+    domínio) + 1 pergunta fora de escopo recusada certo, 8/8 sem nenhuma
+    tool call alucinada.
+    """
+    return ChatGroq(
+        model="qwen/qwen3.8-27b",
+        temperature=0.0,
+        max_tokens=512,
+        api_key=GROQ_API_KEY,
+    )
+
+
+@lru_cache(maxsize=1)
 def get_llm_rapido() -> BaseChatModel:
     # reasoning_effort="low" + max_tokens: o gpt-oss-20b é um modelo de
     # raciocínio (pensa "por dentro" antes de responder) e, sem isso, às

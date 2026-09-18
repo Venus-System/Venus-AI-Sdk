@@ -191,7 +191,7 @@ def test_memoria_de_longo_prazo_sobrevive_a_troca_de_thread_id() -> None:
     )
 
     with (
-        patch("venus_sdk.nodes.roteador.get_llm_rapido") as roteador_mock,
+        patch("venus_sdk.nodes.roteador.get_llm_roteador") as roteador_mock,
         patch("venus_sdk.nodes.memoria.get_llm_rapido") as memoria_mock,
     ):
         roteador_mock.return_value.invoke.return_value = _resposta_llm("Oii Sophia! Tudo bem??")
