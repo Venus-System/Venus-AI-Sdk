@@ -21,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 mongo = ["langgraph-checkpoint-mongodb", "pymongo"]
+a2a = ["a2a-sdk[http-server]"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
