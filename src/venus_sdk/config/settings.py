@@ -14,6 +14,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GROQ_API_KEY   = os.getenv("GROQ_API_KEY")
 DATABASE_URL   = os.getenv("DATABASE_URL")
 MONGODB_URI    = os.getenv("MONGODB_URL")  # opcional — só usado por criar_checkpointer_mongo()
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API = os.getenv("QDRANT_API")
 
 OBRIGATORIAS = {
     "GEMINI_API_KEY": GEMINI_API_KEY,
