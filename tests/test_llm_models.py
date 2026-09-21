@@ -18,20 +18,28 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from venus_sdk.llm.models import extrair_texto_resposta, get_llm_rapido
+import pytest
+
+from venus_sdk.llm import models as M
+from venus_sdk.llm.models import extrair_texto_resposta, get_llm_especialista, get_llm_rapido, provedor_principal
 
 
-def test_get_llm_rapido_limita_o_raciocinio_interno() -> None:
+def test_get_llm_rapido_limita_o_raciocinio_interno(monkeypatch) -> None:
+    monkeypatch.setattr(M, "GROQ_API_KEY", "k")
+    monkeypatch.setattr(M, "GEMINI_API_KEY", "k")
+    monkeypatch.setattr(M, "MISTRAL_API_KEY", None)  # independe das chaves do ambiente
+    monkeypatch.delenv("LLM_CADEIA_RAPIDO", raising=False)
     get_llm_rapido.cache_clear()
     try:
-        with patch("venus_sdk.llm.models.ChatGroq") as chat_groq_mock:
+        with patch("venus_sdk.llm.models.ChatGroq") as chat_groq_mock, patch("venus_sdk.llm.models.ChatGoogleGenerativeAI"):
             get_llm_rapido()
     finally:
         get_llm_rapido.cache_clear()
 
-    _, kwargs = chat_groq_mock.call_args
-    assert kwargs["reasoning_effort"] == "low"
-    assert kwargs["max_tokens"] == 1024
+    chamadas = {c.kwargs["model"]: c.kwargs for c in chat_groq_mock.call_args_list}
+    assert chamadas["openai/gpt-oss-20b"]["reasoning_effort"] == "low"
+    assert chamadas["openai/gpt-oss-20b"]["max_tokens"] == 1024
+    assert "openai/gpt-oss-120b" in chamadas
 
 
 # --- extrair_texto_resposta ---
@@ -74,3 +82,104 @@ def test_extrair_texto_resposta_content_vazio() -> None:
     assert extrair_texto_resposta(SimpleNamespace(content="")) == ""
     assert extrair_texto_resposta(SimpleNamespace(content=None)) == ""
     assert extrair_texto_resposta(SimpleNamespace(content=[])) == ""
+
+
+# --- provedor principal (cota do Gemini gratuito: 20 req/dia) ---
+
+
+def test_provedor_principal_padrao_e_groq(monkeypatch) -> None:
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    assert provedor_principal() == "groq"
+    monkeypatch.setenv("LLM_PROVIDER", " Gemini ")
+    assert provedor_principal() == "gemini"
+
+
+def test_parse_cadeia() -> None:
+    assert M.parse_cadeia(" groq:a/b , Gemini:c ,,") == [("groq", "a/b"), ("gemini", "c")]
+    for ruim in ("groq", "groq:", "openai:x", ":x"):
+        with pytest.raises(ValueError):
+            M.parse_cadeia(ruim)
+
+
+def test_cadeia_pula_provedor_sem_chave_e_repetidos(monkeypatch) -> None:
+    monkeypatch.setattr(M, "GROQ_API_KEY", "k")
+    monkeypatch.setattr(M, "GEMINI_API_KEY", None)
+    monkeypatch.setenv("LLM_CADEIA_ESPECIALISTA", "gemini:g1,groq:a,groq:a,groq:b")
+    assert M.cadeia_especialista() == [("groq", "a"), ("groq", "b")]
+
+
+def test_cadeia_padrao_depende_do_provedor_principal(monkeypatch) -> None:
+    monkeypatch.setattr(M, "GROQ_API_KEY", "k")
+    monkeypatch.setattr(M, "GEMINI_API_KEY", "k")
+    monkeypatch.delenv("LLM_CADEIA_ESPECIALISTA", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER", "groq")
+    assert M.cadeia_especialista()[0][0] == "groq" and len(M.cadeia_especialista()) >= 3
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    assert M.cadeia_especialista()[0][0] == "gemini"
+
+
+def test_cadeia_monta_varios_fallbacks_em_ordem(monkeypatch) -> None:
+    monkeypatch.setattr(M, "GROQ_API_KEY", "k")
+    monkeypatch.setattr(M, "GEMINI_API_KEY", "k")
+    monkeypatch.setenv("LLM_CADEIA_ESPECIALISTA", "groq:a,gemini:b,groq:c,gemini:d")
+    criados = []
+
+    class _LLM:
+        def __init__(self, nome): self.nome = nome
+        def with_fallbacks(self, fbs): return ("cadeia", self.nome, [f.nome for f in fbs])
+
+    def _fake(provedor, modelo, **kw):
+        criados.append((provedor, modelo)); return _LLM(f"{provedor}:{modelo}")
+
+    get_llm_especialista.cache_clear()
+    with patch.object(M, "_criar_modelo", side_effect=_fake):
+        r = get_llm_especialista()
+    get_llm_especialista.cache_clear()
+    assert r == ("cadeia", "groq:a", ["gemini:b", "groq:c", "gemini:d"])
+
+
+def test_cadeia_sem_nenhuma_chave_falha_claro(monkeypatch) -> None:
+    monkeypatch.setattr(M, "GROQ_API_KEY", None)
+    monkeypatch.setattr(M, "GEMINI_API_KEY", None)
+    monkeypatch.setattr(M, "MISTRAL_API_KEY", None)
+    monkeypatch.delenv("LLM_CADEIA_ESPECIALISTA", raising=False)
+    get_llm_especialista.cache_clear()
+    with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
+        get_llm_especialista()
+    get_llm_especialista.cache_clear()
+
+
+def test_fallback_de_verdade_troca_de_modelo_quando_o_primeiro_falha() -> None:
+    """Comportamento real do LangChain com a cadeia: 429 no 1º -> o 2º responde."""
+    from langchain_core.messages import AIMessage
+    from _fakes import LLMScript
+
+    class _Quebrado(LLMScript):
+        def _generate(self, *a, **k):
+            raise RuntimeError("429 RESOURCE_EXHAUSTED")
+
+    ruim = _Quebrado(script=[AIMessage(content="x")])
+    bom = LLMScript(script=[AIMessage(content="do segundo")])
+    ruim2 = _Quebrado(script=[AIMessage(content="x")])
+    cadeia = ruim.with_fallbacks([ruim2, bom])
+    assert cadeia.invoke("oi").content == "do segundo"
+
+
+def test_mistral_entra_na_cadeia_padrao_quando_ha_chave(monkeypatch) -> None:
+    monkeypatch.setattr(M, "MISTRAL_API_KEY", "k")
+    monkeypatch.setattr(M, "GROQ_API_KEY", None)
+    monkeypatch.setattr(M, "GEMINI_API_KEY", None)
+    monkeypatch.delenv("LLM_CADEIA_ESPECIALISTA", raising=False)
+    assert M.cadeia_especialista()[0] == ("mistral", "ministral-14b-latest")
+    assert all(p == "mistral" for p, _ in M.cadeia_especialista())
+
+
+def test_mistral_sem_chave_e_pulada(monkeypatch) -> None:
+    monkeypatch.setattr(M, "MISTRAL_API_KEY", None)
+    monkeypatch.setattr(M, "GROQ_API_KEY", "k")
+    monkeypatch.delenv("LLM_CADEIA_RAPIDO", raising=False)
+    assert all(p != "mistral" for p, _ in M.cadeia_rapida())
+
+
+def test_parse_cadeia_aceita_mistral() -> None:
+    assert M.parse_cadeia("mistral:mistral-medium-latest") == [("mistral", "mistral-medium-latest")]

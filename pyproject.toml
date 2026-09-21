@@ -14,17 +14,30 @@ dependencies = [
     "langchain-core",
     "langchain-google-genai",
     "langchain-groq",
+    "langchain-mistralai",
     "langgraph",
     "asyncpg",
+    "langchain-text-splitters",
+    "numpy",
+    "httpx",
+    "ddgs",
+    "mcp",
+    "langchain-mcp-adapters",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "pytest-asyncio"]
+pdf = ["pypdf"]
 mongo = ["langgraph-checkpoint-mongodb", "pymongo"]
-a2a = ["a2a-sdk[http-server]"]
+a2a = ["a2a-sdk[http-server]", "uvicorn"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: exige Postgres real em DATABASE_URL com schema+seed aplicados (scripts/init_db.py); pulado por padrão",
+]
+asyncio_mode = "auto"
+addopts = "-m 'not integration'"
