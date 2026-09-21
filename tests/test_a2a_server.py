@@ -64,11 +64,7 @@ def test_agent_card_tem_as_skills_esperadas() -> None:
 
     assert card.name == "Venus"
     ids_skills = {skill.id for skill in card.skills}
-    assert ids_skills == {"produto", "ingrediente"}
-    # rotina/faq ainda passam pelo client MCP stub (`mcp/tools.py`) e
-    # quebram com NotImplementedError ao serem chamados — não anunciados.
-    assert "rotina" not in ids_skills
-    assert "faq" not in ids_skills
+    assert {"produto", "ingrediente", "rotina", "faq"} <= set(ids_skills)
 
 
 def test_task_ponta_a_ponta_bate_com_ainvoke_direto() -> None:
