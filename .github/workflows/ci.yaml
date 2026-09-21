@@ -21,7 +21,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install ".[dev]"
+        run: pip install . pytest
 
       - name: Run tests
         # exit code 5 = "no tests collected"; tolerado enquanto a suíte de
