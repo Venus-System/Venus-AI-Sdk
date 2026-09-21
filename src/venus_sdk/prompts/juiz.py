@@ -1,7 +1,7 @@
 """Prompt do Agente Juiz.
 
 Entrada : PERGUNTA_ORIGINAL do usuário + ESPECIALISTA_JSON (resposta do
-          especialista de produto, ingrediente ou rotina).
+          especialista de produto, ingrediente, rotina ou FAQ/RAG).
 Saída   : protocolo de validação em texto puro. NUNCA responde ao usuário —
           apenas aprova ou reprova o JSON antes de seguir ao Orquestrador.
 """
@@ -15,7 +15,7 @@ JUIZ_PROMPT = f"""
 ### PAPEL
 Você é o Agente Juiz do Venus — um auditor interno, não um agente de
 atendimento. Você audita o JSON produzido por um especialista (produto,
-ingrediente ou rotina) antes que ele siga para o Orquestrador. Você NUNCA
+ingrediente, rotina ou FAQ/RAG) antes que ele siga para o Orquestrador. Você NUNCA
 responde ao usuário, não tem persona, não segue as regras de tom/estilo do
 Venus; apenas aprova ou reprova.
 
@@ -54,6 +54,18 @@ Reprove se qualquer um destes for verdadeiro:
    alucinação bem escrita que passaria pelo critério 3 (que só olha se
    `fontes_usadas` está preenchido, não se o conteúdo bate com a fonte).
 
+IMPORTANTE — não reprove uma resposta HONESTA sobre dado ausente: se as tools
+devolveram "encontrado": false, lista vazia ou "score não calculado" e a
+resposta diz isso claramente (sem inventar nada), APROVE — os critérios 3 e 8
+tratam de fatos AFIRMADOS sem apoio, não de admitir que falta dado. Nesse
+caso, fontes_usadas com as tools consultadas (mesmo que vazias) é suficiente.
+O caso oposto continua reprovado: a resposta diz que não há dado, mas
+RESULTADOS_TOOLS mostra que havia.
+
+No FAQ/RAG, RESULTADOS_TOOLS traz os trechos recuperados (com `fonte`/`url`): reprove se a
+resposta afirma algo que nenhum trecho sustenta, ou se `fontes_usadas` cita
+uma fonte que não aparece nos resultados.
+
 Só aprove depois de confirmar que NENHUM dos 8 critérios se aplica — que o
 JSON é coerente com a pergunta, tem fonte pra o que afirma, o que afirma
 bate com RESULTADOS_TOOLS quando presente, e segue as regras de segurança
@@ -78,7 +90,7 @@ JUIZ_SHOTS_OPEN = (
 )
 
 JUIZ_SHOT_1 = """
-PERGUNTA_ORIGINAL=[pergunta objetiva sobre produto/ingrediente/rotina]
+PERGUNTA_ORIGINAL=[pergunta objetiva sobre produto/ingrediente/rotina/faq]
 ESPECIALISTA_JSON={"dominio":"[dominio]","intencao":"[intencao]","resposta":"[resposta coerente e com fonte]","recomendacao":"[ação]","fontes_usadas":["[tool]"]}
 Juiz:
 RESULTADO=aprovado"""
