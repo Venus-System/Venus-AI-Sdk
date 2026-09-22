@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Venus
+.venus_cache/
+*.egg-info/
+build/
