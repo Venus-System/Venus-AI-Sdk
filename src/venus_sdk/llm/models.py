@@ -4,7 +4,7 @@ from functools import lru_cache
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_groq import ChatGroq
 
 from venus_sdk.config.settings import GEMINI_API_KEY, GROQ_API_KEY
@@ -61,6 +61,20 @@ def get_llm_gemini() -> BaseChatModel:
         # tira o warning.
         model="gemini-3.6-flash",
         api_key=GEMINI_API_KEY,
+    )
+
+@lru_cache(maxsize=1)
+def get_llm_embedding():
+    # gemini-embedding-2 é um modelo para criar embeddings ( vetores numéricos
+    # que representam dados ), que permite até 3072 dimensões.
+    #
+    # o output_dimensionality define o número de dimensões usadas, 768 oferece
+    # equilíbrio entre desempenho e capacidade. Sem isso, retornaria erro pois o
+    # Qdrant está configurado para aceitar 768 dimensões.
+    return GoogleGenerativeAIEmbeddings(
+        model="gemini-embedding-2-preview",
+        api_key=GEMINI_API_KEY,
+        output_dimensionality=768
     )
 
 
