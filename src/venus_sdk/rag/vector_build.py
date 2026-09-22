@@ -4,6 +4,7 @@ from qdrant_client import QdrantClient
 
 
 qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API)
+COLLECTION="faq_chunks"
 
 def gerar_embedding(pergunta: str) -> list[float]:
     """Gera um vetor de 768 dimensões à partir da
