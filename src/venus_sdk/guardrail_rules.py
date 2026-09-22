@@ -21,12 +21,13 @@ import unicodedata
 TAMANHO_MAXIMO_MENSAGEM = 4000
 
 MENSAGEM_ENTRADA_BLOQUEADA = (
-    "Não posso continuar com esse pedido. Posso ajudar com dúvidas sobre "
-    "produtos, ingredientes, rotina ou o funcionamento do Venus."
+    "Essa pergunta está fora do que eu consigo te ajudar! Mas podemos "
+    "conversar sobre algum produto, ingrediente ou a sua rotina de "
+    "skincare e haircare — por onde quer começar?"
 )
 MENSAGEM_SAIDA_BLOQUEADA = (
-    "Não posso compartilhar essa resposta. Você pode reformular sua "
-    "pergunta sobre produtos, ingredientes ou rotina?"
+    "Não consegui te dar uma boa resposta pra isso. Pode reformular a "
+    "pergunta ou falar comigo sobre algum produto, ingrediente ou rotina?"
 )
 
 # --- dados sensíveis (usados tanto para bloqueio de saída quanto anonimização) ---

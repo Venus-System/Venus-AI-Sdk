@@ -171,3 +171,18 @@ def test_no_agente_juiz_trata_falha_do_llm_como_reprovado_sem_derrubar_o_grafo()
     assert resultado["aprovado_juiz"] is False
     assert resultado["feedback_juiz"] is None
     assert resultado["tentativas_juiz"] == 1
+
+
+def test_erro_tecnico_do_especialista_nao_gasta_llm_nem_retry() -> None:
+    """Falha de infraestrutura (cota/LLM fora) não é conteúdo ruim: o juiz
+    pula o LLM e o grafo vai direto pra "esgotado" (sem repetir a falha)."""
+    from unittest.mock import patch as _patch
+
+    from venus_sdk.nodes.juiz import MAX_TENTATIVAS_JUIZ, decidir_pos_juiz, no_agente_juiz
+
+    estado = {"resposta_especialista": {"dominio": "produto", "intencao": "erro_tecnico"}, "rota": "produto"}
+    with _patch("venus_sdk.nodes.juiz.get_llm_rapido") as llm:
+        saida = no_agente_juiz(estado)
+    llm.assert_not_called()
+    assert saida["aprovado_juiz"] is False and saida["tentativas_juiz"] == MAX_TENTATIVAS_JUIZ
+    assert decidir_pos_juiz({**estado, **saida}) == "esgotado"

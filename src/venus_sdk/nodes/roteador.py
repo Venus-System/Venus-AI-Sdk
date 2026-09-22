@@ -21,6 +21,24 @@ _PERGUNTA_RE = re.compile(r"PERGUNTA_ORIGINAL=(.*)", re.IGNORECASE | re.DOTALL)
 
 _ROTAS_VALIDAS: frozenset[str] = frozenset({"produto", "ingrediente", "rotina", "faq"})
 
+# Rede de segurança contra o roteador (LLM) rotear small talk para um
+# especialista (achado ao vivo: "oi" caindo em ROUTE=rotina, ver
+# `_recuperar_de_tool_call_alucinada`). Só cobre mensagens INTEIRAMENTE
+# compostas de saudação/agradecimento/despedida — qualquer pedido real passa.
+_SMALL_TALK_RE = re.compile(
+    r"^\s*(oi+e?|ol[aá]+|opa|e a[ií]|bom dia|boa tarde|boa noite|hey|hello|hi|"
+    r"tudo bem\??|como vai\??|obrigad[oa]|valeu|vlw|tchau|at[eé] mais|blz|beleza|ok)"
+    r"(\s*[,!.?]*\s*(tudo bem\??|tudo bom\??|venus|v[eê]nus|td bem\??|"
+    r"como vai\??|e voc[eê]\??))*\s*[!.?]*\s*$",
+    re.IGNORECASE,
+)
+
+
+def e_small_talk(mensagem: str) -> bool:
+    """True se a mensagem é só saudação/agradecimento/despedida."""
+    return bool(_SMALL_TALK_RE.match(mensagem or ""))
+
+
 DecisaoRoteador = Literal["produto", "ingrediente", "rotina", "faq", "direto"]
 
 # Fallback para quando o roteador não emite ROUTE= (small talk/fora de
@@ -28,8 +46,8 @@ DecisaoRoteador = Literal["produto", "ingrediente", "rotina", "faq", "direto"]
 # modelo). Evita cair na mensagem genérica de saída bloqueada por algo tão
 # simples quanto uma saudação.
 _RESPOSTA_DIRETA_FALLBACK = (
-    "Oii, tudo bem?? Posso te ajudar com produto, ingrediente ou rotina de "
-    "skincare/haircare — quais dúvidas você tem hoje??"
+    "Essa pergunta está fora do meu assunto, mas posso te ajudar com produto, "
+    "ingrediente ou rotina de skincare e haircare — quer falar sobre algum deles?"
 )
 
 
@@ -72,6 +90,47 @@ def _recuperar_de_tool_call_alucinada(erro: Exception) -> str | None:
         rota,
     )
     return f"ROUTE={rota}\nPERGUNTA_ORIGINAL={pergunta}"
+
+
+# Rede de segurança: modelos pequenos às vezes RESPONDEM em vez de rotear um pedido claramente de
+# domínio. Só entra quando o LLM não devolveu ROUTE=; é conservadora de propósito.
+_RE_ROTINA = re.compile(r"\brotina\b", re.IGNORECASE)
+_RE_INGREDIENTE = re.compile(
+    r"\b(ingrediente|niacinamida|nicotinamida|retinol|ceramidas?|hialur[oô]nico|vitamina\s*c|salic[ií]lico|"
+    r"glic[oó]lico|pantenol|parfum|fragr[aâ]ncia)\b", re.IGNORECASE)
+_RE_PRODUTO = re.compile(
+    r"\b(produtos?|shampoo|condicionador|hidratante|s[eé]rum|protetor solar|creme|m[aá]scara|"
+    r"limpeza|sabonete|filtro solar)\b", re.IGNORECASE)
+
+
+_RE_FAQ = re.compile(
+    r"(venus.{0,40}\b(score|funciona|regras?|pol[ií]tica|privacidade|dados)\b|"
+    r"\b(score|funciona|regras?|pol[ií]tica|privacidade|dados)\b.{0,40}venus|"
+    r"\b(meus dados|privacidade|lgpd|seus termos|como funciona o score)\b)", re.IGNORECASE)
+
+
+def rota_por_palavras(mensagem: str) -> str | None:
+    """Rota inferida por palavras-chave (ou None se não for clara)."""
+    if _RE_FAQ.search(mensagem):
+        return "faq"
+    if _RE_ROTINA.search(mensagem):
+        return "rotina"
+    if _RE_INGREDIENTE.search(mensagem):
+        return "ingrediente"
+    if _RE_PRODUTO.search(mensagem):
+        return "produto"
+    return None
+
+
+# Rede de segurança contra alucinação na resposta DIRETA do roteador (sem tools, sem juiz): se ela
+# afirma fatos de produto/ingrediente (nota, %, "contém"), descarta e usa uma resposta segura.
+_RE_FATO_DE_PRODUTO = re.compile(
+    r"(\d+\s*/\s*100|\bscore\b[^.\n]{0,30}\d|\d+[.,]?\d*\s*%|\bn[ãa]o cont[eé]m\b|\bcont[eé]m\b|"
+    r"confirma[cç][ãa]o no sistema)", re.IGNORECASE)
+_RESPOSTA_DIRETA_SEGURA = (
+    "Anotei! Posso te ajudar com produtos, ingredientes ou a sua rotina de skincare e haircare "
+    "— o que você quer saber?"
+)
 
 
 def _invocar_roteador(mensagens: list) -> str:
@@ -127,6 +186,24 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
 
     match_rota = _ROUTE_RE.search(texto)
     rota = match_rota.group(1).strip().lower() if match_rota else None
+
+    if rota not in _ROTAS_VALIDAS and not e_small_talk(estado.get("mensagem_usuario", "")):
+        sugerida = rota_por_palavras(estado.get("mensagem_usuario", ""))
+        if sugerida:
+            logger.warning("Roteador não devolveu ROUTE=; rota %s inferida por palavras-chave", sugerida)
+            rota = sugerida
+            texto = f"ROUTE={sugerida}\nPERGUNTA_ORIGINAL={estado.get('mensagem_usuario', '')}"
+
+    if rota in _ROTAS_VALIDAS and e_small_talk(estado.get("mensagem_usuario", "")):
+        # LLM roteou uma saudação pura para um especialista — descarta a rota
+        # e responde direto (ver `_SMALL_TALK_RE`).
+        logger.warning("Roteador mandou small talk para %s; forçando resposta direta", rota)
+        rota = None
+        texto = ""
+
+    if rota not in _ROTAS_VALIDAS and texto and _RE_FATO_DE_PRODUTO.search(texto):
+        logger.warning("Resposta direta do roteador afirmava fatos de produto; substituída por resposta segura")
+        texto = _RESPOSTA_DIRETA_SEGURA
 
     if rota not in _ROTAS_VALIDAS:
         # Small talk ou fora de escopo: o próprio roteador já formulou a
