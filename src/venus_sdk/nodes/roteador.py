@@ -21,6 +21,20 @@ _PERGUNTA_RE = re.compile(r"PERGUNTA_ORIGINAL=(.*)", re.IGNORECASE | re.DOTALL)
 
 _ROTAS_VALIDAS: frozenset[str] = frozenset({"produto", "ingrediente", "rotina", "faq"})
 
+DecisaoRoteador = Literal["produto", "ingrediente", "rotina", "faq", "direto"]
+
+# Fallback para quando o roteador não emite ROUTE= (small talk/fora de
+# escopo) e, mesmo assim, o LLM devolve conteúdo vazio (falha pontual do
+# modelo). Evita cair na mensagem genérica de saída bloqueada por algo tão
+# simples quanto uma saudação.
+_RESPOSTA_DIRETA_FALLBACK = (
+    "Essa pergunta está fora do meu assunto, mas posso te ajudar com produto, "
+    "ingrediente ou rotina de skincare e haircare — quer falar sobre algum deles?"
+)
+
+# Chamadas ao LLM roteador por invocação (a 1ª + uma nova tentativa se ela levantar).
+_TENTATIVAS_LLM_ROTEADOR = 2
+
 # Rede de segurança contra o roteador (LLM) rotear small talk para um
 # especialista (achado ao vivo: "oi" caindo em ROUTE=rotina, ver
 # `_recuperar_de_tool_call_alucinada`). Só cobre mensagens INTEIRAMENTE
@@ -34,21 +48,35 @@ _SMALL_TALK_RE = re.compile(
 )
 
 
+# Rede de segurança: modelos pequenos às vezes RESPONDEM em vez de rotear um pedido claramente de
+# domínio. Só entra quando o LLM não devolveu ROUTE=; é conservadora de propósito.
+_RE_ROTINA = re.compile(r"\brotina\b", re.IGNORECASE)
+_RE_INGREDIENTE = re.compile(
+    r"\b(ingrediente|niacinamida|nicotinamida|retinol|ceramidas?|hialur[oô]nico|vitamina\s*c|salic[ií]lico|"
+    r"glic[oó]lico|pantenol|parfum|fragr[aâ]ncia)\b", re.IGNORECASE)
+_RE_PRODUTO = re.compile(
+    r"\b(produtos?|shampoo|condicionador|hidratante|s[eé]rum|protetor solar|creme|m[aá]scara|"
+    r"limpeza|sabonete|filtro solar)\b", re.IGNORECASE)
+_RE_FAQ = re.compile(
+    r"(venus.{0,40}\b(score|funciona|regras?|pol[ií]tica|privacidade|dados)\b|"
+    r"\b(score|funciona|regras?|pol[ií]tica|privacidade|dados)\b.{0,40}venus|"
+    r"\b(meus dados|privacidade|lgpd|seus termos|como funciona o score)\b)", re.IGNORECASE)
+
+
+# Rede de segurança contra alucinação na resposta DIRETA do roteador (sem tools, sem juiz): se ela
+# afirma fatos de produto/ingrediente (nota, %, "contém"), descarta e usa uma resposta segura.
+_RE_FATO_DE_PRODUTO = re.compile(
+    r"(\d+\s*/\s*100|\bscore\b[^.\n]{0,30}\d|\d+[.,]?\d*\s*%|\bn[ãa]o cont[eé]m\b|\bcont[eé]m\b|"
+    r"confirma[cç][ãa]o no sistema)", re.IGNORECASE)
+_RESPOSTA_DIRETA_SEGURA = (
+    "Anotei! Posso te ajudar com produtos, ingredientes ou a sua rotina de skincare e haircare "
+    "— o que você quer saber?"
+)
+
+
 def e_small_talk(mensagem: str) -> bool:
     """True se a mensagem é só saudação/agradecimento/despedida."""
     return bool(_SMALL_TALK_RE.match(mensagem or ""))
-
-
-DecisaoRoteador = Literal["produto", "ingrediente", "rotina", "faq", "direto"]
-
-# Fallback para quando o roteador não emite ROUTE= (small talk/fora de
-# escopo) e, mesmo assim, o LLM devolve conteúdo vazio (falha pontual do
-# modelo). Evita cair na mensagem genérica de saída bloqueada por algo tão
-# simples quanto uma saudação.
-_RESPOSTA_DIRETA_FALLBACK = (
-    "Essa pergunta está fora do meu assunto, mas posso te ajudar com produto, "
-    "ingrediente ou rotina de skincare e haircare — quer falar sobre algum deles?"
-)
 
 
 def _recuperar_de_tool_call_alucinada(erro: Exception) -> str | None:
@@ -92,23 +120,6 @@ def _recuperar_de_tool_call_alucinada(erro: Exception) -> str | None:
     return f"ROUTE={rota}\nPERGUNTA_ORIGINAL={pergunta}"
 
 
-# Rede de segurança: modelos pequenos às vezes RESPONDEM em vez de rotear um pedido claramente de
-# domínio. Só entra quando o LLM não devolveu ROUTE=; é conservadora de propósito.
-_RE_ROTINA = re.compile(r"\brotina\b", re.IGNORECASE)
-_RE_INGREDIENTE = re.compile(
-    r"\b(ingrediente|niacinamida|nicotinamida|retinol|ceramidas?|hialur[oô]nico|vitamina\s*c|salic[ií]lico|"
-    r"glic[oó]lico|pantenol|parfum|fragr[aâ]ncia)\b", re.IGNORECASE)
-_RE_PRODUTO = re.compile(
-    r"\b(produtos?|shampoo|condicionador|hidratante|s[eé]rum|protetor solar|creme|m[aá]scara|"
-    r"limpeza|sabonete|filtro solar)\b", re.IGNORECASE)
-
-
-_RE_FAQ = re.compile(
-    r"(venus.{0,40}\b(score|funciona|regras?|pol[ií]tica|privacidade|dados)\b|"
-    r"\b(score|funciona|regras?|pol[ií]tica|privacidade|dados)\b.{0,40}venus|"
-    r"\b(meus dados|privacidade|lgpd|seus termos|como funciona o score)\b)", re.IGNORECASE)
-
-
 def rota_por_palavras(mensagem: str) -> str | None:
     """Rota inferida por palavras-chave (ou None se não for clara)."""
     if _RE_FAQ.search(mensagem):
@@ -122,43 +133,31 @@ def rota_por_palavras(mensagem: str) -> str | None:
     return None
 
 
-# Rede de segurança contra alucinação na resposta DIRETA do roteador (sem tools, sem juiz): se ela
-# afirma fatos de produto/ingrediente (nota, %, "contém"), descarta e usa uma resposta segura.
-_RE_FATO_DE_PRODUTO = re.compile(
-    r"(\d+\s*/\s*100|\bscore\b[^.\n]{0,30}\d|\d+[.,]?\d*\s*%|\bn[ãa]o cont[eé]m\b|\bcont[eé]m\b|"
-    r"confirma[cç][ãa]o no sistema)", re.IGNORECASE)
-_RESPOSTA_DIRETA_SEGURA = (
-    "Anotei! Posso te ajudar com produtos, ingredientes ou a sua rotina de skincare e haircare "
-    "— o que você quer saber?"
-)
-
-
 def _invocar_roteador(mensagens: list) -> str:
-    # Bug de content vazio: ver `get_llm_rapido`. Tenta mais uma vez antes de
-    # desistir, em vez de deixar a exceção derrubar o grafo inteiro.
-    try:
-        resposta = get_llm_rapido().invoke(mensagens)
-    except Exception as erro:
-        recuperado = _recuperar_de_tool_call_alucinada(erro)
-        if recuperado is not None:
-            return recuperado
-        logger.warning("Falha ao chamar o LLM roteador; tentando novamente uma vez", exc_info=True)
+    """Chama o LLM roteador, com uma nova tentativa se a primeira levantar.
+
+    Bug de content vazio: ver `get_llm_rapido`. Em vez de deixar a exceção
+    derrubar o grafo inteiro, tenta mais uma vez e, se falhar de novo,
+    devolve `""`. Antes de cada nova tentativa, tenta recuperar a decisão do
+    corpo do erro (ver `_recuperar_de_tool_call_alucinada`)."""
+    for tentativa in range(1, _TENTATIVAS_LLM_ROTEADOR + 1):
         try:
             resposta = get_llm_rapido().invoke(mensagens)
-        except Exception as erro2:
-            recuperado = _recuperar_de_tool_call_alucinada(erro2)
+        except Exception as erro:
+            recuperado = _recuperar_de_tool_call_alucinada(erro)
             if recuperado is not None:
                 return recuperado
+            if tentativa < _TENTATIVAS_LLM_ROTEADOR:
+                logger.warning("Falha ao chamar o LLM roteador; tentando novamente uma vez", exc_info=True)
+                continue
             logger.exception("Segunda tentativa do LLM roteador também falhou")
             return ""
-    return (resposta.content or "").strip()
+        return (resposta.content or "").strip()
+    return ""
 
 
-def no_roteador(estado: EstadoVenus) -> EstadoVenus:
-    """Chama o LLM roteador com `ROUTER_PROMPT_COMPLETO` e extrai o
-    protocolo `ROUTE=.../PERGUNTA_ORIGINAL=...` (ou responde diretamente em
-    caso de small talk/fora de escopo).
-    """
+def _mensagens_para_o_roteador(estado: EstadoVenus) -> list:
+    """Prompt do roteador + histórico da conversa + a mensagem deste turno."""
     mensagem = estado.get("mensagem_anonimizada") or estado.get("mensagem_usuario", "")
     memorias = estado.get("memorias_usuario")
     if memorias:
@@ -175,26 +174,27 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     historico = list(estado.get("historico") or [])
     if historico:
         historico = historico[:-1]
-    mensagens = [("system", ROUTER_PROMPT_COMPLETO), *historico, ("human", mensagem)]
+    return [("system", ROUTER_PROMPT_COMPLETO), *historico, ("human", mensagem)]
 
-    texto = _invocar_roteador(mensagens)
-    if not texto:
-        # Falha pontual do LLM (conteúdo vazio); tenta mais uma vez antes de
-        # decidir — o retry passa pelo mesmo parsing de ROUTE= abaixo, então
-        # se ele vier com uma rota válida isso não vira texto cru pro usuário.
-        texto = _invocar_roteador(mensagens)
 
+def _rota_do_texto(texto: str) -> str | None:
     match_rota = _ROUTE_RE.search(texto)
-    rota = match_rota.group(1).strip().lower() if match_rota else None
+    return match_rota.group(1).strip().lower() if match_rota else None
 
-    if rota not in _ROTAS_VALIDAS and not e_small_talk(estado.get("mensagem_usuario", "")):
-        sugerida = rota_por_palavras(estado.get("mensagem_usuario", ""))
+
+def _aplicar_redes_de_seguranca(rota: str | None, texto: str, mensagem_usuario: str) -> tuple[str | None, str]:
+    """Corrige, por regra, os erros conhecidos do LLM roteador. Devolve
+    `(rota, texto)` já corrigidos."""
+    eh_small_talk = e_small_talk(mensagem_usuario)
+
+    if rota not in _ROTAS_VALIDAS and not eh_small_talk:
+        sugerida = rota_por_palavras(mensagem_usuario)
         if sugerida:
             logger.warning("Roteador não devolveu ROUTE=; rota %s inferida por palavras-chave", sugerida)
             rota = sugerida
-            texto = f"ROUTE={sugerida}\nPERGUNTA_ORIGINAL={estado.get('mensagem_usuario', '')}"
+            texto = f"ROUTE={sugerida}\nPERGUNTA_ORIGINAL={mensagem_usuario}"
 
-    if rota in _ROTAS_VALIDAS and e_small_talk(estado.get("mensagem_usuario", "")):
+    if rota in _ROTAS_VALIDAS and eh_small_talk:
         # LLM roteou uma saudação pura para um especialista — descarta a rota
         # e responde direto (ver `_SMALL_TALK_RE`).
         logger.warning("Roteador mandou small talk para %s; forçando resposta direta", rota)
@@ -205,15 +205,33 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
         logger.warning("Resposta direta do roteador afirmava fatos de produto; substituída por resposta segura")
         texto = _RESPOSTA_DIRETA_SEGURA
 
+    return rota, texto
+
+
+def no_roteador(estado: EstadoVenus) -> EstadoVenus:
+    """Chama o LLM roteador com `ROUTER_PROMPT_COMPLETO` e extrai o
+    protocolo `ROUTE=.../PERGUNTA_ORIGINAL=...` (ou responde diretamente em
+    caso de small talk/fora de escopo).
+    """
+    mensagem_usuario = estado.get("mensagem_usuario", "")
+    mensagens = _mensagens_para_o_roteador(estado)
+
+    texto = _invocar_roteador(mensagens)
+    if not texto:
+        # Falha pontual do LLM (conteúdo vazio); tenta mais uma vez antes de
+        # decidir — o retry passa pelo mesmo parsing de ROUTE= abaixo, então
+        # se ele vier com uma rota válida isso não vira texto cru pro usuário.
+        texto = _invocar_roteador(mensagens)
+
+    rota, texto = _aplicar_redes_de_seguranca(_rota_do_texto(texto), texto, mensagem_usuario)
+
     if rota not in _ROTAS_VALIDAS:
         # Small talk ou fora de escopo: o próprio roteador já formulou a
         # resposta final ao usuário — segue direto para o guardrail de saída.
         return {"rota": None, "resposta_final": texto or _RESPOSTA_DIRETA_FALLBACK}
 
     match_pergunta = _PERGUNTA_RE.search(texto)
-    pergunta_original = (
-        match_pergunta.group(1).strip() if match_pergunta else estado.get("mensagem_usuario", "")
-    )
+    pergunta_original = match_pergunta.group(1).strip() if match_pergunta else mensagem_usuario
 
     return {"rota": rota, "pergunta_original": pergunta_original}  # type: ignore[typeddict-item]
 

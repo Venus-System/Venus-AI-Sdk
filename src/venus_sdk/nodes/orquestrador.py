@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
-from typing import Any
-import re
 import logging
+import re
+from typing import Any
 
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_especialista
+from venus_sdk.nodes._evidencias import dados_da_evidencia
 from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 
@@ -27,8 +28,32 @@ _RESPOSTA_ORQUESTRADOR_FALLBACK = (
     "em instantes?"
 )
 
+_INTENCOES_DE_ERRO = {"erro_tecnico", "erro_formato"}
+_DOMINIOS_COM_DADO_NO_BANCO = {"produto", "ingrediente", "rotina"}
+_SEGURA_GENERICA = (
+    "Não consegui confirmar essa informação com segurança. Pode me dizer o nome do produto ou "
+    "ingrediente, ou perguntar de outro jeito?"
+)
+_AVISO_SEM_NOTA_NEM_INGREDIENTES = (
+    "Esses ainda não têm nota nem ingredientes cadastrados aqui, então não consigo dizer qual "
+    "é o melhor sem chutar. Se você me contar seu tipo de cacho/fio e o que quer (hidratar, definir, "
+    "reduzir frizz), eu te ajudo a escolher entre eles — ou posso ver algum em particular."
+)
+_CONVITE_PARA_DETALHAR = "Quer que eu detalhe algum deles?"
+
+# Quantos itens de cada busca entram na resposta montada sem o LLM.
+_MAX_PRODUTOS_LISTADOS = 6
+_MAX_INGREDIENTES_LISTADOS = 5
+
+# Texto mais curto que isso não pode ser a tradução de uma resposta de verdade.
+_TAMANHO_MINIMO_TEXTO_FINAL = 12
 
 _PLACEHOLDER_RE = re.compile(r"\[[^\]\n]{2,40}\]")
+_NOME_DO_PASSO_RE = re.compile(r"\d+\) (.+?) \(")
+_MARCA_PASSOS_DA_ROTINA = "Passos ("
+
+
+# --- validação do texto do LLM ---
 
 
 def _resposta_direta_do_json(dados: dict) -> str:
@@ -37,9 +62,9 @@ def _resposta_direta_do_json(dados: dict) -> str:
     partes = [f"- {str(dados.get('resposta') or '').strip()}"]
     if dados.get("recomendacao"):
         partes.append(f"- *Recomendação*: {str(dados['recomendacao']).strip()}")
-    extra = dados.get("esclarecer") or dados.get("acompanhamento")
-    if extra:
-        partes.append(f"- *Acompanhamento*: {str(extra).strip()}")
+    acompanhamento = dados.get("esclarecer") or dados.get("acompanhamento")
+    if acompanhamento:
+        partes.append(f"- *Acompanhamento*: {str(acompanhamento).strip()}")
     return "\n".join(partes)
 
 
@@ -48,112 +73,82 @@ def _texto_final_valido(texto: str, dados: dict) -> bool:
     if not texto or _PLACEHOLDER_RE.search(texto):
         return False
     resposta = str(dados.get("resposta") or "").strip()
-    if resposta and len(texto) < 12:
+    if resposta and len(texto) < _TAMANHO_MINIMO_TEXTO_FINAL:
         return False
     # Passos de rotina anexados pelo especialista ("1) Nome (Categoria); ...") não podem se perder.
-    if "Passos (" in resposta:
-        nomes = re.findall(r"\d+\) (.+?) \(", resposta.split("Passos (", 1)[1])
-        if nomes and not any(n.lower() in texto.lower() for n in nomes):
+    if _MARCA_PASSOS_DA_ROTINA in resposta:
+        trecho_dos_passos = resposta.split(_MARCA_PASSOS_DA_ROTINA, 1)[1]
+        nomes = _NOME_DO_PASSO_RE.findall(trecho_dos_passos)
+        if nomes and not any(nome.lower() in texto.lower() for nome in nomes):
             return False
     return True
 
 
-_DOMINIOS_COM_DADO_NO_BANCO = {"produto", "ingrediente", "rotina"}
-_SEGURA_GENERICA = (
-    "Não consegui confirmar essa informação com segurança. Pode me dizer o nome do produto ou "
-    "ingrediente, ou perguntar de outro jeito?"
-)
+# --- resposta montada só com a evidência das tools ---
 
 
-def _dados_da_evidencia(evidencias: list[dict] | None, tool: str) -> Any:
-    for ev in evidencias or []:
-        if ev.get("tool") == tool:
-            dados = ev.get("resultado")
-            try:
-                while isinstance(dados, str):
-                    dados = json.loads(dados)
-            except ValueError:
-                return None
-            return dados
-    return None
+def _parte_rotina(evidencias: list[dict] | None) -> str | None:
+    dados = dados_da_evidencia(evidencias, "suggest_routine")
+    passos = dados.get("passos") if isinstance(dados, dict) else None
+    if not passos:
+        return None
+    lista = "; ".join(f"{passo['ordem']}) {passo['nome']}" for passo in passos)
+    return f"Montei sua rotina com o que você já tem salvo: {lista}."
+
+
+def _parte_produtos(evidencias: list[dict] | None) -> tuple[str | None, bool]:
+    """`(texto, sem_dado)` — `sem_dado` indica que nenhum produto listado tem
+    nota nem ingredientes cadastrados."""
+    produtos = dados_da_evidencia(evidencias, "search_product")
+    if not isinstance(produtos, list) or not produtos:
+        return None, False
+    itens = [p for p in produtos[:_MAX_PRODUTOS_LISTADOS] if isinstance(p, dict) and "name" in p]
+    if not itens:
+        return None, False
+    linhas = "\n".join(f"- {p['name']} ({p['brand_name']})" for p in itens)
+    sem_dado = not any(p.get("tem_score") or p.get("tem_ingredientes") for p in itens)
+    return f"Olha o que encontrei no nosso catálogo:\n\n{linhas}", sem_dado
+
+
+def _parte_ingredientes(evidencias: list[dict] | None) -> str | None:
+    ingredientes = dados_da_evidencia(evidencias, "search_ingredient")
+    if not isinstance(ingredientes, list) or not ingredientes:
+        return None
+    nomes = ", ".join(
+        str(i.get("common_name")) for i in ingredientes[:_MAX_INGREDIENTES_LISTADOS] if isinstance(i, dict)
+    )
+    return f"Encontrei no catálogo: {nomes}." if nomes else None
+
+
+def _parte_alergias(evidencias: list[dict] | None) -> str | None:
+    alergias = dados_da_evidencia(evidencias, "get_user_allergies")
+    if not isinstance(alergias, list) or not alergias:
+        return None
+    nomes = ", ".join(str(a.get("allergy_name")) for a in alergias if isinstance(a, dict))
+    return f"Você declarou alergia a: {nomes}." if nomes else None
 
 
 def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     """Quando o Juiz esgota as tentativas em produto/ingrediente/rotina, o texto do especialista
     (reprovado por inventar dado) NÃO chega ao usuário. Monta uma resposta só com o que as
     tools realmente devolveram."""
-    ev = estado.get("evidencias_tools")
-    partes: list[str] = []
-
-    passos = (_dados_da_evidencia(ev, "suggest_routine") or {}).get("passos") if isinstance(
-        _dados_da_evidencia(ev, "suggest_routine"), dict) else None
-    if passos:
-        lista = "; ".join(f"{p['ordem']}) {p['nome']}" for p in passos)
-        partes.append(f"Montei sua rotina com o que você já tem salvo: {lista}.")
-    produtos = _dados_da_evidencia(ev, "search_product")
-    sem_dado = False
-    if isinstance(produtos, list) and produtos:
-        itens = [p for p in produtos[:6] if isinstance(p, dict) and "name" in p]
-        if itens:
-            linhas = "\n".join(f"- {p['name']} ({p['brand_name']})" for p in itens)
-            partes.append(f"Olha o que encontrei no nosso catálogo:\n\n{linhas}")
-            sem_dado = not any(p.get("tem_score") or p.get("tem_ingredientes") for p in itens)
-    ingredientes = _dados_da_evidencia(ev, "search_ingredient")
-    if isinstance(ingredientes, list) and ingredientes:
-        nomes = ", ".join(str(i.get("common_name")) for i in ingredientes[:5] if isinstance(i, dict))
-        if nomes:
-            partes.append(f"Encontrei no catálogo: {nomes}.")
-    alergias = _dados_da_evidencia(ev, "get_user_allergies")
-    if isinstance(alergias, list) and alergias:
-        nomes = ", ".join(str(a.get("allergy_name")) for a in alergias if isinstance(a, dict))
-        if nomes:
-            partes.append(f"Você declarou alergia a: {nomes}.")
+    evidencias = estado.get("evidencias_tools")
+    texto_produtos, sem_dado = _parte_produtos(evidencias)
+    candidatas = [
+        _parte_rotina(evidencias),
+        texto_produtos,
+        _parte_ingredientes(evidencias),
+        _parte_alergias(evidencias),
+    ]
+    partes = [parte for parte in candidatas if parte]
 
     if not partes:
         return _SEGURA_GENERICA
-    if sem_dado:
-        partes.append(
-            "Esses ainda não têm nota nem ingredientes cadastrados aqui, então não consigo dizer qual "
-            "é o melhor sem chutar. Se você me contar seu tipo de cacho/fio e o que quer (hidratar, definir, "
-            "reduzir frizz), eu te ajudo a escolher entre eles — ou posso ver algum em particular."
-        )
-    else:
-        partes.append("Quer que eu detalhe algum deles?")
+    partes.append(_AVISO_SEM_NOTA_NEM_INGREDIENTES if sem_dado else _CONVITE_PARA_DETALHAR)
     return "\n\n".join(partes)
 
 
-def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
-    """Chama o LLM orquestrador com `ORQUESTRADOR_PROMPT_COMPLETO` e
-    `resposta_especialista`, gravando o texto final em `resposta_final`."""
-    especialista_json = estado.get("resposta_especialista") or {}
-    # Falha técnica/de formato do especialista: nada útil pra "traduzir" — mensagem simples ao
-    # usuário, sem passar pelo LLM (e sem expor erro nenhum).
-    if isinstance(especialista_json, dict) and especialista_json.get("intencao") in {"erro_tecnico", "erro_formato"}:
-        return {"resposta_final": _RESPOSTA_ORQUESTRADOR_FALLBACK}
-    # Juiz reprovou (tentativas esgotadas) em domínio com dado no banco: nunca repassa o texto
-    # reprovado (ele costuma conter invenção); usa só a evidência das tools.
-    if (not estado.get("aprovado_juiz", True) and isinstance(especialista_json, dict)
-            and especialista_json.get("dominio") in _DOMINIOS_COM_DADO_NO_BANCO):
-        return {"resposta_final": _resposta_segura_sem_aprovacao(estado)}
-    entrada = f"ESPECIALISTA_JSON={json.dumps(especialista_json, ensure_ascii=False)}"
-
-    # Chegou aqui via "esgotado" (ver `nodes/juiz.py`) sem aprovação plena.
-    if not estado.get("aprovado_juiz", True):
-        entrada += "\n\n" + _NOTA_JUIZ_ESGOTADO
-
-    mensagens = [("system", ORQUESTRADOR_PROMPT_COMPLETO), ("human", entrada)]
-    texto = _invocar_orquestrador(mensagens)
-    if not texto:
-        # Falha pontual do LLM (conteúdo vazio, ou exceção — ver
-        # `_invocar_orquestrador`); tenta mais uma vez antes de cair no
-        # fallback fixo.
-        texto = _invocar_orquestrador(mensagens)
-
-    if isinstance(especialista_json, dict) and especialista_json.get("resposta") and not _texto_final_valido(texto, especialista_json):
-        logger.warning("Orquestrador devolveu texto inválido (placeholder/saudação); usando o conteúdo do especialista")
-        texto = _resposta_direta_do_json(especialista_json)
-
-    return {"resposta_final": texto or _RESPOSTA_ORQUESTRADOR_FALLBACK}
+# --- nó ---
 
 
 def _invocar_orquestrador(mensagens: list) -> str:
@@ -167,3 +162,47 @@ def _invocar_orquestrador(mensagens: list) -> str:
     except Exception:
         logger.exception("Falha ao chamar o LLM do Orquestrador")
         return ""
+
+
+def _montar_entrada_orquestrador(especialista_json: Any, aprovado: bool) -> str:
+    entrada = f"ESPECIALISTA_JSON={json.dumps(especialista_json, ensure_ascii=False)}"
+    # Chegou aqui via "esgotado" (ver `nodes/juiz.py`) sem aprovação plena.
+    if not aprovado:
+        entrada += "\n\n" + _NOTA_JUIZ_ESGOTADO
+    return entrada
+
+
+def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
+    """Chama o LLM orquestrador com `ORQUESTRADOR_PROMPT_COMPLETO` e
+    `resposta_especialista`, gravando o texto final em `resposta_final`."""
+    especialista_json = estado.get("resposta_especialista") or {}
+    especialista_e_objeto = isinstance(especialista_json, dict)
+    aprovado = estado.get("aprovado_juiz", True)
+
+    # Falha técnica/de formato do especialista: nada útil pra "traduzir" — mensagem simples ao
+    # usuário, sem passar pelo LLM (e sem expor erro nenhum).
+    if especialista_e_objeto and especialista_json.get("intencao") in _INTENCOES_DE_ERRO:
+        return {"resposta_final": _RESPOSTA_ORQUESTRADOR_FALLBACK}
+    # Juiz reprovou (tentativas esgotadas) em domínio com dado no banco: nunca repassa o texto
+    # reprovado (ele costuma conter invenção); usa só a evidência das tools.
+    if not aprovado and especialista_e_objeto and especialista_json.get("dominio") in _DOMINIOS_COM_DADO_NO_BANCO:
+        return {"resposta_final": _resposta_segura_sem_aprovacao(estado)}
+
+    entrada = _montar_entrada_orquestrador(especialista_json, aprovado)
+    mensagens = [("system", ORQUESTRADOR_PROMPT_COMPLETO), ("human", entrada)]
+    texto = _invocar_orquestrador(mensagens)
+    if not texto:
+        # Falha pontual do LLM (conteúdo vazio, ou exceção — ver
+        # `_invocar_orquestrador`); tenta mais uma vez antes de cair no
+        # fallback fixo.
+        texto = _invocar_orquestrador(mensagens)
+
+    if (
+        especialista_e_objeto
+        and especialista_json.get("resposta")
+        and not _texto_final_valido(texto, especialista_json)
+    ):
+        logger.warning("Orquestrador devolveu texto inválido (placeholder/saudação); usando o conteúdo do especialista")
+        texto = _resposta_direta_do_json(especialista_json)
+
+    return {"resposta_final": texto or _RESPOSTA_ORQUESTRADOR_FALLBACK}
