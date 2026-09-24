@@ -28,6 +28,8 @@ def config_padrao_venus() -> dict[str, Any]:
 
 
 def carregar_config_mcp(servidores: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Configuração dos servidores MCP, na ordem de prioridade descrita no
+    topo do módulo; sem nenhuma, usa o servidor do próprio Venus."""
     if servidores:
         return servidores
     bruto = os.getenv("MCP_SERVERS")
@@ -56,4 +58,4 @@ async def get_mcp_tools(servidores: dict[str, Any] | None = None, *,
     except Exception:  # noqa: BLE001
         logger.exception("Não consegui carregar tools MCP")
         return []
-    return [t for t in tools if apenas is None or t.name in apenas]
+    return [tool for tool in tools if apenas is None or tool.name in apenas]

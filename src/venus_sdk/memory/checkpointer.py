@@ -52,7 +52,7 @@ def criar_checkpointer_mongo(
     *,
     db_name: str = DB_MONGO_PADRAO,
     ttl_segundos: int | None = None,
-) -> "MongoDBSaver":
+) -> MongoDBSaver:
     """Cria um checkpointer persistente, gravado no MongoDB.
 
     A opção pra produção: sobrevive a restart do processo e funciona com

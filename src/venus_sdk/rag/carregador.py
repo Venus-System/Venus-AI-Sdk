@@ -16,7 +16,22 @@ def _ler_pdf(caminho: Path) -> list[tuple[int, str]]:
         from pypdf import PdfReader
     except ImportError as exc:  # pragma: no cover
         raise ImportError("Para indexar PDFs instale `pypdf` (pip install pypdf).") from exc
-    return [(n, p.extract_text() or "") for n, p in enumerate(PdfReader(str(caminho)).pages, 1)]
+    paginas = PdfReader(str(caminho)).pages
+    return [(numero, pagina.extract_text() or "") for numero, pagina in enumerate(paginas, 1)]
+
+
+def _ler_partes(caminho: Path) -> list[tuple[int | None, str]]:
+    """`[(pagina, texto)]` do arquivo — `pagina` só existe em PDF."""
+    if caminho.suffix.lower() == ".pdf":
+        return _ler_pdf(caminho)
+    return [(None, caminho.read_text(encoding="utf-8", errors="ignore"))]
+
+
+def _arquivos_suportados(pasta: Path) -> list[Path]:
+    return [
+        caminho for caminho in sorted(pasta.rglob("*"))
+        if caminho.suffix.lower() in EXTENSOES and caminho.is_file()
+    ]
 
 
 def carregar_documentos(pasta: str | Path, *, tamanho_chunk: int = 700, sobreposicao: int = 100) -> list[Document]:
@@ -27,21 +42,15 @@ def carregar_documentos(pasta: str | Path, *, tamanho_chunk: int = 700, sobrepos
         raise FileNotFoundError(f"Pasta de documentos do RAG não encontrada: {pasta}")
     divisor = RecursiveCharacterTextSplitter(chunk_size=tamanho_chunk, chunk_overlap=sobreposicao)
     chunks: list[Document] = []
-    for caminho in sorted(pasta.rglob("*")):
-        if caminho.suffix.lower() not in EXTENSOES or not caminho.is_file():
-            continue
-        if caminho.suffix.lower() == ".pdf":
-            partes = [(pg, txt) for pg, txt in _ler_pdf(caminho)]
-        else:
-            partes = [(None, caminho.read_text(encoding="utf-8", errors="ignore"))]
-        n = 0
-        for pagina, texto in partes:
+    for caminho in _arquivos_suportados(pasta):
+        numero_do_trecho = 0
+        for pagina, texto in _ler_partes(caminho):
             for pedaco in divisor.split_text(texto):
                 if not pedaco.strip():
                     continue
-                n += 1
-                meta = {"fonte": caminho.name, "trecho": n}
+                numero_do_trecho += 1
+                metadados = {"fonte": caminho.name, "trecho": numero_do_trecho}
                 if pagina is not None:
-                    meta["pagina"] = pagina
-                chunks.append(Document(page_content=pedaco, metadata=meta))
+                    metadados["pagina"] = pagina
+                chunks.append(Document(page_content=pedaco, metadata=metadados))
     return chunks

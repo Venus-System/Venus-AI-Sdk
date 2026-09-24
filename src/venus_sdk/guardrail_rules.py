@@ -58,6 +58,7 @@ def _eh_cartao_valido(candidato: str) -> bool:
         soma += digito
     return soma % 10 == 0
 
+
 # --- tentativa de manipulação do sistema (prompt injection / jailbreak) ---
 # Aplicado direto no texto original (com acento) — os character classes
 # ([çc], [ãa]...) já cobrem a variação com/sem acento sem precisar normalizar.
@@ -140,6 +141,8 @@ _EMOJI_RE = re.compile(
     "\U000020E3"             # combining enclosing keycap (ex.: 1️⃣)
     "]+"
 )
+_ESPACO_ANTES_DE_PONTUACAO_RE = re.compile(r"\s+([.,!?;:])")
+_ESPACOS_REPETIDOS_RE = re.compile(r" {2,}")
 
 
 def _eh_tentativa_de_injecao(texto: str) -> bool:
@@ -210,8 +213,8 @@ def remover_emojis(resposta: str) -> str:
     # Emoji costuma vir cercado de espaço (ex.: "Oi! 👋 Tudo bem?" ou
     # "ter 💅. Time"); depois de removê-lo, limpa o espaço órfão antes de
     # pontuação e o espaço duplo que sobra.
-    texto = re.sub(r"\s+([.,!?;:])", r"\1", texto)
-    texto = re.sub(r" {2,}", " ", texto)
+    texto = _ESPACO_ANTES_DE_PONTUACAO_RE.sub(r"\1", texto)
+    texto = _ESPACOS_REPETIDOS_RE.sub(" ", texto)
     return texto.strip()
 
 

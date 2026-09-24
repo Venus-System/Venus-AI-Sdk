@@ -13,7 +13,7 @@ dois desvios previstos pelos próprios prompts dos agentes:
 O FAQ (RAG sobre documentos locais + web + MCP/A2A) também passa pelo Agente
 Juiz, que confere a resposta contra os trechos recuperados.
 
-Reprovação do Juiz (produto/ingrediente/rotina) volta DIRETO pro nó do
+Reprovação do Juiz (produto/ingrediente/rotina/faq) volta DIRETO pro nó do
 especialista que gerou a resposta — não pro roteador (ver
 `nodes/juiz.py::decidir_pos_juiz`): reprovar não muda a rota já
 classificada, só pede uma nova tentativa com o feedback do Juiz.

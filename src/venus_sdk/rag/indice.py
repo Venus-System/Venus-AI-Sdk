@@ -10,9 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import re
-import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -21,19 +19,21 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
 from venus_sdk.rag.carregador import EXTENSOES, carregar_documentos
+from venus_sdk.texto import remover_acentos
 
-_STOP = {"a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em", "um", "uma", "que", "para",
-         "por", "com", "no", "na", "nos", "nas", "se", "ao", "como", "qual", "quais", "sao",
-         "venus", "meu", "meus", "minha", "minhas", "seu", "seus", "sua", "suas", "sao", "ser", "tem"}
+_PALAVRAS_VAZIAS = {"a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em", "um", "uma", "que", "para",
+                    "por", "com", "no", "na", "nos", "nas", "se", "ao", "como", "qual", "quais", "sao",
+                    "venus", "meu", "meus", "minha", "minhas", "seu", "seus", "sua", "suas", "ser", "tem"}
+_PALAVRA_RE = re.compile(r"[a-z0-9]+")
+# Radical grosseiro (5 primeiras letras): "calcula"/"calculo"/"calcular",
+# "cadastro"/"cadastrar" caem no mesmo token sem precisar de stemmer.
+_TAMANHO_RADICAL = 5
+_CASAS_DECIMAIS_SCORE = 3
 
 
 def _tokens(texto: str) -> list[str]:
-    t = unicodedata.normalize("NFD", texto.lower())
-    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
-    palavras = [w for w in re.findall(r"[a-z0-9]+", t) if w not in _STOP and len(w) > 1]
-    # Radical grosseiro (5 primeiras letras): "calcula"/"calculo"/"calcular",
-    # "cadastro"/"cadastrar" caem no mesmo token sem precisar de stemmer.
-    return [w[:5] for w in palavras]
+    palavras = _PALAVRA_RE.findall(remover_acentos(texto.lower()))
+    return [palavra[:_TAMANHO_RADICAL] for palavra in palavras if palavra not in _PALAVRAS_VAZIAS and len(palavra) > 1]
 
 
 class EmbeddingsHash(Embeddings):
@@ -42,20 +42,21 @@ class EmbeddingsHash(Embeddings):
     def __init__(self, dim: int = 512) -> None:
         self.dim = dim
 
-    def _vec(self, texto: str) -> list[float]:
-        v = np.zeros(self.dim, dtype=np.float32)
-        toks = _tokens(texto)
-        for gram in toks + [f"{a}_{b}" for a, b in zip(toks, toks[1:])]:
-            h = int(hashlib.md5(gram.encode()).hexdigest(), 16)
-            v[h % self.dim] += 1.0
-        n = float(np.linalg.norm(v))
-        return (v / n).tolist() if n else v.tolist()
+    def _vetor(self, texto: str) -> list[float]:
+        vetor = np.zeros(self.dim, dtype=np.float32)
+        tokens = _tokens(texto)
+        bigramas = [f"{anterior}_{atual}" for anterior, atual in zip(tokens, tokens[1:])]
+        for grama in tokens + bigramas:
+            posicao = int(hashlib.md5(grama.encode()).hexdigest(), 16) % self.dim
+            vetor[posicao] += 1.0
+        norma = float(np.linalg.norm(vetor))
+        return (vetor / norma).tolist() if norma else vetor.tolist()
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        return [self._vec(t) for t in texts]
+        return [self._vetor(texto) for texto in texts]
 
     def embed_query(self, text: str) -> list[float]:
-        return self._vec(text)
+        return self._vetor(text)
 
 
 class IndiceRAG:
@@ -65,40 +66,49 @@ class IndiceRAG:
                  matriz: np.ndarray | None = None) -> None:
         self.embeddings = embeddings or EmbeddingsHash()
         self.documentos = documentos
-        if matriz is None:
-            matriz = np.array(self.embeddings.embed_documents([d.page_content for d in documentos]), dtype=np.float32) \
-                if documentos else np.zeros((0, 1), dtype=np.float32)
-        self.matriz = matriz
+        self.matriz = matriz if matriz is not None else self._calcular_matriz()
+
+    def _calcular_matriz(self) -> np.ndarray:
+        if not self.documentos:
+            return np.zeros((0, 1), dtype=np.float32)
+        vetores = self.embeddings.embed_documents([documento.page_content for documento in self.documentos])
+        return np.array(vetores, dtype=np.float32)
 
     def buscar(self, consulta: str, k: int = 3, score_minimo: float = 0.1) -> list[dict[str, Any]]:
         """Top-k chunks por cosseno. Devolve `[{trecho, fonte, score, ...}]`
         (vazio se nada passar de `score_minimo` — o agente deve então dizer
         que não sabe, nunca inventar)."""
-        if not len(self.documentos):
+        if not self.documentos:
             return []
-        q = np.array(self.embeddings.embed_query(consulta), dtype=np.float32)
-        nq = float(np.linalg.norm(q))
-        if not nq:
+        vetor_consulta = np.array(self.embeddings.embed_query(consulta), dtype=np.float32)
+        norma_consulta = float(np.linalg.norm(vetor_consulta))
+        if not norma_consulta:
             return []
         normas = np.linalg.norm(self.matriz, axis=1)
         normas[normas == 0] = 1.0
-        scores = (self.matriz @ q) / (normas * nq)
-        ordem = np.argsort(-scores)[:k]
-        saida = []
-        for i in ordem:
-            if scores[i] < score_minimo:
-                continue
-            d = self.documentos[int(i)]
-            item = {"trecho": d.page_content, "fonte": d.metadata.get("fonte"), "score": round(float(scores[i]), 3)}
-            if "pagina" in d.metadata:
-                item["pagina"] = d.metadata["pagina"]
-            saida.append(item)
-        return saida
+        scores = (self.matriz @ vetor_consulta) / (normas * norma_consulta)
+        melhores = np.argsort(-scores)[:k]
+        return [self._resultado(int(i), float(scores[i])) for i in melhores if scores[i] >= score_minimo]
+
+    def _resultado(self, indice: int, score: float) -> dict[str, Any]:
+        documento = self.documentos[indice]
+        resultado = {
+            "trecho": documento.page_content,
+            "fonte": documento.metadata.get("fonte"),
+            "score": round(score, _CASAS_DECIMAIS_SCORE),
+        }
+        if "pagina" in documento.metadata:
+            resultado["pagina"] = documento.metadata["pagina"]
+        return resultado
 
 
 def _assinatura(pasta: Path) -> str:
-    itens = [(str(p.relative_to(pasta)), p.stat().st_size, int(p.stat().st_mtime))
-             for p in sorted(pasta.rglob("*")) if p.is_file() and p.suffix.lower() in EXTENSOES]
+    """Hash dos arquivos indexáveis (caminho, tamanho, data): muda quando algum muda."""
+    itens = [
+        (str(caminho.relative_to(pasta)), caminho.stat().st_size, int(caminho.stat().st_mtime))
+        for caminho in sorted(pasta.rglob("*"))
+        if caminho.is_file() and caminho.suffix.lower() in EXTENSOES
+    ]
     return hashlib.md5(json.dumps(itens).encode()).hexdigest()
 
 
@@ -107,16 +117,28 @@ def criar_indice_local(pasta: str | Path, embeddings: Embeddings | None = None, 
     """Constrói o índice a partir de `pasta`. Com `cache` (arquivo .npz) e
     embeddings padrão, reaproveita a matriz enquanto os arquivos não mudarem."""
     pasta = Path(pasta)
-    docs = carregar_documentos(pasta)
+    documentos = carregar_documentos(pasta)
+    usa_cache = bool(cache) and embeddings is None
+    if not usa_cache:
+        return IndiceRAG(documentos, embeddings)
+
+    arquivo_cache = Path(cache)
     assinatura = _assinatura(pasta)
-    if cache and embeddings is None:
-        cache = Path(cache)
-        if cache.exists():
-            dados = np.load(cache, allow_pickle=False)
-            if str(dados["assinatura"]) == assinatura and dados["matriz"].shape[0] == len(docs):
-                return IndiceRAG(docs, None, dados["matriz"])
-    indice = IndiceRAG(docs, embeddings)
-    if cache and embeddings is None:
-        Path(cache).parent.mkdir(parents=True, exist_ok=True)
-        np.savez(cache, assinatura=np.array(assinatura), matriz=indice.matriz)
+    matriz = _matriz_do_cache(arquivo_cache, assinatura, len(documentos))
+    if matriz is not None:
+        return IndiceRAG(documentos, None, matriz)
+
+    indice = IndiceRAG(documentos, embeddings)
+    arquivo_cache.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(arquivo_cache, assinatura=np.array(assinatura), matriz=indice.matriz)
     return indice
+
+
+def _matriz_do_cache(arquivo_cache: Path, assinatura: str, total_documentos: int) -> np.ndarray | None:
+    """Matriz salva, se o cache existir e ainda corresponder aos arquivos atuais."""
+    if not arquivo_cache.exists():
+        return None
+    dados = np.load(arquivo_cache, allow_pickle=False)
+    if str(dados["assinatura"]) == assinatura and dados["matriz"].shape[0] == total_documentos:
+        return dados["matriz"]
+    return None

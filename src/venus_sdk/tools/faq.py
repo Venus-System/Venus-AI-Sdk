@@ -11,6 +11,8 @@ from langchain_core.tools import BaseTool, tool
 
 from venus_sdk.rag.web import buscar_web
 
+_TRECHOS_POR_BUSCA = 3
+
 
 def montar_tools_faq(indice: Any) -> list[BaseTool]:
     """Monta `faq_retriever` (índice local) e `buscar_na_web`. `indice` é um
@@ -30,7 +32,7 @@ def montar_tools_faq(indice: Any) -> list[BaseTool]:
         `trecho`, a `fonte` (arquivo) e o `score` de similaridade. Use SEMPRE
         antes de responder dúvidas sobre o Venus."""
         try:
-            achados = indice.buscar(pergunta, k=3)
+            achados = indice.buscar(pergunta, k=_TRECHOS_POR_BUSCA)
         except Exception as exc:  # noqa: BLE001
             return {"erro": "falha ao consultar o índice do FAQ", "detalhe": type(exc).__name__}
         if not achados:
