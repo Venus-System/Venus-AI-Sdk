@@ -1,28 +1,35 @@
-from venus_sdk.llm.models import get_llm_embedding
-from venus_sdk.config.settings import QDRANT_API, QDRANT_URL
+from llama_index.embeddings.fastembed import FastEmbedEmbedding
+from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 
+from venus_sdk.config.settings import QDRANT_API, QDRANT_URL
+
+COLLECTION = "faq_chunks"
+
+# Modelo multilíngue FastEmbed que faz embeddings de 768 dimensões
+EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-base"
 
 qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API)
-COLLECTION="faq_chunks"
 
-def gerar_embedding(pergunta: str) -> list[float]:
-    """Gera um vetor de 768 dimensões à partir da
-    pergunta ou texto informado"""
+_embed_model: FastEmbedEmbedding | None = None
+_vector_store: QdrantVectorStore | None = None
 
-    if not pergunta:
-        raise ValueError(
-            "gerar_embedding requer uma mensagem do usuário, "
-            "não é possível gerar um vetor com texto vazio"
-        )
-    
-    return get_llm_embedding().embed_query(pergunta)
 
-def gerar_embedding_batch(textos : list[str]) -> list[list[float]]:
-    """Gera vetores de múltiplos textos de uma vez"""
-    if not textos:
-        raise ValueError(
-            "gerar_embedding requer uma mensagem do usuário, "
-            "não é possível gerar um vetor com texto vazio"
-        )
-    return get_llm_embedding().embed_documents(textos)
+def get_embed_model() -> FastEmbedEmbedding:
+    """
+    Retorna o modelo de Embedding
+    """
+    global _embed_model
+    if _embed_model is None:
+        _embed_model = FastEmbedEmbedding(model_name=EMBEDDING_MODEL_NAME)
+    return _embed_model
+
+
+def get_vector_store() -> QdrantVectorStore:
+    """
+    Retorna o Vector Store
+    """
+    global _vector_store
+    if _vector_store is None:
+        _vector_store = QdrantVectorStore(client=qdrant, collection_name=COLLECTION)
+    return _vector_store
