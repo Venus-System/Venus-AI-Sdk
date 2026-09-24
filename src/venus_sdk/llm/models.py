@@ -63,20 +63,6 @@ def get_llm_gemini() -> BaseChatModel:
         api_key=GEMINI_API_KEY,
     )
 
-@lru_cache(maxsize=1)
-def get_llm_embedding():
-    # gemini-embedding-2 é um modelo para criar embeddings ( vetores numéricos
-    # que representam dados ), que permite até 3072 dimensões.
-    #
-    # o output_dimensionality define o número de dimensões usadas, 768 oferece
-    # equilíbrio entre desempenho e capacidade. Sem isso, retornaria erro pois o
-    # Qdrant está configurado para aceitar 768 dimensões.
-    return GoogleGenerativeAIEmbeddings(
-        model="gemini-embedding-2-preview",
-        api_key=GEMINI_API_KEY,
-        output_dimensionality=768
-    )
-
 
 @lru_cache(maxsize=1)
 def get_llm_groq() -> BaseChatModel:
