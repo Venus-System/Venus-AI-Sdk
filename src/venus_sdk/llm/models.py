@@ -1,3 +1,6 @@
+"""Modelos de linguagem do Venus: clients por provedor e as cadeias de
+fallback usadas pelos nós (especialistas/orquestrador e roteador/juiz/memória)."""
+
 from __future__ import annotations
 
 import os
@@ -43,7 +46,7 @@ def extrair_texto_resposta(resposta: Any) -> str:
         partes = [
             bloco if isinstance(bloco, str) else bloco.get("text", "")
             for bloco in conteudo
-            if isinstance(bloco, str) or isinstance(bloco, dict)
+            if isinstance(bloco, (str, dict))
         ]
         return "".join(partes)
     return str(conteudo) if conteudo else ""
@@ -110,34 +113,62 @@ _CADEIA_PADRAO_ESPECIALISTA = {
     "groq": ["groq:openai/gpt-oss-120b", *_MISTRAL, "groq:openai/gpt-oss-20b", "gemini:gemini-3.6-flash"],
     "gemini": ["gemini:gemini-3.6-flash", *_MISTRAL, "groq:openai/gpt-oss-120b", "groq:openai/gpt-oss-20b"],
 }
-_CADEIA_PADRAO_RAPIDO = ["mistral:ministral-14b-latest", "mistral:ministral-8b-latest", "groq:openai/gpt-oss-20b", "groq:openai/gpt-oss-120b",
-                         "gemini:gemini-3.6-flash"]
+_CADEIA_PADRAO_RAPIDO = [*_MISTRAL, "groq:openai/gpt-oss-20b", "groq:openai/gpt-oss-120b", "gemini:gemini-3.6-flash"]
 
+# Lidas na hora da chamada (e não copiadas aqui) para refletir o valor atual
+# das variáveis do módulo.
 _CHAVES = {"groq": lambda: GROQ_API_KEY, "gemini": lambda: GEMINI_API_KEY, "mistral": lambda: MISTRAL_API_KEY}
+
+# Timeouts (s) por elo: curtos no modelo rápido (classificação), maiores no especialista.
+_TIMEOUT_RAPIDO = 45
+_TIMEOUT_ESPECIALISTA = 75
+_TIMEOUT_GEMINI = 30
+_MAX_TOKENS_RAPIDO_COM_RACIOCINIO = 1024
+
+
+def _criar_gemini(modelo: str) -> BaseChatModel:
+    # Sem temperature/top_p: gemini-3.x usa sampling fixo (ver get_llm_gemini).
+    return ChatGoogleGenerativeAI(model=modelo, api_key=GEMINI_API_KEY, max_retries=1, timeout=_TIMEOUT_GEMINI)
+
+
+def _criar_mistral(modelo: str, *, rapido: bool) -> BaseChatModel:
+    from langchain_mistralai import ChatMistralAI  # import tardio: só quem usa Mistral precisa do pacote
+
+    return ChatMistralAI(
+        model=modelo,
+        api_key=MISTRAL_API_KEY,
+        temperature=0.0 if rapido else 0.3,
+        timeout=_TIMEOUT_RAPIDO if rapido else _TIMEOUT_ESPECIALISTA,
+        max_retries=2,
+    )
+
+
+def _criar_groq(modelo: str, *, rapido: bool) -> BaseChatModel:
+    parametros: dict[str, Any] = {
+        "temperature": 0.0 if rapido else 0.7,
+        "api_key": GROQ_API_KEY,
+        "request_timeout": _TIMEOUT_RAPIDO if rapido else _TIMEOUT_ESPECIALISTA,
+        "max_retries": 0,  # 429 -> próximo elo da cadeia
+    }
+    if "gpt-oss" in modelo:
+        # Especialista: raciocínio "medium" levava 20-30s por passo do agente ReAct.
+        parametros["reasoning_effort"] = "low"
+        if rapido:
+            # Modelo de raciocínio: sem limitar, às vezes gasta o budget "pensando" e devolve
+            # content="" (ver `get_llm_rapido`).
+            parametros["max_tokens"] = _MAX_TOKENS_RAPIDO_COM_RACIOCINIO
+    return ChatGroq(model=modelo, **parametros)
 
 
 def _criar_modelo(provedor: str, modelo: str, *, rapido: bool = False) -> BaseChatModel:
     """Instancia UM elo da cadeia, com timeouts curtos (falhar rápido é o que
     permite o fallback entrar em vez de a conversa ficar parada)."""
     if provedor == "gemini":
-        # Sem temperature/top_p: gemini-3.x usa sampling fixo (ver get_llm_gemini).
-        return ChatGoogleGenerativeAI(model=modelo, api_key=GEMINI_API_KEY, max_retries=1, timeout=30)
+        return _criar_gemini(modelo)
     if provedor == "mistral":
-        from langchain_mistralai import ChatMistralAI  # import tardio: só quem usa Mistral precisa do pacote
-
-        return ChatMistralAI(model=modelo, api_key=MISTRAL_API_KEY, temperature=0.0 if rapido else 0.3,
-                             timeout=45 if rapido else 75, max_retries=2)
+        return _criar_mistral(modelo, rapido=rapido)
     if provedor == "groq":
-        kw: dict[str, Any] = {"temperature": 0.0 if rapido else 0.7, "api_key": GROQ_API_KEY,
-                              "request_timeout": 45 if rapido else 75, "max_retries": 0}  # 429 -> próximo elo da cadeia
-        if "gpt-oss" in modelo and not rapido:
-            # Especialista: raciocínio "medium" levava 20-30s por passo do agente ReAct.
-            kw.update(reasoning_effort="low")
-        if "gpt-oss" in modelo and rapido:
-            # Modelo de raciocínio: sem limitar, às vezes gasta o budget "pensando" e devolve
-            # content="" (ver `get_llm_rapido`).
-            kw.update(reasoning_effort="low", max_tokens=1024)
-        return ChatGroq(model=modelo, **kw)
+        return _criar_groq(modelo, rapido=rapido)
     raise ValueError(f"Provedor de LLM desconhecido: {provedor!r} (use 'mistral', 'groq' ou 'gemini')")
 
 
@@ -145,39 +176,47 @@ def parse_cadeia(texto: str) -> list[tuple[str, str]]:
     """'groq:modelo, gemini:modelo' -> [('groq','modelo'), ('gemini','modelo')].
     Levanta ValueError em entrada malformada."""
     itens: list[tuple[str, str]] = []
-    for bruto in (texto or "").split(","):
-        bruto = bruto.strip()
-        if not bruto:
+    for entrada in (texto or "").split(","):
+        entrada = entrada.strip()
+        if not entrada:
             continue
-        provedor, sep, modelo = bruto.partition(":")
-        if not sep or not modelo.strip() or provedor.strip().lower() not in _CHAVES:
-            raise ValueError(f"Entrada inválida na cadeia de LLMs: {bruto!r} (esperado 'mistral:<modelo>', 'groq:<modelo>' ou 'gemini:<modelo>')")
-        itens.append((provedor.strip().lower(), modelo.strip()))
+        provedor, separador, modelo = entrada.partition(":")
+        provedor, modelo = provedor.strip().lower(), modelo.strip()
+        if not separador or not modelo or provedor not in _CHAVES:
+            raise ValueError(
+                f"Entrada inválida na cadeia de LLMs: {entrada!r} "
+                "(esperado 'mistral:<modelo>', 'groq:<modelo>' ou 'gemini:<modelo>')"
+            )
+        itens.append((provedor, modelo))
     return itens
 
 
 def cadeia_configurada(env: str, padrao: list[str]) -> list[tuple[str, str]]:
     """Cadeia de `env` (ou o padrão), sem os provedores sem chave de API e sem repetidos."""
-    itens = parse_cadeia(os.getenv(env) or ",".join(padrao))
-    vistos, saida = set(), []
-    for item in itens:
-        if item in vistos or not _CHAVES[item[0]]():
+    utilizaveis: list[tuple[str, str]] = []
+    for provedor, modelo in parse_cadeia(os.getenv(env) or ",".join(padrao)):
+        if (provedor, modelo) in utilizaveis or not _CHAVES[provedor]():
             continue
-        vistos.add(item)
-        saida.append(item)
-    return saida
+        utilizaveis.append((provedor, modelo))
+    return utilizaveis
 
 
 def _montar_cadeia(env: str, padrao: list[str], *, rapido: bool) -> BaseChatModel:
     itens = cadeia_configurada(env, padrao)
     if not itens:
-        raise RuntimeError(f"Nenhum LLM utilizável em {env}: defina MISTRAL_API_KEY, GROQ_API_KEY e/ou GEMINI_API_KEY no .env.")
-    modelos = [_criar_modelo(p, m, rapido=rapido) for p, m in itens]
-    return modelos[0].with_fallbacks(modelos[1:]) if len(modelos) > 1 else modelos[0]
+        raise RuntimeError(
+            f"Nenhum LLM utilizável em {env}: defina MISTRAL_API_KEY, GROQ_API_KEY e/ou GEMINI_API_KEY no .env."
+        )
+    principal, *fallbacks = [_criar_modelo(provedor, modelo, rapido=rapido) for provedor, modelo in itens]
+    return principal.with_fallbacks(fallbacks) if fallbacks else principal
+
+
+def _cadeia_padrao_especialista() -> list[str]:
+    return _CADEIA_PADRAO_ESPECIALISTA.get(provedor_principal(), _CADEIA_PADRAO_ESPECIALISTA["groq"])
 
 
 def cadeia_especialista() -> list[tuple[str, str]]:
-    return cadeia_configurada("LLM_CADEIA_ESPECIALISTA", _CADEIA_PADRAO_ESPECIALISTA.get(provedor_principal(), _CADEIA_PADRAO_ESPECIALISTA["groq"]))
+    return cadeia_configurada("LLM_CADEIA_ESPECIALISTA", _cadeia_padrao_especialista())
 
 
 def cadeia_rapida() -> list[tuple[str, str]]:
@@ -187,11 +226,7 @@ def cadeia_rapida() -> list[tuple[str, str]]:
 @lru_cache(maxsize=1)
 def get_llm_especialista() -> BaseChatModel:
     """Especialistas/orquestrador: cadeia com vários fallbacks (ver acima)."""
-    return _montar_cadeia(
-        "LLM_CADEIA_ESPECIALISTA",
-        _CADEIA_PADRAO_ESPECIALISTA.get(provedor_principal(), _CADEIA_PADRAO_ESPECIALISTA["groq"]),
-        rapido=False,
-    )
+    return _montar_cadeia("LLM_CADEIA_ESPECIALISTA", _cadeia_padrao_especialista(), rapido=False)
 
 
 @lru_cache(maxsize=1)

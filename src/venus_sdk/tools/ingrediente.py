@@ -18,7 +18,62 @@ from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
-from venus_sdk.tools._util import LIMITE_BUSCA, consultar, normalizar_termo, radical_de_busca, sem_acento
+from venus_sdk.tools._util import (
+    LIMITE_BUSCA,
+    consultar,
+    exigir_pool,
+    normalizar_termo,
+    radical_de_busca,
+    sem_acento,
+)
+
+
+_SQL_BUSCAR_INGREDIENTE = f"""
+    SELECT DISTINCT i.ingredient_id, i.common_name, i.inci_name
+    FROM venus.ingredients i
+    LEFT JOIN venus.ingredient_aliases ia
+        ON ia.fk_ingredient_id = i.ingredient_id
+    WHERE {sem_acento("i.common_name")} ILIKE '%' || $1 || '%'
+       OR {sem_acento("i.inci_name")} ILIKE '%' || $1 || '%'
+       OR {sem_acento("ia.alias_name")} ILIKE '%' || $1 || '%'
+    ORDER BY i.common_name
+    LIMIT {LIMITE_BUSCA}
+"""
+
+
+_SQL_RESUMO_INGREDIENTE = """
+    SELECT function_summary, safety_summary, scientific_confidence,
+           source_reference
+    FROM venus.ingredients
+    WHERE ingredient_id = $1
+"""
+
+
+_SQL_PROPRIEDADES_INGREDIENTE = """
+    SELECT property_name, property_value, unit, source_reference
+    FROM venus.ingredient_properties
+    WHERE fk_ingredient_id = $1
+"""
+
+
+_SQL_EFEITOS_INGREDIENTE = """
+    SELECT ie.effect_category, ie.effect_name, ie.effect_description,
+           ie.effect_strength, ie.evidence_level, ie.source_reference,
+           pt.name AS profile_tag
+    FROM venus.ingredient_effects ie
+    JOIN venus.profile_tags pt ON pt.profile_tag_id = ie.fk_profile_tag_id
+    WHERE ie.fk_ingredient_id = $1
+      AND ($2::text IS NULL OR pt.name ILIKE $2)
+"""
+
+
+_SQL_REGULACOES_INGREDIENTE = """
+    SELECT ir.restriction_type, ir.max_concentration_value, ir.unit,
+           ir.notes, r.title, r.country, r.agency, r.document_url
+    FROM venus.ingredient_regulations ir
+    JOIN venus.regulations r ON r.regulation_id = ir.fk_regulation_id
+    WHERE ir.fk_ingredient_id = $1
+"""
 
 
 def montar_tools_ingrediente(pool: Any) -> list[BaseTool]:
@@ -26,12 +81,7 @@ def montar_tools_ingrediente(pool: Any) -> list[BaseTool]:
     closure. Levanta `ValueError` se `pool` for `None` (só na hora do uso
     real, nunca na montagem do grafo — ver
     `nodes/especialistas.py::montar_no_agente_ingrediente`)."""
-    if pool is None:
-        raise ValueError(
-            "montar_tools_ingrediente requer um pool do Postgres (asyncpg) — "
-            "quem monta o grafo deve criar o pool e passar via "
-            "compilar_grafo_venus(pool=...)."
-        )
+    exigir_pool(pool, "montar_tools_ingrediente")
 
     @tool
     async def search_ingredient(termo: str) -> list[dict] | dict:
@@ -42,25 +92,14 @@ def montar_tools_ingrediente(pool: Any) -> list[BaseTool]:
         termo = normalizar_termo(termo)
         if not termo:
             return {"erro": "informe um nome de ingrediente para buscar"}
-        query = f"""
-            SELECT DISTINCT i.ingredient_id, i.common_name, i.inci_name
-            FROM venus.ingredients i
-            LEFT JOIN venus.ingredient_aliases ia
-                ON ia.fk_ingredient_id = i.ingredient_id
-            WHERE {sem_acento("i.common_name")} ILIKE '%' || $1 || '%'
-               OR {sem_acento("i.inci_name")} ILIKE '%' || $1 || '%'
-               OR {sem_acento("ia.alias_name")} ILIKE '%' || $1 || '%'
-            ORDER BY i.common_name
-            LIMIT {LIMITE_BUSCA}
-        """
         vazio = "nenhum ingrediente encontrado — não invente um ingredient_id"
-        resultado = await consultar(pool, "search_ingredient", query, termo, vazio=vazio)
+        resultado = await consultar(pool, "search_ingredient", _SQL_BUSCAR_INGREDIENTE, termo, vazio=vazio)
         if isinstance(resultado, dict) and resultado.get("encontrado") is False:
             # Português x INCI: "niacinamida" não é substring de "NIACINAMIDE".
             # Tenta de novo com o radical (sem as 2 últimas letras).
             radical = radical_de_busca(termo)
             if radical != termo:
-                resultado = await consultar(pool, "search_ingredient", query, radical, vazio=vazio)
+                resultado = await consultar(pool, "search_ingredient", _SQL_BUSCAR_INGREDIENTE, radical, vazio=vazio)
         return resultado
 
     @tool
@@ -68,25 +107,14 @@ def montar_tools_ingrediente(pool: Any) -> list[BaseTool]:
         """Explicação geral do ingrediente: pra que serve, é seguro, com
         que confiança científica — a fonte da afirmação vem em
         `source_reference`."""
-        query = """
-            SELECT function_summary, safety_summary, scientific_confidence,
-                   source_reference
-            FROM venus.ingredients
-            WHERE ingredient_id = $1
-        """
-        return await consultar(pool, "get_ingredient_summary", query, ingredient_id,
+        return await consultar(pool, "get_ingredient_summary", _SQL_RESUMO_INGREDIENTE, ingredient_id,
                                uma_linha=True, vazio="ingrediente não encontrado")
 
     @tool
     async def get_ingredient_properties(ingredient_id: int) -> list[dict]:
         """Propriedades técnicas/químicas do ingrediente, cada uma com a
         fonte de onde veio (`source_reference`)."""
-        query = """
-            SELECT property_name, property_value, unit, source_reference
-            FROM venus.ingredient_properties
-            WHERE fk_ingredient_id = $1
-        """
-        return await consultar(pool, "get_ingredient_properties", query, ingredient_id,
+        return await consultar(pool, "get_ingredient_properties", _SQL_PROPRIEDADES_INGREDIENTE, ingredient_id,
                                vazio="nenhuma propriedade cadastrada para este ingrediente")
 
     @tool
@@ -94,16 +122,7 @@ def montar_tools_ingrediente(pool: Any) -> list[BaseTool]:
         """O que o ingrediente faz na pele/cabelo (hidrata, esfolia, pode
         irritar), opcionalmente filtrado por um perfil (ex.: 'pele
         oleosa'). Sem `profile_tag`, devolve todos os efeitos conhecidos."""
-        query = """
-            SELECT ie.effect_category, ie.effect_name, ie.effect_description,
-                   ie.effect_strength, ie.evidence_level, ie.source_reference,
-                   pt.name AS profile_tag
-            FROM venus.ingredient_effects ie
-            JOIN venus.profile_tags pt ON pt.profile_tag_id = ie.fk_profile_tag_id
-            WHERE ie.fk_ingredient_id = $1
-              AND ($2::text IS NULL OR pt.name ILIKE $2)
-        """
-        return await consultar(pool, "get_ingredient_effects", query, ingredient_id, profile_tag,
+        return await consultar(pool, "get_ingredient_effects", _SQL_EFEITOS_INGREDIENTE, ingredient_id, profile_tag,
                                vazio="nenhum efeito cadastrado para este ingrediente/perfil")
 
     @tool
@@ -111,15 +130,8 @@ def montar_tools_ingrediente(pool: Any) -> list[BaseTool]:
         """Restrições regulatórias do ingrediente — proibição, concentração
         máxima permitida — com o documento oficial por trás
         (`document_url`)."""
-        query = """
-            SELECT ir.restriction_type, ir.max_concentration_value, ir.unit,
-                   ir.notes, r.title, r.country, r.agency, r.document_url
-            FROM venus.ingredient_regulations ir
-            JOIN venus.regulations r ON r.regulation_id = ir.fk_regulation_id
-            WHERE ir.fk_ingredient_id = $1
-        """
         return await consultar(
-            pool, "get_ingredient_regulations", query, ingredient_id,
+            pool, "get_ingredient_regulations", _SQL_REGULACOES_INGREDIENTE, ingredient_id,
             vazio="nenhuma restrição regulatória cadastrada para este ingrediente",
         )
 
