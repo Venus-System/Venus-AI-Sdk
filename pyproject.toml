@@ -22,6 +22,7 @@ dependencies = [
 dev = ["pytest"]
 mongo = ["langgraph-checkpoint-mongodb", "pymongo"]
 a2a = ["a2a-sdk[http-server]"]
+rag = ["qdrant_client", "llama_index-core", "llama_index-vector_stores-qdrant", "llama_index-embeddings-fastembed"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
