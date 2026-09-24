@@ -1,7 +1,7 @@
 """Testes dos nós especialistas (`nodes/especialistas.py`) — foco no
 protocolo de entrada (`_montar_entrada`), na extração de evidências das
 tools pro Agente Juiz (`_extrair_evidencias_tools`) e na resiliência a
-falha total do LLM/tools (`_executar_especialista`, `no_agente_faq`)."""
+falha total do LLM/tools (`_executar_especialista`) e nos nós de rotina/FAQ."""
 
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ from venus_sdk.nodes.especialistas import (
     _executar_especialista,
     _extrair_evidencias_tools,
     _montar_entrada,
-    no_agente_faq,
-    no_agente_rotina,
+    montar_no_agente_faq,
+    montar_no_agente_rotina,
 )
 
 
@@ -128,40 +128,106 @@ def test_executar_especialista_excecao_no_llm_cai_no_erro_tecnico_sem_derrubar_o
     assert resultado["evidencias_tools"] is None
 
 
-# --- no_agente_faq/no_agente_rotina: stub (NotImplementedError) x falha de LLM ---
+# --- montar_no_agente_faq / montar_no_agente_rotina ---
 
 
-def test_no_agente_faq_degrada_graciosamente_quando_stub() -> None:
-    """`NotImplementedError` na MONTAGEM do agente (client MCP ainda stub,
-    `mcp/tools.py`) precisa virar uma resposta educada, não derrubar a
-    conversa — o roteador (Groq) de vez em quando alucina uma rota errada
-    (ver `nodes/roteador.py::_recuperar_de_tool_call_alucinada`) e manda
-    small talk inofensivo pra cá; deixar isso crashar é pior que avisar que
-    a funcionalidade ainda não existe (ver `no_agente_faq`)."""
-    with patch("venus_sdk.nodes.especialistas._agente", side_effect=NotImplementedError("TODO: mcp")):
-        resultado = _rodar(no_agente_faq({"mensagem_usuario": "qual a política de privacidade?"}))
+def test_no_agente_faq_sem_indice_levanta_so_no_uso() -> None:
+    """Igual a produto/ingrediente sem `pool`: montar o nó com `indice=None`
+    não levanta (o grafo monta normalmente); o `ValueError` só sai quando o
+    nó é de fato invocado."""
+    no = montar_no_agente_faq(None)  # não levanta
 
-    assert resultado["resposta_final"]  # nunca vazio, nunca levanta
+    with pytest.raises(ValueError, match="índice"):
+        _rodar(no({"rota": "faq", "pergunta_original": "como funciona o score?"}))
 
 
-def test_no_agente_rotina_degrada_graciosamente_quando_stub() -> None:
-    with patch("venus_sdk.nodes.especialistas._agente", side_effect=NotImplementedError("TODO: mcp")):
-        resultado = _rodar(no_agente_rotina({"mensagem_usuario": "monta uma rotina pra mim"}))
+def test_no_agente_faq_devolve_json_com_fontes_e_evidencias() -> None:
+    class _Indice:
+        def buscar(self, consulta: str, k: int = 3):
+            return [{"trecho": "O score vai de 0 a 100", "fonte": "como_funciona_o_score.md", "score": 0.9}]
 
-    assert resultado["resposta_especialista"]["intencao"] == "indisponivel"
-    assert resultado["resposta_especialista"]["resposta"]
-    assert resultado["evidencias_tools"] is None
-
-
-def test_no_agente_faq_usa_fallback_quando_llm_falha_apos_agente_montado() -> None:
+    resposta = {"dominio": "faq", "intencao": "consultar_faq", "resposta": "De 0 a 100.",
+                "recomendacao": "", "fontes_usadas": ["como_funciona_o_score.md"]}
+    evidencias = [{"tool": "faq_retriever", "resultado": "[...]"}]
     with (
-        patch("venus_sdk.nodes.especialistas._agente", return_value="agente-fake"),
-        patch(
-            "venus_sdk.nodes.especialistas._resposta_agente",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("provedor indisponível"),
-        ),
+        patch("venus_sdk.nodes.especialistas.get_llm_especialista", return_value=object()),
+        patch("venus_sdk.nodes.especialistas.montar_agente_mcp", return_value="agente-fake") as montar,
+        patch("venus_sdk.nodes.especialistas._resposta_agente", new_callable=AsyncMock,
+              return_value=(json.dumps(resposta), evidencias)),
     ):
-        resultado = _rodar(no_agente_faq({"mensagem_usuario": "qual a política de privacidade?"}))
+        no = montar_no_agente_faq(_Indice(), tools_extras=["tool-extra-mcp"])
+        resultado = _rodar(no({"rota": "faq", "pergunta_original": "como funciona o score?"}))
 
-    assert resultado["resposta_final"]  # nunca vazio
+    assert resultado["resposta_especialista"]["fontes_usadas"] == ["como_funciona_o_score.md"]
+    assert resultado["evidencias_tools"] == evidencias
+    tools = montar.call_args.kwargs["tools"]
+    assert [getattr(t, "name", t) for t in tools] == ["faq_retriever", "buscar_na_web", "tool-extra-mcp"]
+
+
+def test_no_agente_rotina_sem_pool_levanta_so_no_uso() -> None:
+    no = montar_no_agente_rotina(None)  # montar não levanta
+
+    with pytest.raises(ValueError, match="pool"):
+        _rodar(no({"rota": "rotina", "pergunta_original": "monta uma rotina"}))
+
+
+def test_no_agente_faq_usa_fallback_quando_llm_falha() -> None:
+    class _Indice:
+        def buscar(self, consulta: str, k: int = 3):
+            return []
+
+    with (
+        patch("venus_sdk.nodes.especialistas.get_llm_especialista", return_value=object()),
+        patch("venus_sdk.nodes.especialistas.montar_agente_mcp", return_value="agente-fake"),
+        patch("venus_sdk.nodes.especialistas._resposta_agente", new_callable=AsyncMock,
+              side_effect=RuntimeError("provedor indisponível")),
+    ):
+        resultado = _rodar(montar_no_agente_faq(_Indice())({"rota": "faq", "pergunta_original": "x"}))
+
+    assert resultado["resposta_especialista"]["intencao"] == "erro_tecnico"
+    assert resultado["resposta_especialista"]["fontes_usadas"] == []
+
+
+# --- _extrair_json: JSON cercado por ```json (visto ao vivo com o Gemini) ---
+
+from venus_sdk.nodes.especialistas import _extrair_json  # noqa: E402
+
+
+@pytest.mark.parametrize("texto", [
+    '{"a": 1}',
+    '```json\n{"a": 1}\n```',
+    '```\n{"a": 1}\n```',
+    'Aqui está:\n{"a": 1}\nEspero ter ajudado.',
+    '  ```JSON\n{\n  "a": 1\n}\n```  ',
+])
+def test_extrair_json_tolera_cercas_e_texto_em_volta(texto: str) -> None:
+    assert _extrair_json(texto) == {"a": 1}
+
+
+@pytest.mark.parametrize("texto", ["", "sem json aqui", None])
+def test_extrair_json_sem_objeto_levanta(texto) -> None:
+    with pytest.raises((ValueError, TypeError)):
+        _extrair_json(texto)
+
+
+def test_extrair_json_tolera_chaves_acentuadas_e_quebra_de_linha_em_string() -> None:
+    from venus_sdk.nodes.especialistas import _extrair_json
+
+    bruto = '```json\n{"domínio": "ingrediente", "intenção": "explicar", "resposta": "linha1\nlinha2", "fontes_usadas": []}\n```'
+    d = _extrair_json(bruto)
+    assert d["dominio"] == "ingrediente" and d["intencao"] == "explicar" and "linha2" in d["resposta"]
+
+
+def test_rotina_sem_passos_na_resposta_recebe_os_passos_reais_da_tool() -> None:
+    import json
+
+    from venus_sdk.nodes.especialistas import _garantir_passos_da_rotina
+
+    ev = [{"tool": "suggest_routine", "resultado": json.dumps(
+        {"horario": "manha", "passos": [{"ordem": 1, "nome": "Gel X", "categoria": "Limpeza"},
+                                        {"ordem": 2, "nome": "Creme Y", "categoria": "Hidratante"}]})}]
+    r = _garantir_passos_da_rotina({"resposta": "Sua rotina está pronta!", "recomendacao": ""}, ev)
+    assert "1) Gel X (Limpeza)" in r["resposta"] and "2) Creme Y" in r["resposta"]
+    # se a resposta já cita os produtos, não duplica
+    ok = _garantir_passos_da_rotina({"resposta": "Use Gel X e depois Creme Y.", "recomendacao": ""}, ev)
+    assert "Passos (" not in ok["resposta"]

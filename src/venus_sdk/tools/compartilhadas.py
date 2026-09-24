@@ -10,6 +10,8 @@ from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
+from venus_sdk.tools._util import consultar
+
 
 def montar_tools_compartilhadas(pool: Any) -> list[BaseTool]:
     """Monta a tool `get_user_allergies`, com o `pool` capturado por closure.
@@ -36,8 +38,12 @@ def montar_tools_compartilhadas(pool: Any) -> list[BaseTool]:
             JOIN venus.allergies a ON a.allergy_id = ua.fk_allergy_id
             WHERE ua.fk_user_id = $1
         """
-        async with pool.acquire() as conn:
-            linhas = await conn.fetch(query, user_id)
-        return [dict(linha) for linha in linhas]
+        # Sem linhas = usuário sem alergia declarada (resposta válida, não erro).
+        resposta = await consultar(pool, "get_user_allergies", query, user_id,
+                                   vazio="__sem_alergias__")
+        if isinstance(resposta, dict) and resposta.get("mensagem") == "__sem_alergias__":
+            return {"encontrado": False, "alergias": [],
+                    "mensagem": "o usuário não declarou nenhuma alergia"}
+        return resposta
 
     return [get_user_allergies]

@@ -1,9 +1,7 @@
-"""Exemplo mínimo de uso do SDK Venus.
+"""Exemplo mínimo de uso do SDK Venus: monta o grafo e inspeciona a topologia.
 
-O grafo principal ainda é um esqueleto (ver `venus_sdk/nodes/`): os nós
-levantam `NotImplementedError` até que a lógica de cada um seja
-implementada. Este exemplo só mostra como montar e inspecionar a topologia
-do grafo.
+Para uma conversa de verdade (LLMs + Postgres + RAG), veja
+`examples/conversar_com_venus.py`.
 """
 
 from venus_sdk.flows.venus_flow import montar_grafo_venus

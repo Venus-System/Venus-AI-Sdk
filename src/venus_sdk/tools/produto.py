@@ -25,6 +25,8 @@ from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
+from venus_sdk.tools._util import LIMITE_BUSCA, consultar, nao_encontrado, palavras_de_busca, sem_acento
+
 
 def montar_tools_produto(pool: Any) -> list[BaseTool]:
     """Monta as 5 tools do agente Produto, com o `pool` capturado por closure.
@@ -41,22 +43,45 @@ def montar_tools_produto(pool: Any) -> list[BaseTool]:
         )
 
     @tool
-    async def search_product(termo: str) -> list[dict]:
-        """Acha candidatos a produto a partir do nome (ou parte dele) e/ou da
-        marca digitados pelo usuário — ponto de entrada quando ainda não se
+    async def search_product(termo: str) -> list[dict] | dict:
+        """Acha candidatos a produto a partir de palavras do nome, da marca, da
+        categoria ou da descrição (ex.: 'shampoo cacheado', 'sérum vitamina c') — ponto de entrada quando ainda não se
         sabe o `product_id` (mesmo papel do `search_ingredient` do agente de
         Ingrediente). Use isto ANTES de qualquer outra tool de produto quando
         a pergunta só citar um nome; nunca invente um `product_id`."""
-        query = """
-            SELECT p.product_id, p.name, b.name AS brand_name
+        palavras = palavras_de_busca(termo)
+        if not palavras:
+            return {"erro": "informe um nome, marca ou tipo de produto para buscar"}
+        # Casa QUALQUER palavra com nome, marca, categoria ou descrição e
+        # ordena por quantas palavras bateram — "produto bom pra cabelo
+        # cacheado" acha shampoo/condicionador mesmo sem o nome exato.
+        query = f"""
+            SELECT p.product_id, p.name, b.name AS brand_name, pc.name AS category_name,
+                   count(DISTINCT tok) AS relevancia,
+                   EXISTS (SELECT 1 FROM venus.product_versions pv
+                           JOIN venus.product_scores ps ON ps.fk_product_version_id = pv.product_version_id
+                           WHERE pv.fk_product_id = p.product_id AND pv.is_current) AS tem_score,
+                   EXISTS (SELECT 1 FROM venus.product_versions pv
+                           JOIN venus.product_ingredients pi ON pi.fk_product_version_id = pv.product_version_id
+                           WHERE pv.fk_product_id = p.product_id AND pv.is_current) AS tem_ingredientes
             FROM venus.products p
             JOIN venus.brands b ON b.brand_id = p.fk_brand_id
-            WHERE p.name ILIKE '%' || $1 || '%' OR b.name ILIKE '%' || $1 || '%'
-            LIMIT 10
+            JOIN venus.product_categories pc ON pc.product_category_id = p.fk_product_category_id
+            JOIN unnest($1::text[]) AS tok ON (
+                   {sem_acento("p.name")} ILIKE '%' || tok || '%'
+                OR {sem_acento("b.name")} ILIKE '%' || tok || '%'
+                OR {sem_acento("pc.name")} ILIKE '%' || tok || '%'
+                OR {sem_acento("COALESCE(p.description, '')")} ILIKE '%' || tok || '%'
+            )
+            GROUP BY p.product_id, p.name, b.name, pc.name
+            ORDER BY relevancia DESC, tem_score DESC, tem_ingredientes DESC, p.name
+            LIMIT {LIMITE_BUSCA}
         """
-        async with pool.acquire() as conn:
-            linhas = await conn.fetch(query, termo)
-        return [dict(linha) for linha in linhas]
+        return await consultar(
+            pool, "search_product", query, palavras,
+            vazio="nenhum produto encontrado com esses termos — não invente um product_id; "
+                  "peça ao usuário o nome ou a marca",
+        )
 
     @tool
     async def get_product(product_id: int) -> dict:
@@ -70,9 +95,8 @@ def montar_tools_produto(pool: Any) -> list[BaseTool]:
             JOIN venus.product_categories pc ON pc.product_category_id = p.fk_product_category_id
             WHERE p.product_id = $1
         """
-        async with pool.acquire() as conn:
-            linha = await conn.fetchrow(query, product_id)
-        return dict(linha) if linha else {"erro": "produto não encontrado"}
+        return await consultar(pool, "get_product", query, product_id, uma_linha=True,
+                               vazio="produto não encontrado")
 
     @tool
     async def get_product_score(product_id: int) -> dict:
@@ -88,9 +112,14 @@ def montar_tools_produto(pool: Any) -> list[BaseTool]:
                 ON pv.product_version_id = ps.fk_product_version_id
             WHERE pv.fk_product_id = $1 AND pv.is_current = true
         """
-        async with pool.acquire() as conn:
-            linha = await conn.fetchrow(query, product_id)
-        return dict(linha) if linha else {"erro": "score não encontrado para este produto"}
+        r = await consultar(pool, "get_product_score", query, product_id, uma_linha=True,
+                            vazio="score não encontrado para este produto")
+        notas = [v for k, v in r.items() if k.endswith("_score")] if isinstance(r, dict) else []
+        if notas and all((n or 0) == 0 for n in notas):
+            # Linha existe mas toda zerada = score ainda não calculado (dado
+            # real do catálogo); apresentar "nota 0" seria alucinar um fato.
+            return nao_encontrado("o score deste produto ainda não foi calculado (todas as notas estão zeradas) — não cite notas")
+        return r
 
     @tool
     async def get_personalized_score(product_id: int, user_id: int) -> dict:
@@ -108,9 +137,9 @@ def montar_tools_produto(pool: Any) -> list[BaseTool]:
             ORDER BY ps.created_at DESC
             LIMIT 1
         """
-        async with pool.acquire() as conn:
-            linha = await conn.fetchrow(query, product_id, user_id)
-        return dict(linha) if linha else {"erro": "score personalizado não encontrado para este usuário/produto"}
+        return await consultar(pool, "get_personalized_score", query, product_id, user_id,
+                               uma_linha=True,
+                               vazio="score personalizado não encontrado para este usuário/produto")
 
     @tool
     async def get_product_ingredients(product_id: int) -> list[dict]:
@@ -125,9 +154,10 @@ def montar_tools_produto(pool: Any) -> list[BaseTool]:
             WHERE pv.fk_product_id = $1 AND pv.is_current = true
             ORDER BY pi.position
         """
-        async with pool.acquire() as conn:
-            linhas = await conn.fetch(query, product_id)
-        return [dict(linha) for linha in linhas]
+        return await consultar(
+            pool, "get_product_ingredients", query, product_id,
+            vazio="este produto não tem ingredientes cadastrados — NÃO invente ingredientes",
+        )
 
     return [
         search_product,

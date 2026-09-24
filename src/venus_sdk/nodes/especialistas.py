@@ -1,9 +1,12 @@
-"""Nós dos agentes especialistas: produto, ingrediente, rotina e FAQ."""
+"""Nós dos agentes especialistas: produto, ingrediente, rotina e FAQ (RAG)."""
 
 from __future__ import annotations
 
 import json
 import logging
+import re
+import time
+import unicodedata
 from typing import Any, Awaitable, Callable
 
 from langchain_core.messages import ToolMessage
@@ -17,7 +20,9 @@ from venus_sdk.prompts.rotina import ROTINA_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 from venus_sdk.tools.compartilhadas import montar_tools_compartilhadas
 from venus_sdk.tools.ingrediente import montar_tools_ingrediente
+from venus_sdk.tools.faq import montar_tools_faq
 from venus_sdk.tools.produto import montar_tools_produto
+from venus_sdk.tools.rotina import montar_tools_rotina
 
 logger = logging.getLogger(__name__)
 
@@ -28,50 +33,9 @@ logger = logging.getLogger(__name__)
 # então depois de `MAX_TENTATIVAS_JUIZ` o orquestrador ainda comunica o
 # problema com transparência (ver `nodes/juiz.py`/`nodes/orquestrador.py`).
 _RESPOSTA_ESPECIALISTA_FALLBACK = (
-    "Não consegui consultar as informações necessárias agora — pode "
-    "tentar de novo em instantes?"
+    "Tive um probleminha pra buscar essas informações agora. Pode tentar "
+    "de novo em instantes?"
 )
-
-# Mesmo espírito de `_RESPOSTA_ESPECIALISTA_FALLBACK`, mas pro FAQ — que
-# escreve direto em `resposta_final` e não passa pelo Agente Juiz (ver
-# `flows/venus_flow.py`), então precisa do próprio texto de fallback.
-_RESPOSTA_FAQ_FALLBACK = (
-    "Não consegui buscar essa informação agora — pode tentar de novo em instantes?"
-)
-
-# Rotina/FAQ ainda são stub (client MCP genérico, `mcp/tools.py`) — usadas
-# quando `_agente(...)` levanta `NotImplementedError` na montagem. Distinta
-# dos fallbacks acima (que são sobre uma falha pontual de LLM/tool): aqui a
-# funcionalidade em si não existe ainda. Achado ao vivo em 2026-09-18: o
-# roteador (Groq, `openai/gpt-oss-20b`) de vez em quando alucina uma tool
-# call nativa (ver `nodes/roteador.py::_recuperar_de_tool_call_alucinada`) e
-# a rota recuperada nem sempre bate com a mensagem — ex.: um simples "oi"
-# caindo em `ROUTE=rotina`. Antes disso, `rotina`/`faq` deixavam o
-# `NotImplementedError` propagar cru de propósito (sinal pro teste manual
-# de que falta implementar); agora que qualquer mensagem pode cair ali por
-# engano, deixar a conversa inteira quebrar por isso é pior que avisar que
-# a funcionalidade ainda não existe.
-_RESPOSTA_ROTINA_INDISPONIVEL = (
-    "Ainda não consigo montar ou ajustar rotinas por aqui — essa parte está "
-    "em desenvolvimento. Posso ajudar com dúvidas sobre produto ou ingrediente?"
-)
-_RESPOSTA_FAQ_INDISPONIVEL = (
-    "Ainda não consigo buscar informações sobre o Venus por aqui — essa "
-    "parte está em desenvolvimento. Posso ajudar com dúvidas sobre produto "
-    "ou ingrediente?"
-)
-
-# Cada agente ReAct é montado sob demanda (uma vez) e reaproveitado entre
-# chamadas — montá-lo carrega as tools, que fazem I/O na primeira vez.
-# Usado só por rotina/faq hoje, que ainda não têm tools reais (Mongo/Qdrant
-# pendentes) — produto/ingrediente usam as fábricas por pool logo abaixo.
-_agentes_cache: dict[str, Any] = {}
-
-
-def _agente(nome: str, prompt: str) -> Any:
-    if nome not in _agentes_cache:
-        _agentes_cache[nome] = montar_agente_mcp(get_llm_especialista(), prompt=prompt)
-    return _agentes_cache[nome]
 
 
 def _montar_entrada(estado: EstadoVenus) -> str:
@@ -117,6 +81,9 @@ def _extrair_evidencias_tools(mensagens: list) -> list[dict[str, Any]]:
     ]
 
 
+_log = logging.getLogger(__name__)
+
+
 async def _resposta_agente(agente: Any, entrada: str) -> tuple[str, list[dict[str, Any]]]:
     """Roda o agente via `ainvoke` — as tools de produto/ingrediente são
     async (asyncpg, ver `tools/produto.py`/`tools/ingrediente.py`).
@@ -140,9 +107,74 @@ async def _resposta_agente(agente: Any, entrada: str) -> tuple[str, list[dict[st
     erro de formato.
 
     Devolve `(texto, evidencias_tools)` — ver `_extrair_evidencias_tools`."""
-    resultado = await agente.ainvoke({"messages": [("human", entrada)]})
-    mensagens = resultado["messages"]
+    mensagens: list[Any] = []
+    t0 = time.perf_counter()
+    if not hasattr(agente, "astream"):
+        mensagens = (await agente.ainvoke({"messages": [("human", entrada)]}))["messages"]
+        return extrair_texto_resposta(mensagens[-1]), _extrair_evidencias_tools(mensagens)
+    async for passo in agente.astream(
+        {"messages": [("human", entrada)]}, config={"recursion_limit": 14}, stream_mode="values"
+    ):
+        mensagens = passo["messages"]
+        ultima = mensagens[-1]
+        chamadas = [c.get("name") for c in (getattr(ultima, "tool_calls", None) or [])]
+        _log.info("  [agente %.1fs] %s %s", time.perf_counter() - t0, type(ultima).__name__,
+                  chamadas or str(getattr(ultima, "content", ""))[:80])
     return extrair_texto_resposta(mensagens[-1]), _extrair_evidencias_tools(mensagens)
+
+
+def _sem_acento_chave(chave: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", chave) if unicodedata.category(c) != "Mn")
+
+
+def _normalizar_chaves(dados: Any) -> Any:
+    """Modelos menores escrevem "domínio"/"intenção" (com acento): normaliza as chaves do
+    objeto de topo para o contrato (`dominio`, `intencao`...)."""
+    if isinstance(dados, dict):
+        return {_sem_acento_chave(str(k)): v for k, v in dados.items()}
+    return dados
+
+
+def _extrair_json(texto: str) -> Any:
+    """Faz `json.loads` tolerando o que os LLMs costumam fazer: cercar o JSON com
+    ```json ... ```, colocar uma frase antes/depois, quebrar linha DENTRO de uma string
+    (JSON inválido no modo estrito) e acentuar nomes de campo. Levanta
+    `ValueError`/`TypeError` se não houver um objeto JSON válido."""
+    bruto = (texto or "").strip()
+    candidatos = [bruto, re.sub(r"^```(?:json)?\s*|\s*```$", "", bruto, flags=re.IGNORECASE).strip()]
+    ini, fim = bruto.find("{"), bruto.rfind("}")
+    if ini != -1 and fim > ini:
+        candidatos.append(bruto[ini : fim + 1])
+    for candidato in candidatos:
+        try:
+            return _normalizar_chaves(json.loads(candidato, strict=False))
+        except ValueError:
+            continue
+    raise ValueError("nenhum objeto JSON na resposta do especialista")
+
+
+def _garantir_passos_da_rotina(resposta: dict, evidencias: list[dict] | None) -> dict:
+    """Modelos pequenos dizem "sua rotina está pronta!" sem listar os passos. Se `suggest_routine`
+    devolveu passos e a resposta não cita nenhum produto, anexa os passos REAIS da tool."""
+    for ev in evidencias or []:
+        if ev.get("tool") != "suggest_routine":
+            continue
+        dados = ev.get("resultado")
+        try:
+            while isinstance(dados, str):
+                dados = json.loads(dados)
+        except ValueError:
+            return resposta
+        passos = dados.get("passos") if isinstance(dados, dict) else None
+        if not passos:
+            return resposta
+        texto = f"{resposta.get('resposta', '')} {resposta.get('recomendacao', '')}".lower()
+        if any(str(p.get("nome", "")).lower() in texto for p in passos):
+            return resposta
+        lista = "; ".join(f"{p['ordem']}) {p['nome']} ({p['categoria']})" for p in passos)
+        resposta["resposta"] = f"{str(resposta.get('resposta', '')).strip()} Passos ({dados.get('horario', '')}): {lista}.".strip()
+        return resposta
+    return resposta
 
 
 async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) -> EstadoVenus:
@@ -171,7 +203,7 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
         }
 
     try:
-        resposta_json = json.loads(texto)
+        resposta_json = _extrair_json(texto)
     except (TypeError, ValueError):
         logger.warning("Especialista %s não devolveu JSON válido: %r", nome, texto)
         resposta_json = {
@@ -181,6 +213,9 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
             "recomendacao": "",
             "fontes_usadas": [],
         }
+
+    if nome == "rotina" and isinstance(resposta_json, dict):
+        resposta_json = _garantir_passos_da_rotina(resposta_json, evidencias)
 
     return {"resposta_especialista": resposta_json, "evidencias_tools": evidencias}
 
@@ -238,43 +273,53 @@ def montar_no_agente_ingrediente(pool: Any) -> Callable[[EstadoVenus], Awaitable
     return no_agente_ingrediente
 
 
-async def no_agente_rotina(estado: EstadoVenus) -> EstadoVenus:
-    """Idem, usando `ROTINA_PROMPT_COMPLETO` — ainda via o client MCP
-    genérico (stub); tools de rotina (MongoDB) pendentes."""
-    try:
-        agente = _agente("rotina", ROTINA_PROMPT_COMPLETO)
-    except NotImplementedError:
-        logger.warning("Agente de rotina indisponível — client MCP ainda é stub (mcp/tools.py)")
-        return {
-            "resposta_especialista": {
-                "dominio": "rotina",
-                "intencao": "indisponivel",
-                "resposta": _RESPOSTA_ROTINA_INDISPONIVEL,
-                "recomendacao": "",
-                "fontes_usadas": [],
-            },
-            "evidencias_tools": None,
-        }
-    return await _executar_especialista(estado, "rotina", agente)
+def montar_no_agente_rotina(pool: Any) -> Callable[[EstadoVenus], Awaitable[EstadoVenus]]:
+    """Idem `montar_no_agente_produto`, para o agente de Rotina (ver
+    `tools/rotina.py`) — perfil/favoritos/listas do usuário no Postgres."""
+    cache: dict[str, Any] = {}
+
+    def _agente_rotina() -> Any:
+        if "rotina" not in cache:
+            tools = montar_tools_rotina(pool) + montar_tools_compartilhadas(pool)
+            cache["rotina"] = montar_agente_mcp(
+                get_llm_especialista(), prompt=ROTINA_PROMPT_COMPLETO, tools=tools
+            )
+        return cache["rotina"]
+
+    async def no_agente_rotina(estado: EstadoVenus) -> EstadoVenus:
+        """Roda o agente de rotina e grava o JSON em `resposta_especialista`."""
+        return await _executar_especialista(estado, "rotina", _agente_rotina())
+
+    return no_agente_rotina
 
 
-async def no_agente_faq(estado: EstadoVenus) -> EstadoVenus:
-    """Usa `FAQ_PROMPT_COMPLETO`; grava a resposta final direto em
-    `resposta_final` (o FAQ não passa pelo Agente Juiz). Ainda via o client
-    MCP genérico (stub); tool `faq_retriever` (Qdrant) pendente."""
-    entrada = _montar_entrada(estado)
-    try:
-        agente = _agente("faq", FAQ_PROMPT_COMPLETO)
-    except NotImplementedError:
-        logger.warning("Agente de FAQ indisponível — client MCP ainda é stub (mcp/tools.py)")
-        return {"resposta_final": _RESPOSTA_FAQ_INDISPONIVEL}
-    try:
-        texto, _evidencias = await _resposta_agente(agente, entrada)
-    except Exception:
-        # Sem Agente Juiz depois do FAQ (ver `flows/venus_flow.py`) — se não
-        # blindar aqui, uma falha de LLM (Gemini e Groq indisponíveis) sobe
-        # crua até o `.ainvoke()` do grafo principal, igual ao caso resolvido
-        # em `_executar_especialista`.
-        logger.exception("Especialista FAQ falhou ao chamar o LLM/tools")
-        return {"resposta_final": _RESPOSTA_FAQ_FALLBACK}
-    return {"resposta_final": texto or _RESPOSTA_FAQ_FALLBACK}
+def montar_no_agente_faq(
+    indice: Any, tools_extras: list[Any] | None = None
+) -> Callable[[EstadoVenus], Awaitable[EstadoVenus]]:
+    """Fábrica do nó do agente FAQ — o agente com RAG.
+
+    `indice` é o índice vetorial local (`rag.criar_indice_local`); as tools
+    são `faq_retriever` (documentos locais) e `buscar_na_web` (internet).
+    `tools_extras` recebe tools já carregadas de fontes externas — tools MCP
+    (`mcp.tools.get_mcp_tools`) e/ou A2A (`a2a_client.montar_tool_a2a`).
+
+    Diferente do desenho antigo, o FAQ agora devolve JSON estruturado (com
+    `fontes_usadas` = arquivos/URLs realmente consultados) e passa pelo Agente
+    Juiz, que confere a resposta contra os trechos recuperados
+    (`evidencias_tools`) — mitigação de alucinação também no RAG.
+    """
+    cache: dict[str, Any] = {}
+
+    def _agente_faq() -> Any:
+        if "faq" not in cache:
+            tools = montar_tools_faq(indice) + list(tools_extras or [])
+            cache["faq"] = montar_agente_mcp(
+                get_llm_especialista(), prompt=FAQ_PROMPT_COMPLETO, tools=tools
+            )
+        return cache["faq"]
+
+    async def no_agente_faq(estado: EstadoVenus) -> EstadoVenus:
+        """Roda o agente FAQ (RAG) e grava o JSON em `resposta_especialista`."""
+        return await _executar_especialista(estado, "faq", _agente_faq())
+
+    return no_agente_faq

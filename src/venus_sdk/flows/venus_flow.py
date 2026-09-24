@@ -10,8 +10,8 @@ dois desvios previstos pelos próprios prompts dos agentes:
 - Roteador responde diretamente (small talk ou fora de escopo, ver
   `prompts/router.py`): também pula para o guardrail de saída.
 
-O FAQ é a outra exceção: responde direto e vai para o guardrail de saída sem
-passar pelo Agente Juiz (ver `prompts/faq.py`).
+O FAQ (RAG sobre documentos locais + web + MCP/A2A) também passa pelo Agente
+Juiz, que confere a resposta contra os trechos recuperados.
 
 Reprovação do Juiz (produto/ingrediente/rotina) volta DIRETO pro nó do
 especialista que gerou a resposta — não pro roteador (ver
@@ -32,10 +32,10 @@ from typing import Any
 from langgraph.graph import END, StateGraph
 
 from venus_sdk.nodes.especialistas import (
+    montar_no_agente_faq,
     montar_no_agente_ingrediente,
     montar_no_agente_produto,
-    no_agente_faq,
-    no_agente_rotina,
+    montar_no_agente_rotina,
 )
 from venus_sdk.nodes.guardrails import (
     decidir_pos_guardrail_entrada,
@@ -49,7 +49,9 @@ from venus_sdk.nodes.roteador import decidir_especialista, no_roteador
 from venus_sdk.state import EstadoVenus
 
 
-def montar_grafo_venus(*, pool: Any | None = None) -> StateGraph:
+def montar_grafo_venus(
+    *, pool: Any | None = None, indice_rag: Any | None = None, tools_faq_extras: list[Any] | None = None
+) -> StateGraph:
     """Fábrica do grafo principal do Venus (não compilado — use
     `compilar_grafo_venus()` para obter um grafo executável).
 
@@ -58,7 +60,9 @@ def montar_grafo_venus(*, pool: Any | None = None) -> StateGraph:
     (nunca o SDK), igual `checkpointer`/`store` em `compilar_grafo_venus()`.
     Sem `pool`, os nós de produto/ingrediente ainda entram no grafo (o
     roteamento funciona), mas levantam `ValueError` se forem de fato
-    invocados — só nesse momento, nunca aqui na montagem.
+    invocados — só nesse momento, nunca aqui na montagem. O mesmo vale para
+    `indice_rag` (`rag.criar_indice_local`) no FAQ; `tools_faq_extras` são
+    tools MCP/A2A já carregadas, entregues ao agente FAQ.
     """
     grafo = StateGraph(EstadoVenus)
 
@@ -67,8 +71,8 @@ def montar_grafo_venus(*, pool: Any | None = None) -> StateGraph:
     grafo.add_node("roteador", no_roteador)
     grafo.add_node("agente_produto", montar_no_agente_produto(pool))
     grafo.add_node("agente_ingrediente", montar_no_agente_ingrediente(pool))
-    grafo.add_node("agente_rotina", no_agente_rotina)
-    grafo.add_node("agente_faq", no_agente_faq)
+    grafo.add_node("agente_rotina", montar_no_agente_rotina(pool))
+    grafo.add_node("agente_faq", montar_no_agente_faq(indice_rag, tools_faq_extras))
     grafo.add_node("agente_juiz", no_agente_juiz)
     grafo.add_node("orquestrador", no_orquestrador)
     grafo.add_node("guardrail_saida", no_guardrail_saida)
@@ -98,12 +102,12 @@ def montar_grafo_venus(*, pool: Any | None = None) -> StateGraph:
         },
     )
 
-    # FAQ e small talk/fora de escopo ("direto") já respondem por conta
-    # própria; produto/ingrediente/rotina sempre passam pelo Agente Juiz.
+    # Small talk/fora de escopo ("direto") já respondem por conta própria;
+    # produto/ingrediente/rotina/faq sempre passam pelo Agente Juiz.
     grafo.add_edge("agente_produto", "agente_juiz")
     grafo.add_edge("agente_ingrediente", "agente_juiz")
     grafo.add_edge("agente_rotina", "agente_juiz")
-    grafo.add_edge("agente_faq", "guardrail_saida")
+    grafo.add_edge("agente_faq", "agente_juiz")
 
     grafo.add_conditional_edges(
         "agente_juiz",
@@ -115,6 +119,7 @@ def montar_grafo_venus(*, pool: Any | None = None) -> StateGraph:
             "reprovado_produto": "agente_produto",
             "reprovado_ingrediente": "agente_ingrediente",
             "reprovado_rotina": "agente_rotina",
+            "reprovado_faq": "agente_faq",
             "esgotado": "orquestrador",
         },
     )
@@ -127,7 +132,11 @@ def montar_grafo_venus(*, pool: Any | None = None) -> StateGraph:
 
 
 def compilar_grafo_venus(
-    checkpointer: Any | None = None, store: Any | None = None, pool: Any | None = None
+    checkpointer: Any | None = None,
+    store: Any | None = None,
+    pool: Any | None = None,
+    indice_rag: Any | None = None,
+    tools_faq_extras: list[Any] | None = None,
 ) -> Any:
     """Compila o grafo principal do Venus.
 
@@ -158,5 +167,10 @@ def compilar_grafo_venus(
     produto/ingrediente (`tools/produto.py`, `tools/ingrediente.py`) o usam
     pra consultar o Postgres. Sem ele, produto/ingrediente levantam
     `ValueError` se forem invocados (ver `montar_grafo_venus`).
+
+    `indice_rag` (opcional) é o índice do FAQ (`rag.criar_indice_local`);
+    `tools_faq_extras` são tools MCP/A2A extras para o agente FAQ.
     """
-    return montar_grafo_venus(pool=pool).compile(checkpointer=checkpointer, store=store)
+    return montar_grafo_venus(
+        pool=pool, indice_rag=indice_rag, tools_faq_extras=tools_faq_extras
+    ).compile(checkpointer=checkpointer, store=store)
