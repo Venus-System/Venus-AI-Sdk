@@ -8,8 +8,12 @@ especialista e o Agente Juiz não inventem dados nem quebrem."""
 from __future__ import annotations
 
 import logging
-import unicodedata
+import re
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
+
+from venus_sdk.texto import remover_acentos
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +28,13 @@ _SEM_ACENTO = "aaaaaeeeeiiiiooooouuuucnAAAAAEEEEIIIIOOOOOUUUUCN"
 
 def normalizar_termo(termo: str) -> str:
     """Tira acento e espaços das pontas; o Postgres faz o resto (ILIKE)."""
-    termo = (termo or "").strip()
-    return "".join(
-        c for c in unicodedata.normalize("NFD", termo) if unicodedata.category(c) != "Mn"
-    )
+    return remover_acentos((termo or "").strip())
 
+
+_PALAVRA_RE = re.compile(r"[a-z0-9]+")
+_TAMANHO_MINIMO_PALAVRA = 3
+# Termos de 1 palavra com pelo menos isso de letras perdem as 2 últimas no radical.
+_TAMANHO_MINIMO_PARA_RADICAL = 7
 
 _PALAVRAS_VAZIAS = {
     "de", "da", "do", "das", "dos", "para", "pra", "por", "com", "sem", "que", "uma", "um", "uns",
@@ -40,13 +46,12 @@ _PALAVRAS_VAZIAS = {
 def palavras_de_busca(termo: str) -> list[str]:
     """Palavras relevantes (sem acento, minúsculas, >=3 letras, sem palavras
     vazias) para busca por qualquer-palavra. Sem sobrar nenhuma, devolve `[]`."""
-    import re
-
-    vistas: list[str] = []
-    for w in re.findall(r"[a-z0-9]+", normalizar_termo(termo).lower()):
-        if len(w) >= 3 and w not in _PALAVRAS_VAZIAS and w not in vistas:
-            vistas.append(w)
-    return vistas
+    palavras: list[str] = []
+    for palavra in _PALAVRA_RE.findall(normalizar_termo(termo).lower()):
+        relevante = len(palavra) >= _TAMANHO_MINIMO_PALAVRA and palavra not in _PALAVRAS_VAZIAS
+        if relevante and palavra not in palavras:
+            palavras.append(palavra)
+    return palavras
 
 
 def radical_de_busca(termo: str) -> str:
@@ -54,12 +59,25 @@ def radical_de_busca(termo: str) -> str:
     'niacinami' casa 'NIACINAMIDE'): tira as 2 últimas letras de termos de 1
     palavra com 7+ letras; senão devolve o próprio termo."""
     termo = normalizar_termo(termo).lower()
-    return termo[:-2] if " " not in termo and len(termo) >= 7 else termo
+    e_uma_palavra_longa = " " not in termo and len(termo) >= _TAMANHO_MINIMO_PARA_RADICAL
+    return termo[:-2] if e_uma_palavra_longa else termo
 
 
 def sem_acento(coluna: str) -> str:
     """Fragmento SQL que remove acentos de `coluna` (sem precisar de `unaccent`)."""
     return f"translate({coluna}, '{_COM_ACENTO}', '{_SEM_ACENTO}')"
+
+
+def exigir_pool(pool: Any, fabrica: str) -> None:
+    """Levanta `ValueError` se `pool` for `None`. As fábricas de tools só são
+    chamadas no primeiro uso real do nó (nunca na montagem do grafo), então é
+    nessa hora que a falta do Postgres aparece."""
+    if pool is None:
+        raise ValueError(
+            f"{fabrica} requer um pool do Postgres (asyncpg) — "
+            "quem monta o grafo deve criar o pool e passar via "
+            "compilar_grafo_venus(pool=...)."
+        )
 
 
 def nao_encontrado(mensagem: str) -> dict:
@@ -108,9 +126,6 @@ async def executar(pool: Any, nome: str, query: str, *args: Any) -> Any:
 
 def _limpar(linha: dict) -> dict:
     """Converte tipos não serializáveis em JSON (Decimal, datetime)."""
-    from datetime import date, datetime
-    from decimal import Decimal
-
     saida = {}
     for chave, valor in linha.items():
         if isinstance(valor, Decimal):

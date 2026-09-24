@@ -23,7 +23,7 @@ ResultadoJuiz = Literal[
 ]
 
 # Nº máximo de vezes que o Agente Juiz pode mandar o especialista tentar de
-# novo (via roteador) antes de seguir mesmo assim para o orquestrador.
+# novo antes de seguir mesmo assim para o orquestrador.
 MAX_TENTATIVAS_JUIZ = 2
 
 # `\[?...\]?` tolera o LLM ecoar o formato `RESULTADO=[aprovado|reprovado]`
@@ -33,7 +33,7 @@ MAX_TENTATIVAS_JUIZ = 2
 _RESULTADO_RE = re.compile(r"RESULTADO=\[?(\w+)\]?", re.IGNORECASE)
 _FEEDBACK_RE = re.compile(r"FEEDBACK=\[?(.*?)\]?\s*$", re.IGNORECASE | re.DOTALL)
 
-
+# Trechos que afirmam um dado do catálogo (nota, %, composição).
 _RE_AFIRMA_DADO = re.compile(
     r"\d+\s*/\s*100|\d\s*%|\bscore\b|\bnota\s*\d|\bcont[eé]m\b|\blivre\b|\bsem\s+(sulfato|parabeno|silicone|[áa]lcool)"
     r"|\b(com|de)\s+(manteiga|[óo]leo|prote[íi]na|queratina|[áa]cido|vitamina|extrato)",
@@ -44,33 +44,21 @@ _RE_AFIRMA_DADO = re.compile(
 def _resposta_honesta_sem_dado(estado: EstadoVenus) -> bool:
     """Sugestão de produtos que só lista o que a busca achou, sem afirmar nota/ingrediente:
     não há o que reprovar — o Juiz LLM só pediria dado que o banco não tem."""
-    esp = estado.get("resposta_especialista") or {}
-    if esp.get("dominio") != "produto" or esp.get("intencao") != "sugerir":
+    especialista = estado.get("resposta_especialista") or {}
+    if especialista.get("dominio") != "produto" or especialista.get("intencao") != "sugerir":
         return False
-    ev = estado.get("evidencias_tools") or []
-    if not any(isinstance(e, dict) and e.get("tool") == "search_product" for e in ev):
+    evidencias = estado.get("evidencias_tools") or []
+    if not any(isinstance(ev, dict) and ev.get("tool") == "search_product" for ev in evidencias):
         return False
-    texto = " ".join(str(esp.get(k) or "") for k in ("resposta", "recomendacao", "esclarecer"))
+    texto = " ".join(str(especialista.get(campo) or "") for campo in ("resposta", "recomendacao", "esclarecer"))
     return bool(texto.strip()) and not _RE_AFIRMA_DADO.search(texto)
 
 
-def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
-    """Avalia `resposta_especialista` e atualiza `aprovado_juiz`,
-    `feedback_juiz` e `tentativas_juiz`."""
-    especialista = estado.get("resposta_especialista") or {}
-    if especialista.get("intencao") == "erro_tecnico":
-        # O especialista falhou por infraestrutura (cota/rede/LLM fora do ar),
-        # não por conteúdo ruim: reprovar e mandar tentar de novo só repetiria
-        # a mesma falha (e, com cota estourada, gastaria mais tempo e mais
-        # cota). Pula o LLM do juiz e vai direto para "esgotado" — o
-        # orquestrador comunica o problema com transparência.
-        logger.warning("Especialista %s falhou tecnicamente; sem retry do juiz", especialista.get("dominio"))
-        return {"aprovado_juiz": False, "feedback_juiz": None, "tentativas_juiz": MAX_TENTATIVAS_JUIZ}
+def _veredito(aprovado: bool, feedback: str | None, tentativas: int) -> EstadoVenus:
+    return {"aprovado_juiz": aprovado, "feedback_juiz": feedback, "tentativas_juiz": tentativas}
 
-    if _resposta_honesta_sem_dado(estado):
-        return {"aprovado_juiz": True, "feedback_juiz": None,
-                "tentativas_juiz": estado.get("tentativas_juiz", 0) + 1}
 
+def _montar_entrada_juiz(estado: EstadoVenus) -> str:
     entrada = (
         f"PERGUNTA_ORIGINAL={estado.get('pergunta_original', '')}\n"
         f"ESPECIALISTA_JSON={json.dumps(estado.get('resposta_especialista') or {}, ensure_ascii=False)}"
@@ -84,8 +72,38 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
     evidencias = estado.get("evidencias_tools")
     if evidencias:
         entrada += f"\nRESULTADOS_TOOLS={json.dumps(evidencias, ensure_ascii=False)}"
-    mensagens = [("system", JUIZ_PROMPT_COMPLETO), ("human", entrada)]
+    return entrada
 
+
+def _ler_veredito_do_llm(texto: str) -> tuple[bool, str | None]:
+    """`(aprovado, feedback)` a partir do protocolo `RESULTADO=`/`FEEDBACK=`.
+    Sem `FEEDBACK=`, o texto inteiro vira o feedback da reprovação."""
+    match_resultado = _RESULTADO_RE.search(texto)
+    aprovado = bool(match_resultado) and match_resultado.group(1).strip().lower() == "aprovado"
+    if aprovado:
+        return True, None
+    match_feedback = _FEEDBACK_RE.search(texto)
+    return False, match_feedback.group(1).strip() if match_feedback else texto
+
+
+def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
+    """Avalia `resposta_especialista` e atualiza `aprovado_juiz`,
+    `feedback_juiz` e `tentativas_juiz`."""
+    especialista = estado.get("resposta_especialista") or {}
+    if especialista.get("intencao") == "erro_tecnico":
+        # O especialista falhou por infraestrutura (cota/rede/LLM fora do ar),
+        # não por conteúdo ruim: reprovar e mandar tentar de novo só repetiria
+        # a mesma falha (e, com cota estourada, gastaria mais tempo e mais
+        # cota). Pula o LLM do juiz e vai direto para "esgotado" — o
+        # orquestrador comunica o problema com transparência.
+        logger.warning("Especialista %s falhou tecnicamente; sem retry do juiz", especialista.get("dominio"))
+        return _veredito(False, None, MAX_TENTATIVAS_JUIZ)
+
+    proxima_tentativa = estado.get("tentativas_juiz", 0) + 1
+    if _resposta_honesta_sem_dado(estado):
+        return _veredito(True, None, proxima_tentativa)
+
+    mensagens = [("system", JUIZ_PROMPT_COMPLETO), ("human", _montar_entrada_juiz(estado))]
     try:
         resposta = get_llm_rapido().invoke(mensagens)
     except Exception:
@@ -96,23 +114,10 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         # de `MAX_TENTATIVAS_JUIZ` segue pro orquestrador com a nota de
         # transparência de sempre — em vez de travar a conversa inteira.
         logger.exception("Falha ao chamar o LLM do Agente Juiz")
-        tentativas = estado.get("tentativas_juiz", 0) + 1
-        return {"aprovado_juiz": False, "feedback_juiz": None, "tentativas_juiz": tentativas}
-    texto = (resposta.content or "").strip()
+        return _veredito(False, None, proxima_tentativa)
 
-    match_resultado = _RESULTADO_RE.search(texto)
-    aprovado = bool(match_resultado) and match_resultado.group(1).strip().lower() == "aprovado"
-
-    feedback = None
-    if not aprovado:
-        match_feedback = _FEEDBACK_RE.search(texto)
-        feedback = match_feedback.group(1).strip() if match_feedback else texto
-
-    return {
-        "aprovado_juiz": aprovado,
-        "feedback_juiz": feedback,
-        "tentativas_juiz": estado.get("tentativas_juiz", 0) + 1,
-    }
+    aprovado, feedback = _ler_veredito_do_llm((resposta.content or "").strip())
+    return _veredito(aprovado, feedback, proxima_tentativa)
 
 
 def decidir_pos_juiz(estado: EstadoVenus) -> ResultadoJuiz:

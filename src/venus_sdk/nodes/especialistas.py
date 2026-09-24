@@ -6,25 +6,29 @@ import json
 import logging
 import re
 import time
-import unicodedata
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from langchain_core.messages import ToolMessage
 
 from venus_sdk.flows.agente_mcp import montar_agente_mcp
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_especialista
+from venus_sdk.nodes._evidencias import dados_da_evidencia
 from venus_sdk.prompts.faq import FAQ_PROMPT_COMPLETO
 from venus_sdk.prompts.ingrediente import ESP_INGREDIENTE_PROMPT_COMPLETO
 from venus_sdk.prompts.produto import ESP_PRODUTO_PROMPT_COMPLETO
 from venus_sdk.prompts.rotina import ROTINA_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
+from venus_sdk.texto import remover_acentos
 from venus_sdk.tools.compartilhadas import montar_tools_compartilhadas
-from venus_sdk.tools.ingrediente import montar_tools_ingrediente
 from venus_sdk.tools.faq import montar_tools_faq
+from venus_sdk.tools.ingrediente import montar_tools_ingrediente
 from venus_sdk.tools.produto import montar_tools_produto
 from venus_sdk.tools.rotina import montar_tools_rotina
 
 logger = logging.getLogger(__name__)
+
+NoEspecialista = Callable[[EstadoVenus], Awaitable[EstadoVenus]]
 
 # Fallback pra quando o especialista falha por completo (ex.: Gemini E Groq
 # indisponíveis ao mesmo tempo — ver nota em `_resposta_agente`) — evita que
@@ -36,6 +40,16 @@ _RESPOSTA_ESPECIALISTA_FALLBACK = (
     "Tive um probleminha pra buscar essas informações agora. Pode tentar "
     "de novo em instantes?"
 )
+_RESPOSTA_ERRO_FORMATO = "Não consegui estruturar uma resposta válida para essa pergunta."
+
+# Teto de passos do agente ReAct (LLM -> tool -> LLM...) por pergunta.
+_LIMITE_PASSOS_AGENTE = 14
+_TAMANHO_PREVIA_LOG = 80
+
+_CERCA_MARKDOWN_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+
+
+# --- entrada do especialista ---
 
 
 def _montar_entrada(estado: EstadoVenus) -> str:
@@ -66,6 +80,9 @@ def _montar_entrada(estado: EstadoVenus) -> str:
     return "\n".join(partes)
 
 
+# --- execução do agente ReAct ---
+
+
 def _extrair_evidencias_tools(mensagens: list) -> list[dict[str, Any]]:
     """Extrai nome+retorno de cada `ToolMessage` da execução do agente ReAct
     — a evidência bruta que embasa (ou não) `resposta_especialista`, usada
@@ -81,7 +98,10 @@ def _extrair_evidencias_tools(mensagens: list) -> list[dict[str, Any]]:
     ]
 
 
-_log = logging.getLogger(__name__)
+def _logar_passo_do_agente(mensagem: Any, inicio: float) -> None:
+    chamadas = [chamada.get("name") for chamada in (getattr(mensagem, "tool_calls", None) or [])]
+    previa = chamadas or str(getattr(mensagem, "content", ""))[:_TAMANHO_PREVIA_LOG]
+    logger.info("  [agente %.1fs] %s %s", time.perf_counter() - inicio, type(mensagem).__name__, previa)
 
 
 async def _resposta_agente(agente: Any, entrada: str) -> tuple[str, list[dict[str, Any]]]:
@@ -107,32 +127,46 @@ async def _resposta_agente(agente: Any, entrada: str) -> tuple[str, list[dict[st
     erro de formato.
 
     Devolve `(texto, evidencias_tools)` — ver `_extrair_evidencias_tools`."""
-    mensagens: list[Any] = []
-    t0 = time.perf_counter()
-    if not hasattr(agente, "astream"):
-        mensagens = (await agente.ainvoke({"messages": [("human", entrada)]}))["messages"]
-        return extrair_texto_resposta(mensagens[-1]), _extrair_evidencias_tools(mensagens)
-    async for passo in agente.astream(
-        {"messages": [("human", entrada)]}, config={"recursion_limit": 14}, stream_mode="values"
-    ):
-        mensagens = passo["messages"]
-        ultima = mensagens[-1]
-        chamadas = [c.get("name") for c in (getattr(ultima, "tool_calls", None) or [])]
-        _log.info("  [agente %.1fs] %s %s", time.perf_counter() - t0, type(ultima).__name__,
-                  chamadas or str(getattr(ultima, "content", ""))[:80])
+    entrada_agente = {"messages": [("human", entrada)]}
+    if hasattr(agente, "astream"):
+        mensagens = await _executar_com_log_de_passos(agente, entrada_agente)
+    else:
+        mensagens = (await agente.ainvoke(entrada_agente))["messages"]
     return extrair_texto_resposta(mensagens[-1]), _extrair_evidencias_tools(mensagens)
 
 
-def _sem_acento_chave(chave: str) -> str:
-    return "".join(c for c in unicodedata.normalize("NFD", chave) if unicodedata.category(c) != "Mn")
+async def _executar_com_log_de_passos(agente: Any, entrada_agente: dict[str, Any]) -> list[Any]:
+    """Roda o agente passo a passo (`astream`), logando cada passo, e devolve
+    as mensagens do último."""
+    mensagens: list[Any] = []
+    inicio = time.perf_counter()
+    async for passo in agente.astream(
+        entrada_agente, config={"recursion_limit": _LIMITE_PASSOS_AGENTE}, stream_mode="values"
+    ):
+        mensagens = passo["messages"]
+        _logar_passo_do_agente(mensagens[-1], inicio)
+    return mensagens
+
+
+# --- leitura do JSON devolvido pelo especialista ---
 
 
 def _normalizar_chaves(dados: Any) -> Any:
     """Modelos menores escrevem "domínio"/"intenção" (com acento): normaliza as chaves do
     objeto de topo para o contrato (`dominio`, `intencao`...)."""
     if isinstance(dados, dict):
-        return {_sem_acento_chave(str(k)): v for k, v in dados.items()}
+        return {remover_acentos(str(chave)): valor for chave, valor in dados.items()}
     return dados
+
+
+def _candidatos_a_json(texto: str) -> list[str]:
+    """O texto como veio, sem a cerca ```json``` e só o trecho entre a 1ª `{` e a última `}`."""
+    bruto = (texto or "").strip()
+    candidatos = [bruto, _CERCA_MARKDOWN_RE.sub("", bruto).strip()]
+    inicio, fim = bruto.find("{"), bruto.rfind("}")
+    if inicio != -1 and fim > inicio:
+        candidatos.append(bruto[inicio : fim + 1])
+    return candidatos
 
 
 def _extrair_json(texto: str) -> Any:
@@ -140,12 +174,7 @@ def _extrair_json(texto: str) -> Any:
     ```json ... ```, colocar uma frase antes/depois, quebrar linha DENTRO de uma string
     (JSON inválido no modo estrito) e acentuar nomes de campo. Levanta
     `ValueError`/`TypeError` se não houver um objeto JSON válido."""
-    bruto = (texto or "").strip()
-    candidatos = [bruto, re.sub(r"^```(?:json)?\s*|\s*```$", "", bruto, flags=re.IGNORECASE).strip()]
-    ini, fim = bruto.find("{"), bruto.rfind("}")
-    if ini != -1 and fim > ini:
-        candidatos.append(bruto[ini : fim + 1])
-    for candidato in candidatos:
+    for candidato in _candidatos_a_json(texto):
         try:
             return _normalizar_chaves(json.loads(candidato, strict=False))
         except ValueError:
@@ -156,35 +185,38 @@ def _extrair_json(texto: str) -> Any:
 def _garantir_passos_da_rotina(resposta: dict, evidencias: list[dict] | None) -> dict:
     """Modelos pequenos dizem "sua rotina está pronta!" sem listar os passos. Se `suggest_routine`
     devolveu passos e a resposta não cita nenhum produto, anexa os passos REAIS da tool."""
-    for ev in evidencias or []:
-        if ev.get("tool") != "suggest_routine":
-            continue
-        dados = ev.get("resultado")
-        try:
-            while isinstance(dados, str):
-                dados = json.loads(dados)
-        except ValueError:
-            return resposta
-        passos = dados.get("passos") if isinstance(dados, dict) else None
-        if not passos:
-            return resposta
-        texto = f"{resposta.get('resposta', '')} {resposta.get('recomendacao', '')}".lower()
-        if any(str(p.get("nome", "")).lower() in texto for p in passos):
-            return resposta
-        lista = "; ".join(f"{p['ordem']}) {p['nome']} ({p['categoria']})" for p in passos)
-        resposta["resposta"] = f"{str(resposta.get('resposta', '')).strip()} Passos ({dados.get('horario', '')}): {lista}.".strip()
+    dados = dados_da_evidencia(evidencias, "suggest_routine")
+    passos = dados.get("passos") if isinstance(dados, dict) else None
+    if not passos:
         return resposta
+
+    texto_da_resposta = f"{resposta.get('resposta', '')} {resposta.get('recomendacao', '')}".lower()
+    if any(str(passo.get("nome", "")).lower() in texto_da_resposta for passo in passos):
+        return resposta
+
+    lista = "; ".join(f"{passo['ordem']}) {passo['nome']} ({passo['categoria']})" for passo in passos)
+    resposta_atual = str(resposta.get("resposta", "")).strip()
+    resposta["resposta"] = f"{resposta_atual} Passos ({dados.get('horario', '')}): {lista}.".strip()
     return resposta
+
+
+def _resposta_de_falha(nome: str, intencao: str, texto: str) -> dict[str, Any]:
+    """JSON no formato do especialista para quando ele não conseguiu responder."""
+    return {
+        "dominio": nome,
+        "intencao": intencao,
+        "resposta": texto,
+        "recomendacao": "",
+        "fontes_usadas": [],
+    }
 
 
 async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) -> EstadoVenus:
     """Roda `agente` (já montado, com as tools do domínio) e grava o JSON
     devolvido em `resposta_especialista` (ou um JSON de erro, se a saída não
     for JSON válido)."""
-    entrada = _montar_entrada(estado)
-
     try:
-        texto, evidencias = await _resposta_agente(agente, entrada)
+        texto, evidencias = await _resposta_agente(agente, _montar_entrada(estado))
     except Exception:
         # Gemini E o fallback Groq falharam (ou algo mais quebrou dentro do
         # agente ReAct) — nunca deixa isso subir cru até `.ainvoke()` do
@@ -192,13 +224,7 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
         # JSON reprovável normalmente pelo Agente Juiz, não um crash.
         logger.exception("Especialista %s falhou ao chamar o LLM/tools", nome)
         return {
-            "resposta_especialista": {
-                "dominio": nome,
-                "intencao": "erro_tecnico",
-                "resposta": _RESPOSTA_ESPECIALISTA_FALLBACK,
-                "recomendacao": "",
-                "fontes_usadas": [],
-            },
+            "resposta_especialista": _resposta_de_falha(nome, "erro_tecnico", _RESPOSTA_ESPECIALISTA_FALLBACK),
             "evidencias_tools": None,
         }
 
@@ -206,13 +232,7 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
         resposta_json = _extrair_json(texto)
     except (TypeError, ValueError):
         logger.warning("Especialista %s não devolveu JSON válido: %r", nome, texto)
-        resposta_json = {
-            "dominio": nome,
-            "intencao": "erro_formato",
-            "resposta": "Não consegui estruturar uma resposta válida para essa pergunta.",
-            "recomendacao": "",
-            "fontes_usadas": [],
-        }
+        resposta_json = _resposta_de_falha(nome, "erro_formato", _RESPOSTA_ERRO_FORMATO)
 
     if nome == "rotina" and isinstance(resposta_json, dict):
         resposta_json = _garantir_passos_da_rotina(resposta_json, evidencias)
@@ -220,82 +240,73 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
     return {"resposta_especialista": resposta_json, "evidencias_tools": evidencias}
 
 
-def montar_no_agente_produto(pool: Any) -> Callable[[EstadoVenus], Awaitable[EstadoVenus]]:
+# --- fábricas dos nós ---
+
+
+def _montar_no_especialista(
+    nome: str, prompt: str, montar_tools: Callable[[], list[Any]]
+) -> NoEspecialista:
+    """Nó de especialista com o agente ReAct montado sob demanda.
+
+    O agente só é montado (e as tools só exigem `pool`/`indice` de verdade)
+    no primeiro uso real do nó, nunca na montagem do grafo; depois fica em
+    cache, um por instância da fábrica."""
+    cache: dict[str, Any] = {}
+
+    def _agente() -> Any:
+        if nome not in cache:
+            tools = montar_tools()
+            cache[nome] = montar_agente_mcp(get_llm_especialista(), prompt=prompt, tools=tools)
+        return cache[nome]
+
+    async def no_especialista(estado: EstadoVenus) -> EstadoVenus:
+        """Roda o agente e grava o JSON em `resposta_especialista`."""
+        return await _executar_especialista(estado, nome, _agente())
+
+    return no_especialista
+
+
+def montar_no_agente_produto(pool: Any) -> NoEspecialista:
     """Fábrica do nó do agente de Produto — recebe o `pool` do Postgres (ver
     `tools/produto.py`) e devolve o nó pronto pra registrar no grafo
     (`flows/venus_flow.py::montar_grafo_venus`).
 
     O agente ReAct só é montado (e as tools só exigem `pool` de verdade) no
-    primeiro uso real do nó, nunca na montagem do grafo — mesmo espírito do
-    `_agente()` acima, só que com cache por instância da fábrica (uma por
-    `pool`) em vez de cache global por nome.
+    primeiro uso real do nó, nunca na montagem do grafo (ver
+    `_montar_no_especialista`).
 
     O nó é `async def` (ver `_resposta_agente`) — o grafo precisa ser
     invocado via `.ainvoke()`/`.astream()`, nunca `.invoke()`, quando `pool`
     não for `None` (ver `examples/conversar_com_venus.py`).
     """
-    cache: dict[str, Any] = {}
-
-    def _agente_produto() -> Any:
-        if "produto" not in cache:
-            tools = montar_tools_produto(pool) + montar_tools_compartilhadas(pool)
-            cache["produto"] = montar_agente_mcp(
-                get_llm_especialista(), prompt=ESP_PRODUTO_PROMPT_COMPLETO, tools=tools
-            )
-        return cache["produto"]
-
-    async def no_agente_produto(estado: EstadoVenus) -> EstadoVenus:
-        """Roda o agente de produto (tools de Postgres) e grava o JSON em
-        `resposta_especialista`."""
-        return await _executar_especialista(estado, "produto", _agente_produto())
-
-    return no_agente_produto
+    return _montar_no_especialista(
+        "produto",
+        ESP_PRODUTO_PROMPT_COMPLETO,
+        lambda: montar_tools_produto(pool) + montar_tools_compartilhadas(pool),
+    )
 
 
-def montar_no_agente_ingrediente(pool: Any) -> Callable[[EstadoVenus], Awaitable[EstadoVenus]]:
+def montar_no_agente_ingrediente(pool: Any) -> NoEspecialista:
     """Idem `montar_no_agente_produto`, para o agente de Ingrediente (ver
     `tools/ingrediente.py`)."""
-    cache: dict[str, Any] = {}
-
-    def _agente_ingrediente() -> Any:
-        if "ingrediente" not in cache:
-            tools = montar_tools_ingrediente(pool) + montar_tools_compartilhadas(pool)
-            cache["ingrediente"] = montar_agente_mcp(
-                get_llm_especialista(), prompt=ESP_INGREDIENTE_PROMPT_COMPLETO, tools=tools
-            )
-        return cache["ingrediente"]
-
-    async def no_agente_ingrediente(estado: EstadoVenus) -> EstadoVenus:
-        """Roda o agente de ingrediente (tools de Postgres) e grava o JSON
-        em `resposta_especialista`."""
-        return await _executar_especialista(estado, "ingrediente", _agente_ingrediente())
-
-    return no_agente_ingrediente
+    return _montar_no_especialista(
+        "ingrediente",
+        ESP_INGREDIENTE_PROMPT_COMPLETO,
+        lambda: montar_tools_ingrediente(pool) + montar_tools_compartilhadas(pool),
+    )
 
 
-def montar_no_agente_rotina(pool: Any) -> Callable[[EstadoVenus], Awaitable[EstadoVenus]]:
+def montar_no_agente_rotina(pool: Any) -> NoEspecialista:
     """Idem `montar_no_agente_produto`, para o agente de Rotina (ver
     `tools/rotina.py`) — perfil/favoritos/listas do usuário no Postgres."""
-    cache: dict[str, Any] = {}
-
-    def _agente_rotina() -> Any:
-        if "rotina" not in cache:
-            tools = montar_tools_rotina(pool) + montar_tools_compartilhadas(pool)
-            cache["rotina"] = montar_agente_mcp(
-                get_llm_especialista(), prompt=ROTINA_PROMPT_COMPLETO, tools=tools
-            )
-        return cache["rotina"]
-
-    async def no_agente_rotina(estado: EstadoVenus) -> EstadoVenus:
-        """Roda o agente de rotina e grava o JSON em `resposta_especialista`."""
-        return await _executar_especialista(estado, "rotina", _agente_rotina())
-
-    return no_agente_rotina
+    return _montar_no_especialista(
+        "rotina",
+        ROTINA_PROMPT_COMPLETO,
+        lambda: montar_tools_rotina(pool) + montar_tools_compartilhadas(pool),
+    )
 
 
-def montar_no_agente_faq(
-    indice: Any, tools_extras: list[Any] | None = None
-) -> Callable[[EstadoVenus], Awaitable[EstadoVenus]]:
+def montar_no_agente_faq(indice: Any, tools_extras: list[Any] | None = None) -> NoEspecialista:
     """Fábrica do nó do agente FAQ — o agente com RAG.
 
     `indice` é o índice vetorial local (`rag.criar_indice_local`); as tools
@@ -308,18 +319,8 @@ def montar_no_agente_faq(
     Juiz, que confere a resposta contra os trechos recuperados
     (`evidencias_tools`) — mitigação de alucinação também no RAG.
     """
-    cache: dict[str, Any] = {}
-
-    def _agente_faq() -> Any:
-        if "faq" not in cache:
-            tools = montar_tools_faq(indice) + list(tools_extras or [])
-            cache["faq"] = montar_agente_mcp(
-                get_llm_especialista(), prompt=FAQ_PROMPT_COMPLETO, tools=tools
-            )
-        return cache["faq"]
-
-    async def no_agente_faq(estado: EstadoVenus) -> EstadoVenus:
-        """Roda o agente FAQ (RAG) e grava o JSON em `resposta_especialista`."""
-        return await _executar_especialista(estado, "faq", _agente_faq())
-
-    return no_agente_faq
+    return _montar_no_especialista(
+        "faq",
+        FAQ_PROMPT_COMPLETO,
+        lambda: montar_tools_faq(indice) + list(tools_extras or []),
+    )

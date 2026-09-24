@@ -78,10 +78,8 @@ class MongoDBStore(BaseStore):
     namespace+chave, não por busca livre — mas não é um vector store.
     """
 
-    def __init__(
-        self, cliente: "MongoClient", *, db_name: str, collection_name: str
-    ) -> None:
-        self._colecao: "Collection" = cliente[db_name][collection_name]
+    def __init__(self, cliente: MongoClient, *, db_name: str, collection_name: str) -> None:
+        self._colecao: Collection = cliente[db_name][collection_name]
         self._colecao.create_index([("namespace", 1), ("key", 1)], unique=True)
 
     # --- API exigida por BaseStore ---

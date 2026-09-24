@@ -17,6 +17,8 @@ from langchain_core.tools import BaseTool, tool
 
 logger = logging.getLogger(__name__)
 
+_TIMEOUT_HTTP_SEGUNDOS = 60
+
 
 async def consultar_agente_externo(url: str, mensagem: str, *, httpx_client: Any | None = None,
                                    context_id: str | None = None) -> str:
@@ -27,11 +29,11 @@ async def consultar_agente_externo(url: str, mensagem: str, *, httpx_client: Any
     from a2a.helpers import get_message_text, new_text_message
     from a2a.types import Role, SendMessageRequest
 
-    fechar = httpx_client is None
-    if fechar:
+    cliente_proprio = httpx_client is None
+    if cliente_proprio:
         import httpx
 
-        httpx_client = httpx.AsyncClient(timeout=60)
+        httpx_client = httpx.AsyncClient(timeout=_TIMEOUT_HTTP_SEGUNDOS)
     client = await create_client(
         agent=url, client_config=ClientConfig(httpx_client=httpx_client, streaming=False)
     )
@@ -43,14 +45,15 @@ async def consultar_agente_externo(url: str, mensagem: str, *, httpx_client: Any
         async for evento in client.send_message(request):
             if evento.message is not None:
                 textos.append(get_message_text(evento.message))
-        return "\n".join(t for t in textos if t)
+        return "\n".join(texto for texto in textos if texto)
     finally:
         await client.close()
-        if fechar:
+        if cliente_proprio:
             await httpx_client.aclose()
 
 
 def carregar_agentes_externos(agentes: dict[str, str] | None = None) -> dict[str, str]:
+    """`agentes` se informado; senão o JSON de `A2A_AGENTES_EXTERNOS` (ou `{}`)."""
     if agentes:
         return agentes
     bruto = os.getenv("A2A_AGENTES_EXTERNOS")
@@ -63,7 +66,7 @@ def montar_tool_a2a(agentes: dict[str, str] | None = None, *, httpx_client: Any 
     agentes = carregar_agentes_externos(agentes)
     if not agentes:
         return []
-    lista = ", ".join(agentes)
+    nomes_disponiveis = ", ".join(agentes)
 
     @tool("consultar_agente_externo")
     async def _consultar(agente: str, pergunta: str) -> dict:
@@ -71,7 +74,7 @@ def montar_tool_a2a(agentes: dict[str, str] | None = None, *, httpx_client: Any 
         nomes disponíveis; `pergunta` é o texto a enviar. Devolve
         `{"agente", "resposta"}` — cite o agente como fonte."""
         if agente not in agentes:
-            return {"erro": f"agente desconhecido; disponíveis: {lista}"}
+            return {"erro": f"agente desconhecido; disponíveis: {nomes_disponiveis}"}
         try:
             resposta = await consultar_agente_externo(agentes[agente], pergunta, httpx_client=httpx_client)
         except Exception as exc:  # noqa: BLE001
@@ -79,5 +82,5 @@ def montar_tool_a2a(agentes: dict[str, str] | None = None, *, httpx_client: Any 
             return {"erro": "não consegui consultar o agente externo agora", "detalhe": type(exc).__name__}
         return {"agente": agente, "url": agentes[agente], "resposta": resposta or "(sem resposta)"}
 
-    _consultar.description += f" Agentes disponíveis: {lista}."
+    _consultar.description += f" Agentes disponíveis: {nomes_disponiveis}."
     return [_consultar]
