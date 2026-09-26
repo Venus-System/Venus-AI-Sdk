@@ -7,7 +7,7 @@ import logging
 import re
 from typing import Any
 
-from venus_sdk.llm.models import extrair_texto_resposta, get_llm_especialista
+from venus_sdk.llm.models import extrair_texto_resposta, get_llm_orquestrador
 from venus_sdk.nodes._evidencias import argumentos_da_evidencia, dados_da_evidencia
 from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
@@ -346,13 +346,13 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
 
 
 def _invocar_orquestrador(mensagens: list) -> str:
-    """`get_llm_especialista().invoke()` protegido contra exceção — sem
+    """`get_llm_orquestrador().invoke()` protegido contra exceção — sem
     isto, uma falha total de provedor (Gemini E o fallback Groq
     indisponíveis) subia crua até o `.ainvoke()` do grafo principal em vez
     de cair no fallback fixo, mesmo já existindo tratamento pro caso mais
     ameno de conteúdo vazio logo abaixo."""
     try:
-        return extrair_texto_resposta(get_llm_especialista().invoke(mensagens)).strip()
+        return extrair_texto_resposta(get_llm_orquestrador().invoke(mensagens)).strip()
     except Exception:
         logger.exception("Falha ao chamar o LLM do Orquestrador")
         return ""
@@ -407,4 +407,37 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
         logger.warning("Orquestrador devolveu texto inválido (placeholder/saudação); usando o conteúdo do especialista")
         texto = _resposta_direta_do_json(especialista_json)
 
+    if texto and estado.get("rota") == "rotina":
+        faltando = _itens_omitidos(texto, estado.get("evidencias_tools"))
+        if faltando:
+            logger.warning("Orquestrador omitiu itens da conta do usuário (%s); resposta montada das tools", faltando)
+            texto = _resposta_segura_sem_aprovacao(estado)
+
     return {"resposta_final": texto or _RESPOSTA_ORQUESTRADOR_FALLBACK}
+
+
+def _itens_obrigatorios(evidencias: list[dict] | None) -> list[str]:
+    """Nomes que uma resposta sobre a conta PRECISA citar: os passos da rotina
+    montada ou, sem rotina, os favoritos e os itens das listas consultados."""
+    rotina = dados_da_evidencia(evidencias, "suggest_routine")
+    if isinstance(rotina, dict) and rotina.get("passos"):
+        return [str(passo.get("nome")) for passo in rotina["passos"] if isinstance(passo, dict)]
+    nomes: list[str] = []
+    favoritos = dados_da_evidencia(evidencias, "get_user_favorites")
+    if isinstance(favoritos, list):
+        nomes += [str(f.get("name")) for f in favoritos if isinstance(f, dict) and f.get("name")]
+    listas = dados_da_evidencia(evidencias, "get_user_lists")
+    if isinstance(listas, list):
+        nomes += [str(i.get("product_name")) for i in listas if isinstance(i, dict) and i.get("product_name")]
+    return nomes
+
+
+def _itens_omitidos(texto: str, evidencias: list[dict] | None) -> list[str]:
+    """Itens obrigatórios que não aparecem no texto (comparação sem espaços
+    nem maiúsculas: "FPS 50" e "FPS50" contam como o mesmo)."""
+    texto_compacto = _compactar(texto)
+    return [nome for nome in _itens_obrigatorios(evidencias) if _compactar(nome) not in texto_compacto]
+
+
+def _compactar(texto: str) -> str:
+    return re.sub(r"\s+", "", texto).lower()

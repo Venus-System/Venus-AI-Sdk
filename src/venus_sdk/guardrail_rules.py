@@ -77,7 +77,13 @@ _INJECAO_RE = re.compile(
     r"(qual|repita)\s+(é\s+|sã[oa]\s+)?(o\s+seu|suas?)\s+(prompt|instru[çc][õo]es)\s*(inicial|de\s+sistema)?|"
     r"modo\s+desenvolvedor|"
     r"modo\s+(sem\s+filtro|sem\s+censura|irrestrito|deus|god)|"
-    r"sem\s+(filtro|censura|restri[çc][õo]es)\s+(nenhum[ao]|algum[ao])?|"
+    # "sem restrições" sozinho é frase comum ("ingrediente sem restrições
+    # regulatórias") e bloqueava respostas legítimas na saída — só conta
+    # com um verbo de comando antes ou com "nenhuma/alguma" junto.
+    r"sem\s+(filtro|censura)\b|"
+    r"sem\s+restri[çc][õo]es\s+(nenhum[ao]|algum[ao])\b|"
+    r"sem\s+nenhuma\s+restri[çc][ãa]o|"
+    r"(respond|fal|aj|atu|oper|funcion|convers)\w*\s+sem\s+restri[çc][õo]es|"
     r"dan\s+mode|"
     r"stan\s+mode|"
     r"jailbreak|"

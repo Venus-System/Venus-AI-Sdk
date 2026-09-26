@@ -131,21 +131,27 @@ def _criar_gemini(modelo: str) -> BaseChatModel:
     return ChatGoogleGenerativeAI(model=modelo, api_key=GEMINI_API_KEY, max_retries=1, timeout=_TIMEOUT_GEMINI)
 
 
-def _criar_mistral(modelo: str, *, rapido: bool) -> BaseChatModel:
+def _temperatura(rapido: bool, temperatura: float | None, padrao_especialista: float) -> float:
+    if temperatura is not None:
+        return temperatura
+    return 0.0 if rapido else padrao_especialista
+
+
+def _criar_mistral(modelo: str, *, rapido: bool, temperatura: float | None = None) -> BaseChatModel:
     from langchain_mistralai import ChatMistralAI  # import tardio: só quem usa Mistral precisa do pacote
 
     return ChatMistralAI(
         model=modelo,
         api_key=MISTRAL_API_KEY,
-        temperature=0.0 if rapido else 0.3,
+        temperature=_temperatura(rapido, temperatura, 0.3),
         timeout=_TIMEOUT_RAPIDO if rapido else _TIMEOUT_ESPECIALISTA,
         max_retries=2,
     )
 
 
-def _criar_groq(modelo: str, *, rapido: bool) -> BaseChatModel:
+def _criar_groq(modelo: str, *, rapido: bool, temperatura: float | None = None) -> BaseChatModel:
     parametros: dict[str, Any] = {
-        "temperature": 0.0 if rapido else 0.7,
+        "temperature": _temperatura(rapido, temperatura, 0.7),
         "api_key": GROQ_API_KEY,
         "request_timeout": _TIMEOUT_RAPIDO if rapido else _TIMEOUT_ESPECIALISTA,
         "max_retries": 0,  # 429 -> próximo elo da cadeia
@@ -160,15 +166,18 @@ def _criar_groq(modelo: str, *, rapido: bool) -> BaseChatModel:
     return ChatGroq(model=modelo, **parametros)
 
 
-def _criar_modelo(provedor: str, modelo: str, *, rapido: bool = False) -> BaseChatModel:
+def _criar_modelo(
+    provedor: str, modelo: str, *, rapido: bool = False, temperatura: float | None = None
+) -> BaseChatModel:
     """Instancia UM elo da cadeia, com timeouts curtos (falhar rápido é o que
-    permite o fallback entrar em vez de a conversa ficar parada)."""
+    permite o fallback entrar em vez de a conversa ficar parada).
+    `temperatura` sobrepõe a padrão (não se aplica ao Gemini, de sampling fixo)."""
     if provedor == "gemini":
         return _criar_gemini(modelo)
     if provedor == "mistral":
-        return _criar_mistral(modelo, rapido=rapido)
+        return _criar_mistral(modelo, rapido=rapido, temperatura=temperatura)
     if provedor == "groq":
-        return _criar_groq(modelo, rapido=rapido)
+        return _criar_groq(modelo, rapido=rapido, temperatura=temperatura)
     raise ValueError(f"Provedor de LLM desconhecido: {provedor!r} (use 'mistral', 'groq' ou 'gemini')")
 
 
@@ -201,13 +210,16 @@ def cadeia_configurada(env: str, padrao: list[str]) -> list[tuple[str, str]]:
     return utilizaveis
 
 
-def _montar_cadeia(env: str, padrao: list[str], *, rapido: bool) -> BaseChatModel:
+def _montar_cadeia(env: str, padrao: list[str], *, rapido: bool, temperatura: float | None = None) -> BaseChatModel:
     itens = cadeia_configurada(env, padrao)
     if not itens:
         raise RuntimeError(
             f"Nenhum LLM utilizável em {env}: defina MISTRAL_API_KEY, GROQ_API_KEY e/ou GEMINI_API_KEY no .env."
         )
-    principal, *fallbacks = [_criar_modelo(provedor, modelo, rapido=rapido) for provedor, modelo in itens]
+    parametros: dict[str, Any] = {"rapido": rapido}
+    if temperatura is not None:
+        parametros["temperatura"] = temperatura
+    principal, *fallbacks = [_criar_modelo(provedor, modelo, **parametros) for provedor, modelo in itens]
     return principal.with_fallbacks(fallbacks) if fallbacks else principal
 
 
@@ -227,6 +239,18 @@ def cadeia_rapida() -> list[tuple[str, str]]:
 def get_llm_especialista() -> BaseChatModel:
     """Especialistas/orquestrador: cadeia com vários fallbacks (ver acima)."""
     return _montar_cadeia("LLM_CADEIA_ESPECIALISTA", _cadeia_padrao_especialista(), rapido=False)
+
+
+@lru_cache(maxsize=1)
+def get_llm_orquestrador() -> BaseChatModel:
+    """Orquestrador: mesmos modelos dos especialistas, com temperatura 0.
+
+    O orquestrador só reescreve o JSON do especialista em tom de conversa;
+    com a temperatura dos especialistas (0.7) ele "enfeitava" a resposta com
+    fatos, dicas e elogios que não estavam no JSON (teste de 2026-09-26)."""
+    return _montar_cadeia(
+        "LLM_CADEIA_ESPECIALISTA", _cadeia_padrao_especialista(), rapido=False, temperatura=0.0
+    )
 
 
 def get_llm_juiz() -> BaseChatModel:

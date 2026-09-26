@@ -28,7 +28,7 @@ def _patches(stack: ExitStack, *, router, juiz, especialista, orquestrador) -> N
     stack.enter_context(patch("venus_sdk.nodes.roteador.get_llm_rapido", return_value=router))
     stack.enter_context(patch("venus_sdk.nodes.juiz.get_llm_juiz", return_value=juiz))
     stack.enter_context(patch("venus_sdk.nodes.especialistas.get_llm_especialista", return_value=especialista))
-    stack.enter_context(patch("venus_sdk.nodes.orquestrador.get_llm_especialista", return_value=orquestrador))
+    stack.enter_context(patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador", return_value=orquestrador))
 
 
 def _faq_json(fontes: list[str], resposta: str = "O score vai de 0 a 100.") -> str:
