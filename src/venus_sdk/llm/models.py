@@ -229,9 +229,19 @@ def get_llm_especialista() -> BaseChatModel:
     return _montar_cadeia("LLM_CADEIA_ESPECIALISTA", _cadeia_padrao_especialista(), rapido=False)
 
 
+def get_llm_juiz() -> BaseChatModel:
+    """Agente Juiz: mesma cadeia dos especialistas, não a rápida.
+
+    Julgar exige ler com cuidado o JSON do especialista contra o retorno
+    bruto das tools. Com o modelo rápido o Juiz errava leituras simples
+    (teste de 2026-09-26: disse que o FAQ citava "cinco dimensões" do score
+    quando o trecho recuperado listava seis) e reprovava respostas corretas."""
+    return get_llm_especialista()
+
+
 @lru_cache(maxsize=1)
 def get_llm_rapido() -> BaseChatModel:
-    """Roteador/juiz/memória (classificação curta): cadeia rápida com fallbacks.
+    """Roteador/memória (classificação curta): cadeia rápida com fallbacks.
 
     O gpt-oss-20b é um modelo de raciocínio: sem `reasoning_effort="low"` +
     `max_tokens` ele às vezes gasta o budget inteiro pensando e devolve

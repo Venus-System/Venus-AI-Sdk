@@ -42,9 +42,19 @@ _RESPOSTA_ESPECIALISTA_FALLBACK = (
 )
 _RESPOSTA_ERRO_FORMATO = "Não consegui estruturar uma resposta válida para essa pergunta."
 
-# Teto de passos do agente ReAct (LLM -> tool -> LLM...) por pergunta.
-_LIMITE_PASSOS_AGENTE = 14
+# Teto de passos do agente ReAct por pergunta; cada rodada de tool gasta 2
+# (LLM + tool). Com 14, o agente de ingrediente que consulta as 5 tools uma a
+# uma estourava o teto e devolvia "Sorry, need more steps to process this
+# request." no lugar do JSON (teste de 2026-09-26).
+_LIMITE_PASSOS_AGENTE = 24
 _TAMANHO_PREVIA_LOG = 80
+
+_TOOLS_DE_ESCRITA = {"add_favorite", "remove_favorite"}
+_FAVORITO_RE = re.compile(r"favorit", re.IGNORECASE)
+_VERBO_DE_ALTERACAO_RE = re.compile(
+    r"\b(adicion\w*|inclu\w*|coloc\w*|salv\w*|guard\w*|remov\w*|tir[ae]\w*|exclu\w*|apag\w*|desfavorit\w*)",
+    re.IGNORECASE,
+)
 
 _CERCA_MARKDOWN_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 
@@ -90,12 +100,28 @@ def _extrair_evidencias_tools(mensagens: list) -> list[dict[str, Any]]:
     `nodes/juiz.py`). Sem isto, o Juiz só via o JSON final do especialista e
     não tinha como perceber quando uma tool citada não sustentava, de
     verdade, a afirmação feita (achado de um teste de conversa real em
-    2026-09-10 — ver `EstadoVenus.evidencias_tools`)."""
-    return [
-        {"tool": mensagem.name, "resultado": mensagem.content}
+    2026-09-10 — ver `EstadoVenus.evidencias_tools`).
+
+    Inclui `argumentos` (os parâmetros da chamada, ex.: `ingredient_id`)
+    quando a chamada correspondente aparece nas mensagens: sem isso não dá
+    pra saber de QUAL item é cada retorno quando o agente consulta mais de um
+    (teste de 2026-09-26: detalhes de um ingrediente apareceram na resposta
+    sobre outro)."""
+    argumentos_por_chamada = {
+        chamada.get("id"): chamada.get("args")
         for mensagem in mensagens
-        if isinstance(mensagem, ToolMessage)
-    ]
+        for chamada in (getattr(mensagem, "tool_calls", None) or [])
+    }
+    evidencias = []
+    for mensagem in mensagens:
+        if not isinstance(mensagem, ToolMessage):
+            continue
+        evidencia = {"tool": mensagem.name, "resultado": mensagem.content}
+        argumentos = argumentos_por_chamada.get(mensagem.tool_call_id)
+        if argumentos is not None:
+            evidencia["argumentos"] = argumentos
+        evidencias.append(evidencia)
+    return evidencias
 
 
 def _logar_passo_do_agente(mensagem: Any, inicio: float) -> None:
@@ -298,12 +324,46 @@ def montar_no_agente_ingrediente(pool: Any) -> NoEspecialista:
 
 def montar_no_agente_rotina(pool: Any) -> NoEspecialista:
     """Idem `montar_no_agente_produto`, para o agente de Rotina (ver
-    `tools/rotina.py`) — perfil/favoritos/listas do usuário no Postgres."""
-    return _montar_no_especialista(
-        "rotina",
-        ROTINA_PROMPT_COMPLETO,
-        lambda: montar_tools_rotina(pool) + montar_tools_compartilhadas(pool),
+    `tools/rotina.py`) — perfil/favoritos/listas do usuário no Postgres.
+    Também recebe `search_product`, para achar o `product_id` de um produto
+    que o usuário pede para favoritar pelo nome.
+
+    As tools que ALTERAM dados (`add_favorite`/`remove_favorite`) só são
+    entregues ao agente quando a pergunta do usuário pede isso
+    explicitamente. No teste de 2026-09-26, ao montar uma rotina, o agente
+    chamou `remove_favorite` para "corrigir" a rotina depois de uma
+    reprovação do Juiz — só a própria pergunta autoriza escrita, nunca o
+    feedback do Juiz nem a interpretação do LLM."""
+    somente_leitura = _montar_no_especialista(
+        "rotina", ROTINA_PROMPT_COMPLETO, lambda: _tools_rotina(pool, com_escrita=False)
     )
+    com_escrita = _montar_no_especialista(
+        "rotina", ROTINA_PROMPT_COMPLETO, lambda: _tools_rotina(pool, com_escrita=True)
+    )
+
+    async def no_agente_rotina(estado: EstadoVenus) -> EstadoVenus:
+        pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario", "")
+        no = com_escrita if pede_alteracao_de_favorito(pergunta) else somente_leitura
+        return await no(estado)
+
+    return no_agente_rotina
+
+
+def pede_alteracao_de_favorito(pergunta: str) -> bool:
+    """True se a pergunta pede para adicionar ou remover um favorito."""
+    texto = pergunta or ""
+    return bool(_FAVORITO_RE.search(texto) and _VERBO_DE_ALTERACAO_RE.search(texto))
+
+
+def _tools_rotina(pool: Any, *, com_escrita: bool) -> list[Any]:
+    tools = montar_tools_rotina(pool) + montar_tools_compartilhadas(pool) + _busca_de_produto(pool)
+    if com_escrita:
+        return tools
+    return [tool for tool in tools if tool.name not in _TOOLS_DE_ESCRITA]
+
+
+def _busca_de_produto(pool: Any) -> list[Any]:
+    return [tool for tool in montar_tools_produto(pool) if tool.name == "search_product"]
 
 
 def montar_no_agente_faq(indice: Any, tools_extras: list[Any] | None = None) -> NoEspecialista:

@@ -7,7 +7,7 @@ import logging
 import re
 from typing import Literal
 
-from venus_sdk.llm.models import get_llm_rapido
+from venus_sdk.llm.models import get_llm_juiz
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 
@@ -105,7 +105,7 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
 
     mensagens = [("system", JUIZ_PROMPT_COMPLETO), ("human", _montar_entrada_juiz(estado))]
     try:
-        resposta = get_llm_rapido().invoke(mensagens)
+        resposta = get_llm_juiz().invoke(mensagens)
     except Exception:
         # LLM do Juiz indisponível — não deixa isso subir cru até o
         # `.ainvoke()` do grafo principal. Trata como reprovação silenciosa

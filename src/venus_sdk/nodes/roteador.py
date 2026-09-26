@@ -62,6 +62,21 @@ _RE_FAQ = re.compile(
     r"\b(score|funciona|regras?|pol[ií]tica|privacidade|dados)\b.{0,40}venus|"
     r"\b(meus dados|privacidade|lgpd|seus termos|como funciona o score)\b)", re.IGNORECASE)
 
+# Pedidos sobre o que está CADASTRADO na conta (perfil, alergias cadastradas,
+# favoritos, listas): só o agente de rotina tem essas tools. Aplicado MESMO
+# quando o LLM escolheu outra rota — no teste de 2026-09-26 "quais são meus
+# favoritos?" ia para produto (que respondia "você não tem favoritos") e "qual
+# meu tipo de pele segundo meu perfil?" era respondida pelo próprio roteador,
+# que inventava o dado.
+_RE_DADOS_DA_CONTA = re.compile(
+    r"\b(favorit\w*|minhas? listas?|listas? (de produtos|salvas?)|(meu|no|do) perfil|"
+    r"alergias? cadastrad\w*|minhas alergias)\b",
+    re.IGNORECASE,
+)
+# "Ingredientes/composição DO [produto]": pergunta de produto, não de ingrediente
+# isolado (só o agente de produto tem `get_product_ingredients`).
+_RE_COMPOSICAO_DE = re.compile(r"\b(ingredientes|composi[cç][aã]o|f[oó]rmula)\s+d[oa]s?\b", re.IGNORECASE)
+
 
 # Rede de segurança contra alucinação na resposta DIRETA do roteador (sem tools, sem juiz): se ela
 # afirma fatos de produto/ingrediente (nota, %, "contém"), descarta e usa uma resposta segura.
@@ -122,6 +137,8 @@ def _recuperar_de_tool_call_alucinada(erro: Exception) -> str | None:
 
 def rota_por_palavras(mensagem: str) -> str | None:
     """Rota inferida por palavras-chave (ou None se não for clara)."""
+    if _RE_DADOS_DA_CONTA.search(mensagem):
+        return "rotina"
     if _RE_FAQ.search(mensagem):
         return "faq"
     if _RE_ROTINA.search(mensagem):
@@ -182,17 +199,36 @@ def _rota_do_texto(texto: str) -> str | None:
     return match_rota.group(1).strip().lower() if match_rota else None
 
 
+def _rota_obrigatoria(rota: str | None, mensagem_usuario: str) -> str | None:
+    """Rota que a mensagem exige independentemente da escolha do LLM, ou `None`.
+    Não mexe em `faq`: "o Venus guarda meus favoritos?" é dúvida de privacidade."""
+    if rota != "faq" and _RE_DADOS_DA_CONTA.search(mensagem_usuario):
+        return "rotina"
+    if rota == "ingrediente" and _RE_COMPOSICAO_DE.search(mensagem_usuario) and _RE_PRODUTO.search(mensagem_usuario):
+        return "produto"
+    return None
+
+
+def _encaminhar(rota: str, mensagem_usuario: str) -> str:
+    return f"ROUTE={rota}\nPERGUNTA_ORIGINAL={mensagem_usuario}"
+
+
 def _aplicar_redes_de_seguranca(rota: str | None, texto: str, mensagem_usuario: str) -> tuple[str | None, str]:
     """Corrige, por regra, os erros conhecidos do LLM roteador. Devolve
     `(rota, texto)` já corrigidos."""
     eh_small_talk = e_small_talk(mensagem_usuario)
+
+    obrigatoria = _rota_obrigatoria(rota, mensagem_usuario)
+    if obrigatoria and obrigatoria != rota:
+        logger.warning("Roteador escolheu %s; rota %s forçada por palavras-chave", rota, obrigatoria)
+        return obrigatoria, _encaminhar(obrigatoria, mensagem_usuario)
 
     if rota not in _ROTAS_VALIDAS and not eh_small_talk:
         sugerida = rota_por_palavras(mensagem_usuario)
         if sugerida:
             logger.warning("Roteador não devolveu ROUTE=; rota %s inferida por palavras-chave", sugerida)
             rota = sugerida
-            texto = f"ROUTE={sugerida}\nPERGUNTA_ORIGINAL={mensagem_usuario}"
+            texto = _encaminhar(sugerida, mensagem_usuario)
 
     if rota in _ROTAS_VALIDAS and eh_small_talk:
         # LLM roteou uma saudação pura para um especialista — descarta a rota

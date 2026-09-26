@@ -61,7 +61,7 @@ async def _rodar(pool, msg: str, rota: str, chamadas_tool: list[tuple[str, dict]
     with ExitStack() as st:
         st.enter_context(patch("venus_sdk.nodes.roteador.get_llm_rapido", return_value=router))
         st.enter_context(patch("venus_sdk.nodes.memoria.get_llm_rapido", return_value=mem))
-        st.enter_context(patch("venus_sdk.nodes.juiz.get_llm_rapido", return_value=j))
+        st.enter_context(patch("venus_sdk.nodes.juiz.get_llm_juiz", return_value=j))
         st.enter_context(patch("venus_sdk.nodes.especialistas.get_llm_especialista", return_value=esp))
         st.enter_context(patch("venus_sdk.nodes.orquestrador.get_llm_especialista", return_value=orq))
         grafo = compilar_grafo_venus(checkpointer=criar_checkpointer_em_memoria(),
