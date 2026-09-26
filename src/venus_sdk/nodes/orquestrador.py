@@ -11,6 +11,7 @@ from venus_sdk.llm.models import extrair_texto_resposta, get_llm_orquestrador
 from venus_sdk.nodes._evidencias import argumentos_da_evidencia, dados_da_evidencia
 from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
+from venus_sdk.texto import remover_acentos
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,11 @@ _TIPOS_DE_RESTRICAO = {"prohibited": "proibido", "restricted": "uso restrito"}
 
 # Texto mais curto que isso não pode ser a tradução de uma resposta de verdade.
 _TAMANHO_MINIMO_TEXTO_FINAL = 12
+
+# Numa resposta sobre um produto que listou ingredientes, o texto final
+# precisa citar pelo menos esta fração deles (tolera nome traduzido/grafado
+# diferente pelo especialista, mas não uma lista trocada por 2 ou 3 exemplos).
+_FRACAO_MINIMA_DE_INGREDIENTES_CITADOS = 0.8
 
 _PLACEHOLDER_RE = re.compile(r"\[[^\]\n]{2,40}\]")
 _NOME_DO_PASSO_RE = re.compile(r"\d+\) (.+?) \(")
@@ -407,13 +413,46 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
         logger.warning("Orquestrador devolveu texto inválido (placeholder/saudação); usando o conteúdo do especialista")
         texto = _resposta_direta_do_json(especialista_json)
 
-    if texto and estado.get("rota") == "rotina":
-        faltando = _itens_omitidos(texto, estado.get("evidencias_tools"))
-        if faltando:
-            logger.warning("Orquestrador omitiu itens da conta do usuário (%s); resposta montada das tools", faltando)
-            texto = _resposta_segura_sem_aprovacao(estado)
+    if texto and _omitiu_dados_das_tools(texto, estado):
+        texto = _resposta_segura_sem_aprovacao(estado)
 
     return {"resposta_final": texto or _RESPOSTA_ORQUESTRADOR_FALLBACK}
+
+
+def _omitiu_dados_das_tools(texto: str, estado: EstadoVenus) -> bool:
+    """True se o texto do LLM deixou de fora dados que a resposta precisa
+    trazer: itens da conta (rota rotina) ou a lista de ingredientes de um
+    produto (rota produto). No teste de 2026-09-26 o orquestrador trocava a
+    lista de 19 ingredientes aprovada pelo Juiz por 3 ingredientes comentados
+    e uma afirmação de segurança que nenhuma tool fez."""
+    evidencias = estado.get("evidencias_tools")
+    rota = estado.get("rota")
+    if rota == "rotina":
+        faltando = _itens_omitidos(texto, evidencias)
+        if faltando:
+            logger.warning("Orquestrador omitiu itens da conta do usuário (%s); resposta montada das tools", faltando)
+        return bool(faltando)
+    if rota == "produto":
+        ingredientes = _ingredientes_do_produto(evidencias)
+        if not ingredientes:
+            return False
+        citados = [nome for nome in ingredientes if _compactar(nome) in _compactar(texto)]
+        if len(citados) < _FRACAO_MINIMA_DE_INGREDIENTES_CITADOS * len(ingredientes):
+            logger.warning(
+                "Orquestrador citou %d de %d ingredientes; resposta montada das tools", len(citados), len(ingredientes)
+            )
+            return True
+    return False
+
+
+def _ingredientes_do_produto(evidencias: list[dict] | None) -> list[str]:
+    product_id = _produto_consultado(evidencias)
+    if product_id is None:
+        return []
+    ingredientes = dados_da_evidencia(evidencias, "get_product_ingredients", product_id=product_id)
+    if not isinstance(ingredientes, list):
+        return []
+    return [str(i.get("common_name")) for i in ingredientes if isinstance(i, dict) and i.get("common_name")]
 
 
 def _itens_obrigatorios(evidencias: list[dict] | None) -> list[str]:
@@ -440,4 +479,5 @@ def _itens_omitidos(texto: str, evidencias: list[dict] | None) -> list[str]:
 
 
 def _compactar(texto: str) -> str:
-    return re.sub(r"\s+", "", texto).lower()
+    """Sem espaços, acentos nem maiúsculas: "FPS 50" = "FPS50", "Álcool" = "alcool"."""
+    return remover_acentos(re.sub(r"\s+", "", texto)).lower()

@@ -316,3 +316,22 @@ def test_get_llm_orquestrador_usa_temperatura_zero(monkeypatch) -> None:
         models.get_llm_orquestrador()
     models.get_llm_orquestrador.cache_clear()
     assert criados and all(kw.get("temperatura") == 0.0 for kw in criados)
+
+
+def test_orquestrador_que_troca_a_lista_de_ingredientes_por_exemplos_e_substituido() -> None:
+    ingredientes = [{"position": n, "common_name": nome} for n, nome in enumerate(
+        ["ÁGUA", "GLICEROL", "ÁLCOOL CETEARÍLICO", "PETROLATO", "DIMETICONA", "TOCOFEROL"], 1)]
+    estado = {
+        "rota": "produto", "aprovado_juiz": True,
+        "resposta_especialista": {"dominio": "produto", "intencao": "consultar", "resposta": "Ingredientes: ..."},
+        "evidencias_tools": [
+            _evidencia("get_product", {"name": "Creme X", "brand_name": "Marca", "category_name": "Hidratante"},
+                       {"product_id": 10}),
+            _evidencia("get_product_ingredients", ingredientes, {"product_id": 10}),
+        ],
+    }
+    llm = LLMScript(script=[AIMessage(content="Tem glicerol e petrolato, e nada que cause irritação.")])
+    with patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador", return_value=llm):
+        texto = no_orquestrador(estado)["resposta_final"]
+    assert "irritação" not in texto
+    assert "ÁGUA, GLICEROL, ÁLCOOL CETEARÍLICO, PETROLATO, DIMETICONA, TOCOFEROL." in texto
