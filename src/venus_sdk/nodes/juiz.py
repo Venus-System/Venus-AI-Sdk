@@ -100,6 +100,10 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         return _veredito(False, None, MAX_TENTATIVAS_JUIZ)
 
     proxima_tentativa = estado.get("tentativas_juiz", 0) + 1
+    if especialista.get("intencao") == "nao_suportado":
+        # Recusa fixa escrita no código (ex.: a IA não salva favoritos) — não
+        # há dado para auditar.
+        return _veredito(True, None, proxima_tentativa)
     if _resposta_honesta_sem_dado(estado):
         return _veredito(True, None, proxima_tentativa)
 

@@ -246,20 +246,15 @@ def _parte_ingredientes(evidencias: list[dict] | None) -> str | None:
 
 
 def _parte_acao_favorito(evidencias: list[dict] | None) -> str | None:
-    """Resultado REAL de adicionar/remover favorito — nunca "feito" sem `ok`."""
-    for tool, feito, verbo in (
-        ("add_favorite", "Pronto, adicionei o produto aos seus favoritos.", "adicionar"),
-        ("remove_favorite", "Pronto, removi o produto dos seus favoritos.", "remover"),
-    ):
-        resultado = dados_da_evidencia(evidencias, tool)
-        if not isinstance(resultado, dict):
-            continue
-        if resultado.get("ok"):
-            return feito
-        if resultado.get("encontrado") is False:
-            return f"Não consegui {verbo}: {resultado.get('mensagem')}."
-        return f"Não consegui {verbo} o produto nos seus favoritos agora — deu um erro ao gravar. Pode tentar de novo mais tarde?"
-    return None
+    """Resultado REAL de remover favorito — nunca "feito" sem `ok`."""
+    resultado = dados_da_evidencia(evidencias, "remove_favorite")
+    if not isinstance(resultado, dict):
+        return None
+    if resultado.get("ok"):
+        return "Pronto, removi o produto dos seus favoritos."
+    if resultado.get("encontrado") is False:
+        return f"Não consegui remover: {resultado.get('mensagem')}."
+    return "Não consegui remover o produto dos seus favoritos agora — deu um erro ao gravar. Pode tentar de novo mais tarde?"
 
 
 def _parte_favoritos(evidencias: list[dict] | None) -> str | None:
@@ -391,6 +386,9 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
     # usuário, sem passar pelo LLM (e sem expor erro nenhum).
     if especialista_e_objeto and especialista_json.get("intencao") in _INTENCOES_DE_ERRO:
         return {"resposta_final": _RESPOSTA_ORQUESTRADOR_FALLBACK}
+    # Recusa fixa escrita no código: vai como está, sem reescrita do LLM.
+    if especialista_e_objeto and especialista_json.get("intencao") == "nao_suportado":
+        return {"resposta_final": especialista_json.get("resposta") or _RESPOSTA_ORQUESTRADOR_FALLBACK}
     # Juiz reprovou (tentativas esgotadas) em domínio com dado no banco: nunca repassa o texto
     # reprovado (ele costuma conter invenção); usa só a evidência das tools.
     if not aprovado and _dominio_com_dado_no_banco(estado, especialista_json):

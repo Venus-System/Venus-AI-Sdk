@@ -49,11 +49,20 @@ _RESPOSTA_ERRO_FORMATO = "Não consegui estruturar uma resposta válida para ess
 _LIMITE_PASSOS_AGENTE = 24
 _TAMANHO_PREVIA_LOG = 80
 
-_TOOLS_DE_ESCRITA = {"add_favorite", "remove_favorite"}
+_TOOLS_DE_ESCRITA = {"remove_favorite"}
 _FAVORITO_RE = re.compile(r"favorit", re.IGNORECASE)
-_VERBO_DE_ALTERACAO_RE = re.compile(
-    r"\b(adicion\w*|inclu\w*|coloc\w*|salv\w*|guard\w*|remov\w*|tir[ae]\w*|exclu\w*|apag\w*|desfavorit\w*)",
-    re.IGNORECASE,
+_VERBO_DE_ADICAO_RE = re.compile(
+    r"\b(adicion\w*|inclu\w*|coloc\w*|salv\w*|guard\w*|bot[ae]\w*|p[oõ]e|marc[ae]\w*)\b", re.IGNORECASE
+)
+_VERBO_DE_REMOCAO_RE = re.compile(r"\b(remov\w*|tir[ae]\w*|exclu\w*|apag\w*|desfavorit\w*)", re.IGNORECASE)
+
+# A IA nunca salva favoritos: o pedido é recusado sem passar pelo LLM (não
+# há tool para isso, e deixar o LLM responder gerava recusas que o Juiz
+# reprovava por "não ter fonte" — o usuário recebia uma resposta genérica).
+INTENCAO_NAO_SUPORTADA = "nao_suportado"
+_RESPOSTA_ADICIONAR_FAVORITO = (
+    "Eu não salvo produtos nos seus favoritos — isso é você quem escolhe e faz direto no app. "
+    "Posso te mostrar os favoritos que você já tem ou montar uma rotina com eles?"
 )
 
 _CERCA_MARKDOWN_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
@@ -325,12 +334,10 @@ def montar_no_agente_ingrediente(pool: Any) -> NoEspecialista:
 def montar_no_agente_rotina(pool: Any) -> NoEspecialista:
     """Idem `montar_no_agente_produto`, para o agente de Rotina (ver
     `tools/rotina.py`) — perfil/favoritos/listas do usuário no Postgres.
-    Também recebe `search_product`, para achar o `product_id` de um produto
-    que o usuário pede para favoritar pelo nome.
+    A IA não adiciona favoritos (não existe tool para isso).
 
-    As tools que ALTERAM dados (`add_favorite`/`remove_favorite`) só são
-    entregues ao agente quando a pergunta do usuário pede isso
-    explicitamente. No teste de 2026-09-26, ao montar uma rotina, o agente
+    A tool que ALTERA dados (`remove_favorite`) só é entregue ao agente
+    quando a pergunta do usuário pede isso explicitamente. No teste de 2026-09-26, ao montar uma rotina, o agente
     chamou `remove_favorite` para "corrigir" a rotina depois de uma
     reprovação do Juiz — só a própria pergunta autoriza escrita, nunca o
     feedback do Juiz nem a interpretação do LLM."""
@@ -343,27 +350,36 @@ def montar_no_agente_rotina(pool: Any) -> NoEspecialista:
 
     async def no_agente_rotina(estado: EstadoVenus) -> EstadoVenus:
         pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario", "")
-        no = com_escrita if pede_alteracao_de_favorito(pergunta) else somente_leitura
+        if pede_para_adicionar_favorito(pergunta):
+            return {
+                "resposta_especialista": _resposta_de_falha(
+                    "rotina", INTENCAO_NAO_SUPORTADA, _RESPOSTA_ADICIONAR_FAVORITO
+                ),
+                "evidencias_tools": None,
+            }
+        no = com_escrita if pede_remocao_de_favorito(pergunta) else somente_leitura
         return await no(estado)
 
     return no_agente_rotina
 
 
-def pede_alteracao_de_favorito(pergunta: str) -> bool:
-    """True se a pergunta pede para adicionar ou remover um favorito."""
+def pede_para_adicionar_favorito(pergunta: str) -> bool:
+    """True se a pergunta pede para salvar um produto nos favoritos."""
     texto = pergunta or ""
-    return bool(_FAVORITO_RE.search(texto) and _VERBO_DE_ALTERACAO_RE.search(texto))
+    return bool(_FAVORITO_RE.search(texto) and _VERBO_DE_ADICAO_RE.search(texto))
+
+
+def pede_remocao_de_favorito(pergunta: str) -> bool:
+    """True se a pergunta pede para tirar um produto dos favoritos."""
+    texto = pergunta or ""
+    return bool(_FAVORITO_RE.search(texto) and _VERBO_DE_REMOCAO_RE.search(texto))
 
 
 def _tools_rotina(pool: Any, *, com_escrita: bool) -> list[Any]:
-    tools = montar_tools_rotina(pool) + montar_tools_compartilhadas(pool) + _busca_de_produto(pool)
+    tools = montar_tools_rotina(pool) + montar_tools_compartilhadas(pool)
     if com_escrita:
         return tools
     return [tool for tool in tools if tool.name not in _TOOLS_DE_ESCRITA]
-
-
-def _busca_de_produto(pool: Any) -> list[Any]:
-    return [tool for tool in montar_tools_produto(pool) if tool.name == "search_product"]
 
 
 def montar_no_agente_faq(indice: Any, tools_extras: list[Any] | None = None) -> NoEspecialista:
