@@ -25,6 +25,8 @@ Duas opções, no mesmo espírito do checkpointer:
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
@@ -50,7 +52,20 @@ if TYPE_CHECKING:
     from pymongo import MongoClient
     from pymongo.collection import Collection
 
+logger = logging.getLogger(__name__)
+
 COLLECTION_MONGO_PADRAO = "memorias_longo_prazo"
+
+# Timeout (ms) para achar o servidor/conectar. O padrão do pymongo é 30 s: com
+# o Mongo fora do ar, cada requisição da API ficaria presa esse tempo todo.
+TIMEOUT_MONGO_MS_PADRAO = 5000
+
+# Índice único antigo em (namespace, key). `namespace` é uma LISTA, então o
+# Mongo cria índice multikey — indexa cada item separado — e todo usuário
+# gerava a mesma entrada ("memorias", "perfil"): o `unique` barrava do
+# segundo usuário em diante (DuplicateKeyError). Removido na inicialização.
+_INDICE_LEGADO = "namespace_1_key_1"
+_INDICE_UNICO = "namespace_str_1_key_1"
 
 
 def criar_store_em_memoria() -> InMemoryStore:
@@ -80,7 +95,46 @@ class MongoDBStore(BaseStore):
 
     def __init__(self, cliente: MongoClient, *, db_name: str, collection_name: str) -> None:
         self._colecao: Collection = cliente[db_name][collection_name]
-        self._colecao.create_index([("namespace", 1), ("key", 1)], unique=True)
+        self._preparar_colecao()
+
+    # --- índice e migração (seguros com várias instâncias subindo juntas) ---
+
+    def _preparar_colecao(self) -> None:
+        """Deixa a coleção pronta: remove o índice único legado, preenche
+        `namespace_str` nos documentos antigos e cria o índice único novo.
+
+        Tudo idempotente e tolerante a concorrência: várias tasks da API podem
+        subir ao mesmo tempo (ou conviver com a versão antiga num deploy
+        gradual) sem passo manual nem erro de "índice já existe/não existe"."""
+        self._remover_indice_legado()
+        self._preencher_namespace_str()
+        self._colecao.create_index(
+            [("namespace_str", 1), ("key", 1)],
+            name=_INDICE_UNICO,
+            unique=True,
+            # Documento gravado pela versão antiga (sem o campo) não entra no
+            # índice — sem isso, todos colidiriam no valor nulo.
+            partialFilterExpression={"namespace_str": {"$exists": True}},
+        )
+
+    def _remover_indice_legado(self) -> None:
+        from pymongo.errors import OperationFailure
+
+        indice = self._colecao.index_information().get(_INDICE_LEGADO)
+        if not indice or not indice.get("unique"):
+            return
+        try:
+            self._colecao.drop_index(_INDICE_LEGADO)
+            logger.info("Índice único legado %s removido de %s", _INDICE_LEGADO, self._colecao.name)
+        except OperationFailure:
+            # Outra instância removeu antes — o resultado é o mesmo.
+            logger.info("Índice %s já tinha sido removido por outra instância", _INDICE_LEGADO)
+
+    def _preencher_namespace_str(self) -> None:
+        for doc in self._colecao.find({"namespace_str": {"$exists": False}}, {"namespace": 1}):
+            self._colecao.update_one(
+                {"_id": doc["_id"]}, {"$set": {"namespace_str": _chave_do_namespace(doc["namespace"])}}
+            )
 
     # --- API exigida por BaseStore ---
 
@@ -105,25 +159,36 @@ class MongoDBStore(BaseStore):
         raise TypeError(f"Operação não suportada por MongoDBStore: {type(op)!r}")
 
     def _get(self, op: GetOp) -> Item | None:
-        doc = self._colecao.find_one({"namespace": list(op.namespace), "key": op.key})
+        doc = self._colecao.find_one(_filtro(op.namespace, op.key))
         return self._doc_para_item(doc) if doc else None
 
     def _put(self, op: PutOp) -> None:
-        filtro = {"namespace": list(op.namespace), "key": op.key}
+        filtro = _filtro(op.namespace, op.key)
         if op.value is None:
             self._colecao.delete_one(filtro)
             return None
 
         agora = datetime.now(timezone.utc)
-        self._colecao.update_one(
-            filtro,
-            {
-                "$set": {"value": op.value, "updated_at": agora},
-                "$setOnInsert": {"created_at": agora},
-            },
-            upsert=True,
-        )
+        atualizacao = {
+            "$set": {"value": op.value, "updated_at": agora},
+            # `namespace` (lista) continua gravado: é o que `_search` usa para
+            # filtrar por prefixo e o que a versão antiga lê.
+            "$setOnInsert": {"created_at": agora, "namespace": list(op.namespace)},
+        }
+        self._upsert(filtro, atualizacao)
         return None
+
+    def _upsert(self, filtro: dict[str, Any], atualizacao: dict[str, Any]) -> None:
+        """`update_one(upsert=True)` com uma nova tentativa: quando duas
+        instâncias inserem o MESMO documento ao mesmo tempo, uma delas recebe
+        `DuplicateKeyError` do índice único — na segunda tentativa o documento
+        já existe e vira um update comum."""
+        from pymongo.errors import DuplicateKeyError
+
+        try:
+            self._colecao.update_one(filtro, atualizacao, upsert=True)
+        except DuplicateKeyError:
+            self._colecao.update_one(filtro, atualizacao, upsert=True)
 
     def _search(self, op: SearchOp) -> list[SearchItem]:
         consulta: dict[str, Any] = {}
@@ -177,11 +242,22 @@ class MongoDBStore(BaseStore):
         return Item(**kwargs)
 
 
+def _chave_do_namespace(namespace: Iterable[str]) -> str:
+    """Namespace como texto único e sem ambiguidade (`["memorias", "uid"]`),
+    para o índice único — um campo LISTA viraria índice multikey."""
+    return json.dumps(list(namespace), ensure_ascii=False)
+
+
+def _filtro(namespace: Iterable[str], key: str) -> dict[str, Any]:
+    return {"namespace_str": _chave_do_namespace(namespace), "key": key}
+
+
 def criar_store_mongo(
     uri: str | None = None,
     *,
     db_name: str = DB_MONGO_PADRAO,
     collection_name: str = COLLECTION_MONGO_PADRAO,
+    timeout_ms: int = TIMEOUT_MONGO_MS_PADRAO,
 ) -> MongoDBStore:
     """Cria um store de memória de longo prazo persistido no MongoDB.
 
@@ -193,6 +269,10 @@ def criar_store_mongo(
     `uri`: string de conexão do Mongo. Se omitida, usa `MONGODB_URI` do
     `.env` (ver `config/settings.py`) — a mesma variável usada por
     `criar_checkpointer_mongo()`.
+
+    `timeout_ms`: quanto esperar para achar/conectar ao servidor antes de
+    desistir. Curto de propósito — quem chama (`nodes/memoria.py`) segue a
+    conversa sem memória quando o Mongo não responde.
 
     Levanta `ImportError` com mensagem clara se o extra `mongo` não estiver
     instalado, e `ValueError` se nenhuma URI for encontrada.
@@ -212,5 +292,5 @@ def criar_store_mongo(
             ".env ou passe `uri=` explicitamente."
         )
 
-    cliente = MongoClient(uri_final)
+    cliente = MongoClient(uri_final, serverSelectionTimeoutMS=timeout_ms, connectTimeoutMS=timeout_ms)
     return MongoDBStore(cliente, db_name=db_name, collection_name=collection_name)

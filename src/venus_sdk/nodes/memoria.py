@@ -46,7 +46,13 @@ def no_carregar_memoria(estado: EstadoVenus, *, store: BaseStore) -> EstadoVenus
     if store is None or not usuario_id:
         return {}
 
-    item = store.get(_namespace(usuario_id), CHAVE_PERFIL)
+    try:
+        item = store.get(_namespace(usuario_id), CHAVE_PERFIL)
+    except Exception:
+        # Store fora do ar/lento: o turno segue sem memória de longo prazo em
+        # vez de a requisição inteira virar erro.
+        logger.exception("Falha ao ler memória de longo prazo (usuario_id=%s)", usuario_id)
+        return {}
     return {"memorias_usuario": item.value if item else None}
 
 
@@ -89,7 +95,13 @@ def no_atualizar_memoria(estado: EstadoVenus, *, store: BaseStore) -> EstadoVenu
         return {}
 
     perfil_atualizado = _mesclar_perfil(perfil_atual, fatos_novos)
-    store.put(_namespace(usuario_id), CHAVE_PERFIL, perfil_atualizado)
+    try:
+        store.put(_namespace(usuario_id), CHAVE_PERFIL, perfil_atualizado)
+    except Exception:
+        # A resposta já foi validada e está indo pro usuário: falha ao gravar
+        # a memória só perde a memória, nunca a resposta.
+        logger.exception("Falha ao gravar memória de longo prazo (usuario_id=%s)", usuario_id)
+        return {}
     return {"memorias_usuario": perfil_atualizado}
 
 
