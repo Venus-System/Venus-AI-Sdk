@@ -57,6 +57,14 @@ _TAMANHO_MINIMO_TEXTO_FINAL = 12
 # diferente pelo especialista, mas não uma lista trocada por 2 ou 3 exemplos).
 _FRACAO_MINIMA_DE_INGREDIENTES_CITADOS = 0.8
 
+# Listas só aparecem na resposta quando a pergunta pede por elas; senão, no
+# máximo um comentário curto (ex.: "ele tem 19 ingredientes cadastrados").
+_PEDE_INGREDIENTES_RE = re.compile(
+    r"\b(ingredientes?|composi[cç][aã]o|f[oó]rmula|inci|o que (ele |ela )?(tem|leva|cont[eé]m))\b", re.IGNORECASE
+)
+_PEDE_FAVORITOS_RE = re.compile(r"favorit", re.IGNORECASE)
+_PEDE_LISTAS_RE = re.compile(r"\blistas?\b", re.IGNORECASE)
+
 _PLACEHOLDER_RE = re.compile(r"\[[^\]\n]{2,40}\]")
 _NOME_DO_PASSO_RE = re.compile(r"\d+\) (.+?) \(")
 _MARCA_PASSOS_DA_ROTINA = "Passos ("
@@ -127,9 +135,11 @@ def _cabecalho_do_produto(evidencias: list[dict] | None, product_id: Any) -> str
     return f"{achado['name']} ({achado.get('brand_name')})." if achado else None
 
 
-def _detalhe_do_produto(evidencias: list[dict] | None) -> str | None:
+def _detalhe_do_produto(evidencias: list[dict] | None, pergunta: str = "") -> str | None:
     """Dados de UM produto consultado em detalhe (nome, nota, ingredientes) —
-    só retornos de chamadas feitas para ESSE `product_id`."""
+    só retornos de chamadas feitas para ESSE `product_id`. A lista de
+    ingredientes só entra (completa) se a pergunta pediu; senão, só a
+    contagem."""
     product_id = _produto_consultado(evidencias)
     if product_id is None:
         return None
@@ -146,21 +156,20 @@ def _detalhe_do_produto(evidencias: list[dict] | None) -> str | None:
 
     ingredientes = dados_da_evidencia(evidencias, "get_product_ingredients", product_id=product_id)
     if isinstance(ingredientes, list) and ingredientes:
-        nomes = [
-            str(i.get("common_name") or i.get("inci_name"))
-            for i in ingredientes[:_MAX_INGREDIENTES_DO_PRODUTO] if isinstance(i, dict)
-        ]
-        continua = "…" if len(ingredientes) > _MAX_INGREDIENTES_DO_PRODUTO else "."
-        linhas.append(f"Ingredientes cadastrados, na ordem do rótulo: {', '.join(nomes)}{continua}")
+        if _PEDE_INGREDIENTES_RE.search(pergunta or ""):
+            nomes = [str(i.get("common_name") or i.get("inci_name")) for i in ingredientes if isinstance(i, dict)]
+            linhas.append(f"Ingredientes cadastrados, na ordem do rótulo: {', '.join(nomes)}.")
+        else:
+            linhas.append(f"Ele tem {len(ingredientes)} ingredientes cadastrados — quer que eu liste?")
     elif isinstance(ingredientes, dict) and ingredientes.get("encontrado") is False:
         linhas.append("Os ingredientes dele ainda não estão cadastrados aqui.")
     return "\n".join(linhas)
 
 
-def _parte_produtos(evidencias: list[dict] | None) -> tuple[str | None, bool]:
+def _parte_produtos(evidencias: list[dict] | None, pergunta: str = "") -> tuple[str | None, bool]:
     """`(texto, sem_dado)` — `sem_dado` indica que nenhum produto listado tem
     nota nem ingredientes cadastrados."""
-    detalhe = _detalhe_do_produto(evidencias)
+    detalhe = _detalhe_do_produto(evidencias, pergunta)
     if detalhe:
         return detalhe, False
     produtos = dados_da_evidencia(evidencias, "search_product")
@@ -328,7 +337,8 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     ]
     # Numa pergunta sobre a conta, a busca de produto foi só um meio (achar o
     # id): listar o catálogo ali confunde mais do que ajuda.
-    texto_produtos, sem_dado = (None, False) if dados_da_conta else _parte_produtos(evidencias)
+    pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
+    texto_produtos, sem_dado = (None, False) if dados_da_conta else _parte_produtos(evidencias, pergunta)
     candidatas = [
         *dados_da_conta,
         texto_produtos,
@@ -359,8 +369,13 @@ def _invocar_orquestrador(mensagens: list) -> str:
         return ""
 
 
-def _montar_entrada_orquestrador(especialista_json: Any, aprovado: bool) -> str:
-    entrada = f"ESPECIALISTA_JSON={json.dumps(especialista_json, ensure_ascii=False)}"
+def _montar_entrada_orquestrador(especialista_json: Any, aprovado: bool, pergunta: str = "") -> str:
+    # A pergunta vai junto para o orquestrador saber o que resumir e se uma
+    # lista (ingredientes, favoritos...) foi pedida ou só veio no JSON.
+    entrada = (
+        f"PERGUNTA_ORIGINAL={pergunta}\n"
+        f"ESPECIALISTA_JSON={json.dumps(especialista_json, ensure_ascii=False)}"
+    )
     # Chegou aqui via "esgotado" (ver `nodes/juiz.py`) sem aprovação plena.
     if not aprovado:
         entrada += "\n\n" + _NOTA_JUIZ_ESGOTADO
@@ -394,7 +409,8 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
     if not aprovado and _dominio_com_dado_no_banco(estado, especialista_json):
         return {"resposta_final": _resposta_segura_sem_aprovacao(estado)}
 
-    entrada = _montar_entrada_orquestrador(especialista_json, aprovado)
+    pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
+    entrada = _montar_entrada_orquestrador(especialista_json, aprovado, pergunta)
     mensagens = [("system", ORQUESTRADOR_PROMPT_COMPLETO), ("human", entrada)]
     texto = _invocar_orquestrador(mensagens)
     if not texto:
@@ -425,12 +441,13 @@ def _omitiu_dados_das_tools(texto: str, estado: EstadoVenus) -> bool:
     e uma afirmação de segurança que nenhuma tool fez."""
     evidencias = estado.get("evidencias_tools")
     rota = estado.get("rota")
+    pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
     if rota == "rotina":
-        faltando = _itens_omitidos(texto, evidencias)
+        faltando = _itens_omitidos(texto, evidencias, pergunta)
         if faltando:
             logger.warning("Orquestrador omitiu itens da conta do usuário (%s); resposta montada das tools", faltando)
         return bool(faltando)
-    if rota == "produto":
+    if rota == "produto" and _PEDE_INGREDIENTES_RE.search(pergunta):
         ingredientes = _ingredientes_do_produto(evidencias)
         if not ingredientes:
             return False
@@ -453,27 +470,28 @@ def _ingredientes_do_produto(evidencias: list[dict] | None) -> list[str]:
     return [str(i.get("common_name")) for i in ingredientes if isinstance(i, dict) and i.get("common_name")]
 
 
-def _itens_obrigatorios(evidencias: list[dict] | None) -> list[str]:
+def _itens_obrigatorios(evidencias: list[dict] | None, pergunta: str = "") -> list[str]:
     """Nomes que uma resposta sobre a conta PRECISA citar: os passos da rotina
-    montada ou, sem rotina, os favoritos e os itens das listas consultados."""
+    montada ou, sem rotina, os favoritos e os itens das listas — só quando a
+    pergunta pediu por eles."""
     rotina = dados_da_evidencia(evidencias, "suggest_routine")
     if isinstance(rotina, dict) and rotina.get("passos"):
         return [str(passo.get("nome")) for passo in rotina["passos"] if isinstance(passo, dict)]
     nomes: list[str] = []
-    favoritos = dados_da_evidencia(evidencias, "get_user_favorites")
+    favoritos = dados_da_evidencia(evidencias, "get_user_favorites") if _PEDE_FAVORITOS_RE.search(pergunta) else None
     if isinstance(favoritos, list):
         nomes += [str(f.get("name")) for f in favoritos if isinstance(f, dict) and f.get("name")]
-    listas = dados_da_evidencia(evidencias, "get_user_lists")
+    listas = dados_da_evidencia(evidencias, "get_user_lists") if _PEDE_LISTAS_RE.search(pergunta) else None
     if isinstance(listas, list):
         nomes += [str(i.get("product_name")) for i in listas if isinstance(i, dict) and i.get("product_name")]
     return nomes
 
 
-def _itens_omitidos(texto: str, evidencias: list[dict] | None) -> list[str]:
+def _itens_omitidos(texto: str, evidencias: list[dict] | None, pergunta: str = "") -> list[str]:
     """Itens obrigatórios que não aparecem no texto (comparação sem espaços
     nem maiúsculas: "FPS 50" e "FPS50" contam como o mesmo)."""
     texto_compacto = _compactar(texto)
-    return [nome for nome in _itens_obrigatorios(evidencias) if _compactar(nome) not in texto_compacto]
+    return [nome for nome in _itens_obrigatorios(evidencias, pergunta) if _compactar(nome) not in texto_compacto]
 
 
 def _compactar(texto: str) -> str:

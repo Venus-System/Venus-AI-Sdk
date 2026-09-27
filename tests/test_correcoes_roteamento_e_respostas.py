@@ -159,10 +159,11 @@ def _evidencia(tool: str, resultado: object, argumentos: dict | None = None) -> 
     return evidencia
 
 
-def _esgotado(dominio: str, evidencias: list[tuple], rota: str | None = None) -> dict:
+def _esgotado(dominio: str, evidencias: list[tuple], rota: str | None = None, pergunta: str = "") -> dict:
     return {
         "aprovado_juiz": False,
         "rota": rota or dominio,
+        "pergunta_original": pergunta,
         "resposta_especialista": {"dominio": dominio, "intencao": "explicar", "resposta": "texto reprovado"},
         "evidencias_tools": [_evidencia(*item) for item in evidencias],
     }
@@ -188,19 +189,31 @@ def test_resposta_segura_de_ingrediente_mostra_o_que_as_tools_trouxeram() -> Non
     assert "texto reprovado" not in texto
 
 
-def test_resposta_segura_de_produto_mostra_detalhes_nota_e_ingredientes() -> None:
-    estado = _esgotado("produto", [
+def _estado_de_produto_detalhado(pergunta: str) -> dict:
+    return _esgotado("produto", [
         ("search_product", [{"product_id": 10, "name": "Creme X", "brand_name": "Marca"}]),
         ("get_product", {"name": "Creme X", "brand_name": "Marca", "category_name": "Hidratante"}, {"product_id": 10}),
         ("get_product_score", {"encontrado": False, "mensagem": "score não calculado"}, {"product_id": 10}),
         ("get_product_ingredients", [{"position": 1, "common_name": "ÁGUA"}, {"position": 2, "common_name": "GLICEROL"}],
          {"product_id": 10}),
-    ])
+    ], pergunta=pergunta)
+
+
+def test_resposta_segura_de_produto_lista_ingredientes_quando_pedidos() -> None:
+    estado = _estado_de_produto_detalhado("Quais os ingredientes do Creme X?")
     with patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador", side_effect=AssertionError("sem LLM")):
         texto = no_orquestrador(estado)["resposta_final"]
     assert "Creme X (Marca), da categoria Hidratante." in texto
     assert "ainda não tem nota calculada" in texto
     assert "ÁGUA, GLICEROL." in texto
+
+
+def test_resposta_segura_de_produto_so_comenta_ingredientes_quando_nao_pedidos() -> None:
+    estado = _estado_de_produto_detalhado("O que é o Creme X?")
+    with patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador", side_effect=AssertionError("sem LLM")):
+        texto = no_orquestrador(estado)["resposta_final"]
+    assert "Ele tem 2 ingredientes cadastrados — quer que eu liste?" in texto
+    assert "GLICEROL" not in texto
 
 
 def _resposta_segura(dominio: str, evidencias: list[tuple[str, object]]) -> str:
@@ -308,9 +321,9 @@ def test_pedido_para_agir_sem_restricoes_continua_bloqueado(texto: str) -> None:
 # --- orquestrador: fidelidade nas respostas sobre a conta ---
 
 
-def _orquestrar_com_llm(texto_do_llm: str, evidencias: list[tuple]) -> str:
+def _orquestrar_com_llm(texto_do_llm: str, evidencias: list[tuple], pergunta: str = "Quais são os meus favoritos?") -> str:
     estado = {
-        "rota": "rotina", "aprovado_juiz": True,
+        "rota": "rotina", "aprovado_juiz": True, "pergunta_original": pergunta,
         "resposta_especialista": {"dominio": "rotina", "intencao": "consultar", "resposta": "Seus favoritos."},
         "evidencias_tools": [_evidencia(*item) for item in evidencias],
     }
@@ -323,6 +336,13 @@ def test_orquestrador_que_omite_favoritos_e_substituido_pelos_dados_das_tools() 
     favoritos = [{"name": "Creme X"}, {"name": "Loção FPS50"}, {"name": "Óleo Y"}]
     texto = _orquestrar_com_llm("Que legal você curtir a linha! O Creme X é ótimo.", [("get_user_favorites", favoritos)])
     assert texto == "Seus produtos favoritos: Creme X, Loção FPS50, Óleo Y.\n\nQuer que eu detalhe mais alguma coisa?"
+
+
+def test_favoritos_consultados_mas_nao_pedidos_nao_sao_obrigatorios() -> None:
+    favoritos = [{"name": "Creme X"}, {"name": "Loção FPS50"}]
+    resposta_llm = "Não há alergias cadastradas no seu perfil."
+    texto = _orquestrar_com_llm(resposta_llm, [("get_user_favorites", favoritos)], pergunta="Tenho alergia cadastrada?")
+    assert texto == resposta_llm
 
 
 def test_orquestrador_que_cita_todos_os_favoritos_e_mantido() -> None:
@@ -351,6 +371,7 @@ def test_orquestrador_que_troca_a_lista_de_ingredientes_por_exemplos_e_substitui
         ["ÁGUA", "GLICEROL", "ÁLCOOL CETEARÍLICO", "PETROLATO", "DIMETICONA", "TOCOFEROL"], 1)]
     estado = {
         "rota": "produto", "aprovado_juiz": True,
+        "pergunta_original": "Quais os ingredientes do Creme X?",
         "resposta_especialista": {"dominio": "produto", "intencao": "consultar", "resposta": "Ingredientes: ..."},
         "evidencias_tools": [
             _evidencia("get_product", {"name": "Creme X", "brand_name": "Marca", "category_name": "Hidratante"},
@@ -363,3 +384,19 @@ def test_orquestrador_que_troca_a_lista_de_ingredientes_por_exemplos_e_substitui
         texto = no_orquestrador(estado)["resposta_final"]
     assert "irritação" not in texto
     assert "ÁGUA, GLICEROL, ÁLCOOL CETEARÍLICO, PETROLATO, DIMETICONA, TOCOFEROL." in texto
+
+
+def test_entrada_do_orquestrador_leva_a_pergunta() -> None:
+    capturadas = []
+
+    class _LLM:
+        def invoke(self, mensagens):
+            capturadas.append(mensagens)
+            return AIMessage(content="O Creme X é um hidratante.")
+
+    estado = {"rota": "produto", "aprovado_juiz": True, "pergunta_original": "O que é o Creme X?",
+              "resposta_especialista": {"dominio": "produto", "intencao": "consultar", "resposta": "É um hidratante."},
+              "evidencias_tools": []}
+    with patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador", return_value=_LLM()):
+        no_orquestrador(estado)
+    assert "PERGUNTA_ORIGINAL=O que é o Creme X?" in capturadas[0][1][1]
