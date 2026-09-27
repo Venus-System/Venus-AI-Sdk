@@ -46,7 +46,7 @@ from langgraph.store.base import (
 from langgraph.store.memory import InMemoryStore
 
 from venus_sdk.config.settings import MONGODB_URI
-from venus_sdk.memory.checkpointer import DB_MONGO_PADRAO
+from venus_sdk.memory.checkpointer import DB_MONGO_PADRAO, TIMEOUT_MONGO_MS_PADRAO
 
 if TYPE_CHECKING:
     from pymongo import MongoClient
@@ -55,10 +55,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 COLLECTION_MONGO_PADRAO = "memorias_longo_prazo"
-
-# Timeout (ms) para achar o servidor/conectar. O padrão do pymongo é 30 s: com
-# o Mongo fora do ar, cada requisição da API ficaria presa esse tempo todo.
-TIMEOUT_MONGO_MS_PADRAO = 5000
 
 # Índice único antigo em (namespace, key). `namespace` é uma LISTA, então o
 # Mongo cria índice multikey — indexa cada item separado — e todo usuário

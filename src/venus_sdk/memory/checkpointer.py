@@ -36,6 +36,10 @@ if TYPE_CHECKING:
 
 DB_MONGO_PADRAO = "venus"
 
+# Timeout (ms) para achar o servidor/conectar. O padrão do pymongo é 30 s: com
+# o Mongo fora do ar, cada requisição da API ficaria presa esse tempo todo.
+TIMEOUT_MONGO_MS_PADRAO = 5000
+
 
 def criar_checkpointer_em_memoria() -> InMemorySaver:
     """Cria um checkpointer novo, em memória (RAM).
@@ -52,6 +56,7 @@ def criar_checkpointer_mongo(
     *,
     db_name: str = DB_MONGO_PADRAO,
     ttl_segundos: int | None = None,
+    timeout_ms: int = TIMEOUT_MONGO_MS_PADRAO,
 ) -> MongoDBSaver:
     """Cria um checkpointer persistente, gravado no MongoDB.
 
@@ -69,6 +74,9 @@ def criar_checkpointer_mongo(
     tempo (ex.: `60 * 60 * 24` para expirar em 24h) — evita acumular
     conversas antigas pra sempre. Sem isso, ficam guardados
     indefinidamente.
+    `timeout_ms`: quanto esperar para achar/conectar ao servidor antes de
+    desistir (curto de propósito: falhar rápido em vez de prender a
+    requisição).
 
     Conecta de verdade já na criação (ao contrário do `pymongo.MongoClient`
     puro, que é preguiçoso) — precisa de um Mongo alcançável nesse momento.
@@ -93,5 +101,5 @@ def criar_checkpointer_mongo(
             ".env ou passe `uri=` explicitamente."
         )
 
-    cliente = MongoClient(uri_final)
+    cliente = MongoClient(uri_final, serverSelectionTimeoutMS=timeout_ms, connectTimeoutMS=timeout_ms)
     return MongoDBSaver(cliente, db_name=db_name, ttl=ttl_segundos)
