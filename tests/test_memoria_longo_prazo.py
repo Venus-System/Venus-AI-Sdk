@@ -215,8 +215,9 @@ def test_memoria_de_longo_prazo_sobrevive_a_troca_de_thread_id() -> None:
     assert estado_2["memorias_usuario"] == {"nome": "Sophia", "tipo_pele": "oleosa"}
 
 
-# Sem teste automatizado para `criar_store_mongo()`: mesma razão do
-# checkpointer (ver `tests/test_memoria.py`) — fala com o Atlas de verdade
-# (`MONGODB_URI`), e o usuário configurado não tem permissão de
-# `dropDatabase`. Testado manualmente (ping + put/get round-trip) na hora da
-# implementação; ver PR/commit.
+# `criar_store_mongo()` em si (conexão com o Atlas) não tem teste
+# automatizado — o usuário configurado não tem permissão de `dropDatabase`.
+# A lógica do `MongoDBStore` (índice único, migração, vários usuários,
+# concorrência) é coberta em `tests/test_store_mongo.py`, com uma coleção
+# falsa que imita o índice multikey do Mongo. O round-trip manual feito na
+# implementação usou UM usuário só — por isso não pegou o bug do índice.
