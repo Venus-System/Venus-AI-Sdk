@@ -169,12 +169,14 @@ CREATE TABLE IF NOT EXISTS venus.user_list_items (
 -- Um refresh_token por usuário. Quem grava é o backend do mobile/web (o SDK
 -- nunca inicia o fluxo OAuth), via salvar_refresh_token; o agente de rotina
 -- só lê. Guardado CIFRADO (Fernet, GOOGLE_TOKEN_ENCRYPTION_KEY) — nunca em
--- texto puro.
+-- texto puro. Nomes no padrão do schema `venus` (inglês, created_at/updated_at);
+-- no banco real, o time de banco cria com BIGINT IDENTITY e o trigger
+-- fn_touch_updated_at, como as outras tabelas.
 CREATE TABLE IF NOT EXISTS venus.google_oauth_tokens (
     google_oauth_token_id SERIAL PRIMARY KEY,
-    fk_user_id INT NOT NULL UNIQUE REFERENCES venus.users(user_id),
-    refresh_token_cifrado BYTEA NOT NULL,
-    escopo TEXT NOT NULL,
-    criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
-    atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+    fk_user_id INT NOT NULL UNIQUE REFERENCES venus.users(user_id) ON DELETE CASCADE,
+    encrypted_refresh_token BYTEA NOT NULL,
+    scope TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

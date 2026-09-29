@@ -137,7 +137,7 @@ def test_salvar_refresh_token_grava_cifrado_nunca_texto_puro(monkeypatch) -> Non
 def test_obter_refresh_token_decifra_o_que_foi_salvo(monkeypatch) -> None:
     monkeypatch.setenv("GOOGLE_TOKEN_ENCRYPTION_KEY", Fernet.generate_key().decode())
     cifrado = cifrar_token("refresh-original")
-    pool = PoolFalso(ConexaoFalsa(fetchrow={"refresh_token_cifrado": cifrado}))
+    pool = PoolFalso(ConexaoFalsa(fetchrow={"encrypted_refresh_token": cifrado}))
 
     resultado = _rodar(obter_refresh_token(pool, 42))
 

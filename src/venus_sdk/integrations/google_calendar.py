@@ -139,12 +139,12 @@ async def salvar_refresh_token(pool: Any, user_id: int, refresh_token: str, *, e
     async with pool.acquire() as conn:
         await conn.execute(
             """
-            INSERT INTO venus.google_oauth_tokens (fk_user_id, refresh_token_cifrado, escopo)
+            INSERT INTO venus.google_oauth_tokens (fk_user_id, encrypted_refresh_token, scope)
             VALUES ($1, $2, $3)
             ON CONFLICT (fk_user_id) DO UPDATE
-                SET refresh_token_cifrado = EXCLUDED.refresh_token_cifrado,
-                    escopo = EXCLUDED.escopo,
-                    atualizado_em = now()
+                SET encrypted_refresh_token = EXCLUDED.encrypted_refresh_token,
+                    scope = EXCLUDED.scope,
+                    updated_at = now()
             """,
             user_id, cifrado, escopo,
         )
@@ -157,12 +157,12 @@ async def obter_refresh_token(pool: Any, user_id: int) -> str | None:
     como exceção."""
     async with pool.acquire() as conn:
         linha = await conn.fetchrow(
-            "SELECT refresh_token_cifrado FROM venus.google_oauth_tokens WHERE fk_user_id = $1",
+            "SELECT encrypted_refresh_token FROM venus.google_oauth_tokens WHERE fk_user_id = $1",
             user_id,
         )
     if linha is None:
         return None
-    return decifrar_token(linha["refresh_token_cifrado"])
+    return decifrar_token(linha["encrypted_refresh_token"])
 
 
 async def remover_refresh_token(pool: Any, user_id: int) -> None:
