@@ -45,7 +45,7 @@ def test_get_llm_rapido_limita_o_raciocinio_interno(monkeypatch) -> None:
 # --- extrair_texto_resposta ---
 #
 # Regressão pro bug de verdade rodando o grafo completo em 2026-09-08: o
-# gemini-3.6-flash (usado por get_llm_especialista/get_llm_gemini) devolve
+# gemini-3.6-flash (elo das cadeias de get_llm_especialista) devolve
 # `content` como uma LISTA de blocos com "thought signature" em vez da
 # string simples que gemini-2.5-flash devolvia — `.strip()`/`json.loads()`
 # direto nisso quebrava com AttributeError/TypeError em orquestrador.py e

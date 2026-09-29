@@ -11,12 +11,9 @@ Rota = Literal["produto", "ingrediente", "rotina", "faq"]
 
 
 class EstadoVenus(TypedDict, total=False):
-    """Estado compartilhado entre todos os nós do `StateGraph` principal.
-
-    TODO: revisar/ajustar os campos conforme a implementação de cada nó
-    (`nodes/`) avançar — este é o desenho inicial baseado no fluxo descrito
-    nos prompts (roteador -> especialista -> agente juiz -> orquestrador).
-    """
+    """Estado compartilhado entre todos os nós do `StateGraph` principal
+    (guardrail -> memória -> roteador -> especialista -> juiz -> orquestrador
+    -> guardrail -> memória)."""
 
     # --- entrada ---
     # Identificador estável do usuário (distinto do thread_id de conversa) —

@@ -2,7 +2,7 @@
 pede favoritar/remover. Imprime rota, tools, veredito do juiz, resposta e tempo."""
 from __future__ import annotations
 
-import asyncio, os, sys, time, uuid
+import asyncio, sys, time, uuid
 
 import asyncpg
 from dotenv import load_dotenv

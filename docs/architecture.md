@@ -16,7 +16,7 @@ Visão geral dos módulos do SDK Venus (`src/venus_sdk/`):
 - **tools/** — tools Postgres (via `asyncpg`, schema `venus`) dos especialistas de produto/ingrediente — consulta estruturada a um catálogo já curado (ETL de ANVISA/CosIng/PubChem), **não é RAG**:
   - `produto.py` — `montar_tools_produto(pool)`: `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`. `search_product` foi adicionada em 2026-09-10 — sem ela, uma pergunta que só citava o NOME do produto não tinha como resolver o `product_id`, e o especialista chutava um id (achado ao vivo: alucinou ingredientes de um produto sem nenhum cadastrado).
   - `ingrediente.py` — `montar_tools_ingrediente(pool)`: `search_ingredient`, `get_ingredient_summary`, `get_ingredient_properties`, `get_ingredient_effects`, `get_ingredient_regulations`.
-  - `compartilhadas.py` — `montar_tools_compartilhadas(pool)`: `get_user_allergies` (usada por produto e ingrediente; rotina também vai usar quando for implementada).
+  - `compartilhadas.py` — `montar_tools_compartilhadas(pool)`: `get_user_allergies` (usada por produto, ingrediente e rotina).
   - Validadas manualmente em 2026-09-05 contra o Postgres de teste real, com dado de verdade (as 9 tools originais) — sem teste automatizado no CI, mesma razão do checkpointer/store Mongo. `search_product` (2026-09-10) não fez parte dessa validação manual.
   - `get_user_allergies`/`get_personalized_score` exigem um `user_id` inteiro do Postgres — DISTINTO do `usuario_id` string da memória de longo prazo (ver `state.py`). Esse valor chega aos especialistas via `EstadoVenus.usuario_id_postgres` -> `USER_ID_POSTGRES=` no protocolo de entrada (`nodes/especialistas.py::_montar_entrada`) — quem invoca o grafo (o app) precisa fornecê-lo; sem ele, o prompt (`IDENTIFICADOR_USUARIO_NOTA` em `prompts/comum.py`) instrui o especialista a NUNCA inventar um número e a admitir que a checagem de alergia/personalização não pôde ser feita.
 - **prompts/** — os prompts de cada agente (`router.py`, `produto.py`, `ingrediente.py`, `rotina.py`, `faq.py`, `orquestrador.py`, `memoria.py`), com a persona/contexto compartilhados em `comum.py`.
@@ -25,7 +25,7 @@ Visão geral dos módulos do SDK Venus (`src/venus_sdk/`):
 - **mcp/** — `servidor.py` (FastMCP; expõe as tools LangChain, `python -m venus_sdk.mcp.servidor`) e `tools.py` (client via `langchain-mcp-adapters`: `get_mcp_tools()` async, config por `MCP_SERVERS`/`mcp_servers.json`; servidor indisponível → `[]`, não derruba).
 - **a2a_server.py / a2a_client.py** — Venus como agente A2A (4 skills; `usuario_id`/`usuario_id_postgres` via `metadata`) e `montar_tool_a2a` (tool `consultar_agente_externo`, agentes em `A2A_AGENTES_EXTERNOS`).
 - **guardrail_rules.py** — regras puras de guardrail (`guardrail_entrada`, `guardrail_saida`, `anonimizar_entrada`), sem dependência do grafo/estado.
-- **llm/** — clients e wrappers de integração com provedores de LLM (Gemini, Groq).
+- **llm/** — cadeias de fallback entre provedores (Groq, Mistral, Gemini): `get_llm_rapido` (roteador/memória), `get_llm_especialista` (especialistas), `get_llm_juiz` (mesma cadeia dos especialistas) e `get_llm_orquestrador` (mesma cadeia, temperatura 0). Ordem configurável por `LLM_PROVIDER` e `LLM_CADEIA_*`.
 - **config/** — configurações e variáveis de ambiente do SDK.
 - **memory/** — as duas memórias do grafo principal, com a mesma dualidade RAM (dev/teste) / MongoDB (produção, requer extra `mongo` e `MONGODB_URI` no `.env`):
   - `checkpointer.py` — histórico de UMA conversa, por `thread_id`: `criar_checkpointer_em_memoria()` ou `criar_checkpointer_mongo()`.
@@ -39,19 +39,8 @@ observabilidade (custo, latência, taxa de erro, ROI). O roteador tem uma rede d
 segurança (`nodes/roteador.py::e_small_talk`) contra saudação roteada para
 especialista.
 
-Resiliência a falha de LLM (2026-09-10): rodando o grafo de verdade contra
-os LLMs reais, uma cota do Gemini estourada no meio de uma conversa chegou a
-subir como exceção crua até o `.ainvoke()` do grafo principal (produto/
-ingrediente/rotina/faq via `nodes/especialistas.py`, e o orquestrador/
-`nodes/orquestrador.py` — o roteador e a memória de longo prazo já eram
-resilientes a isso). Agora todo nó que chama um LLM (especialistas,
-orquestrador, Agente Juiz) captura qualquer exceção do provedor e degrada
-pra uma resposta genérica em vez de derrubar a conversa inteira — o
-Agente Juiz reprova essa resposta genérica normalmente, e depois de
-`MAX_TENTATIVAS_JUIZ` o orquestrador ainda comunica o problema com
-transparência (mesmo caminho já usado pro caso "esgotado"). Isso não
-depende de ter identificado a causa exata de o fallback
-`get_llm_gemini().with_fallbacks([get_llm_groq()])` não ter coberto aquela
-chamada específica (pode ter sido os dois provedores falhando ao mesmo
-tempo) — o objetivo aqui é só garantir que o grafo nunca quebra por causa
-de um provedor de LLM indisponível.
+Resiliência: todo nó que chama um LLM (roteador, especialistas, juiz,
+orquestrador, memória) captura qualquer exceção do provedor e degrada para
+uma resposta genérica em vez de derrubar a conversa — mesmo com todos os elos
+da cadeia de fallback fora do ar. Falhas do store de memória (Mongo fora do
+ar/lento) também só fazem o turno seguir sem memória.

@@ -29,12 +29,10 @@ jobs:
           cache: pip
 
       - name: Instalar dependencias
-        run: pip install . pytest
+        run: pip install ".[dev]"
 
       - name: Build e testes
-        # exit code 5 = "no tests collected"; tolerado enquanto a suíte de
-        # testes está sendo reconstruída durante a migração pro LangGraph.
-        run: pytest || [ "$?" = "5" ]
+        run: pytest
 
       - name: Log in to GHCR
         uses: docker/login-action@v3

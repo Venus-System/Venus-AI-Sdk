@@ -29,8 +29,8 @@
 - [ ] Não deixei `print()` de debug nem código comentado sem necessidade
 - [ ] Não commitei nenhuma chave, senha ou URL privada (segredos ficam só no `.env`, que está no `.gitignore`)
 - [ ] Todo código novo em `src/` tem type hints e docstring
-- [ ] Novos agentes herdam de `BaseAgent` (`src/venus/agents/`) e novos fluxos de `BaseFlow` (`src/venus/flows/`), implementando os métodos abstratos exigidos
-- [ ] Se usei uma variável de ambiente nova, ela foi adicionada em `config/settings.py` (incluindo em `OBRIGATORIAS`, se for obrigatória) e documentada
+- [ ] Novos agentes seguem o padrão de `src/venus_sdk/nodes/` (fábrica que monta o nó) e são registrados em `src/venus_sdk/flows/venus_flow.py`
+- [ ] Se usei uma variável de ambiente nova, ela foi adicionada em `config/settings.py` (e em `validar_config`, se for obrigatória) e documentada
 - [ ] Dependências novas foram adicionadas em `pyproject.toml`, não instaladas soltas na venv
 - [ ] Adicionei ou atualizei testes em `tests/` para a lógica nova
 
