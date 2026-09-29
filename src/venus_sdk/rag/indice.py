@@ -4,7 +4,8 @@ Embeddings são injetáveis: por padrão `EmbeddingsHash` (offline, determiníst
 sem chave de API — bag-of-words com hashing); com `GEMINI_API_KEY` dá para
 passar `GoogleGenerativeAIEmbeddings`. O índice é reconstruído a partir da
 pasta e cacheado em disco (`.npz`), invalidado quando os arquivos mudam.
-Alternativa remota (Qdrant) fica a cargo de quem injetar outro `IndiceRAG`."""
+Um índice remoto (ex.: banco vetorial) pode ser usado injetando outro objeto
+com o mesmo método `buscar(consulta, k)`."""
 
 from __future__ import annotations
 

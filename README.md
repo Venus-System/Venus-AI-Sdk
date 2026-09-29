@@ -26,7 +26,7 @@ guardrail entrada → carregar memória → roteador ─┬→ produto ───
 
 - **Sessões**: `thread_id` (checkpointer, histórico da conversa) + `usuario_id` (memória de longo prazo, `memory/store.py`).
 - **RAG**: `data/faq/*.md|txt|pdf` → índice local (`rag/`); a resposta cita as fontes em `fontes_usadas`.
-- **MCP**: `python -m venus_sdk.mcp.servidor` expõe as 19 tools; `mcp/tools.py` as consome (`get_mcp_tools`).
+- **MCP**: `python -m venus_sdk.mcp.servidor` expõe as 18 tools; `mcp/tools.py` as consome (`get_mcp_tools`).
 - **A2A**: `a2a_server.py` (Venus como agente A2A, skills produto/ingrediente/rotina/faq; identidade via `metadata`) e `a2a_client.py` (Venus consulta agente externo).
 - Detalhes em [`docs/architecture.md`](docs/architecture.md).
 

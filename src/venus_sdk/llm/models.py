@@ -28,8 +28,7 @@ from venus_sdk.config.settings import GEMINI_API_KEY, GROQ_API_KEY, MISTRAL_API_
 def extrair_texto_resposta(resposta: Any) -> str:
     """Normaliza `AIMessage.content` pra string simples.
 
-    `get_llm_gemini()`/`get_llm_especialista()` (gemini-3.6-flash, ver
-    abaixo) às vezes devolvem `content` como uma LISTA de blocos —
+    O gemini-3.6-flash (um dos elos das cadeias abaixo) às vezes devolve `content` como uma LISTA de blocos —
     `[{"type": "text", "text": "...", "extras": {"signature": "..."}}]`,
     a "thought signature" desse modelo — em vez da string simples que
     `gemini-2.5-flash` devolvia. Chamar `.strip()`/`json.loads()` direto
@@ -50,38 +49,6 @@ def extrair_texto_resposta(resposta: Any) -> str:
         ]
         return "".join(partes)
     return str(conteudo) if conteudo else ""
-
-
-@lru_cache(maxsize=1)
-def get_llm_gemini() -> BaseChatModel:
-    return ChatGoogleGenerativeAI(
-        # gemini-2.5-flash foi descontinuado pro Google pra contas novas
-        # (404 NOT_FOUND em produção, 2026-09-08) — substituído conforme a
-        # própria mensagem de erro da API.
-        #
-        # Sem temperature/top_p de propósito: gemini-3.6-flash usa sampling
-        # fixo e ignora os dois (UserWarning do langchain_google_genai a
-        # cada chamada se passados) — omitir não muda o comportamento, só
-        # tira o warning.
-        model="gemini-3.6-flash",
-        api_key=GEMINI_API_KEY,
-        # O padrão do client é max_retries=6 SEM timeout: numa cota estourada
-        # (429) ou rede lenta, uma única chamada ficava minutos "travada" em
-        # silêncio em vez de cair no fallback do Groq. Falha rápido.
-        max_retries=1,
-        timeout=30,
-    )
-
-
-@lru_cache(maxsize=1)
-def get_llm_groq() -> BaseChatModel:
-    return ChatGroq(
-        model="openai/gpt-oss-120b",
-        temperature=0.7,
-        api_key=GROQ_API_KEY,
-        request_timeout=45,
-        max_retries=2,
-    )
 
 
 def provedor_principal() -> str:
@@ -127,7 +94,10 @@ _MAX_TOKENS_RAPIDO_COM_RACIOCINIO = 1024
 
 
 def _criar_gemini(modelo: str) -> BaseChatModel:
-    # Sem temperature/top_p: gemini-3.x usa sampling fixo (ver get_llm_gemini).
+    # Sem temperature/top_p: gemini-3.x usa sampling fixo e ignora os dois
+    # (só geraria UserWarning a cada chamada). max_retries=1 + timeout curto:
+    # o padrão do client (6 retries, sem timeout) prendia a chamada por
+    # minutos numa cota estourada em vez de cair no próximo elo da cadeia.
     return ChatGoogleGenerativeAI(model=modelo, api_key=GEMINI_API_KEY, max_retries=1, timeout=_TIMEOUT_GEMINI)
 
 
