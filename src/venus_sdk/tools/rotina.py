@@ -178,14 +178,6 @@ _SQL_LISTAS_DO_USUARIO = """
 """
 
 
-_SQL_ADICIONAR_FAVORITO = """
-    INSERT INTO venus.favorites (fk_user_id, fk_product_id)
-    SELECT $1, p.product_id FROM venus.products p WHERE p.product_id = $2
-    ON CONFLICT (fk_user_id, fk_product_id) DO NOTHING
-"""
-
-_SQL_PRODUTO_EXISTE = "SELECT 1 AS ok FROM venus.products WHERE product_id = $1"
-
 _SQL_REMOVER_FAVORITO = "DELETE FROM venus.favorites WHERE fk_user_id = $1 AND fk_product_id = $2"
 
 _SQL_ALERGIAS_PARA_ROTINA = """SELECT lower(a.allergy_name) AS nome FROM venus.user_allergies ua
@@ -228,18 +220,6 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
                                vazio="o usuário não tem listas")
 
     @tool
-    async def add_favorite(user_id: int, product_id: int) -> dict:
-        """Adiciona um produto aos favoritos do usuário (idempotente)."""
-        existe = await consultar(pool, "add_favorite", _SQL_PRODUTO_EXISTE,
-                                 product_id, uma_linha=True, vazio="produto não encontrado")
-        if existe.get("encontrado") is False or "erro" in existe:
-            return existe
-        resultado = await executar(pool, "add_favorite", _SQL_ADICIONAR_FAVORITO, user_id, product_id)
-        if isinstance(resultado, dict):
-            return resultado
-        return {"ok": True, "mensagem": "produto adicionado aos favoritos"}
-
-    @tool
     async def remove_favorite(user_id: int, product_id: int) -> dict:
         """Remove um produto dos favoritos do usuário."""
         resultado = await executar(pool, "remove_favorite", _SQL_REMOVER_FAVORITO, user_id, product_id)
@@ -273,5 +253,6 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
                 termos += _termos_da_alergia(linha["nome"])
         return _montar_rotina(favoritos, termos, horario)
 
-    return [get_user_profile, get_user_favorites, get_user_lists, add_favorite,
-            remove_favorite, suggest_routine]
+    # Não existe tool para ADICIONAR favorito de propósito: salvar produto nos
+    # favoritos é decisão do usuário, feita por ele no app — a IA nunca faz.
+    return [get_user_profile, get_user_favorites, get_user_lists, remove_favorite, suggest_routine]

@@ -36,13 +36,19 @@ from venus_sdk.tools._util import (
 
 # Casa QUALQUER palavra com nome, marca, categoria ou descrição e ordena por
 # quantas palavras bateram — "produto bom pra cabelo cacheado" acha
-# shampoo/condicionador mesmo sem o nome exato.
+# shampoo/condicionador mesmo sem o nome exato. `tem_score` só é verdadeiro
+# com alguma nota acima de zero: linha toda zerada é "score não calculado"
+# (mesma regra de `get_product_score`) — antes a busca dizia `tem_score: true`
+# e o score dizia "não calculado", e o Juiz reprovava a resposta correta.
 _SQL_BUSCAR_PRODUTO = f"""
     SELECT p.product_id, p.name, b.name AS brand_name, pc.name AS category_name,
            count(DISTINCT tok) AS relevancia,
            EXISTS (SELECT 1 FROM venus.product_versions pv
                    JOIN venus.product_scores ps ON ps.fk_product_version_id = pv.product_version_id
-                   WHERE pv.fk_product_id = p.product_id AND pv.is_current) AS tem_score,
+                   WHERE pv.fk_product_id = p.product_id AND pv.is_current
+                     AND GREATEST(ps.overall_score, ps.health_score, ps.environmental_score, ps.ethical_score,
+                                  ps.performance_score, ps.transparency_score, ps.confidence_score) > 0
+                  ) AS tem_score,
            EXISTS (SELECT 1 FROM venus.product_versions pv
                    JOIN venus.product_ingredients pi ON pi.fk_product_version_id = pv.product_version_id
                    WHERE pv.fk_product_id = p.product_id AND pv.is_current) AS tem_ingredientes

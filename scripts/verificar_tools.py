@@ -76,8 +76,9 @@ async def main() -> int:
     await checar("get_user_profile", t["get_user_profile"].ainvoke({"user_id": 1}), ok_dict)
     await checar("get_user_favorites", t["get_user_favorites"].ainvoke({"user_id": 1}), ok_lista)
     await checar("get_user_lists", t["get_user_lists"].ainvoke({"user_id": 1}), ok_lista)
-    await checar("add_favorite", t["add_favorite"].ainvoke({"user_id": 2, "product_id": 6}), lambda r: r.get("ok"))
-    await checar("remove_favorite", t["remove_favorite"].ainvoke({"user_id": 2, "product_id": 6}), lambda r: r.get("ok"))
+    await checar("remove_favorite (produto que não é favorito)",
+                 t["remove_favorite"].ainvoke({"user_id": 2, "product_id": 999999}),
+                 lambda r: r.get("encontrado") is False)
     await checar("suggest_routine (exclui produtos com alergia)", t["suggest_routine"].ainvoke({"user_id": 1, "horario": "manha"}),
                  lambda r: {e["product_id"] for e in r["excluidos_por_alergia"]} == {1, 4})
     print("== FAQ / RAG ==")

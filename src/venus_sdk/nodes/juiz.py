@@ -7,7 +7,7 @@ import logging
 import re
 from typing import Literal
 
-from venus_sdk.llm.models import get_llm_rapido
+from venus_sdk.llm.models import get_llm_juiz
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 
@@ -100,12 +100,16 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         return _veredito(False, None, MAX_TENTATIVAS_JUIZ)
 
     proxima_tentativa = estado.get("tentativas_juiz", 0) + 1
+    if especialista.get("intencao") == "nao_suportado":
+        # Recusa fixa escrita no código (ex.: a IA não salva favoritos) — não
+        # há dado para auditar.
+        return _veredito(True, None, proxima_tentativa)
     if _resposta_honesta_sem_dado(estado):
         return _veredito(True, None, proxima_tentativa)
 
     mensagens = [("system", JUIZ_PROMPT_COMPLETO), ("human", _montar_entrada_juiz(estado))]
     try:
-        resposta = get_llm_rapido().invoke(mensagens)
+        resposta = get_llm_juiz().invoke(mensagens)
     except Exception:
         # LLM do Juiz indisponível — não deixa isso subir cru até o
         # `.ainvoke()` do grafo principal. Trata como reprovação silenciosa

@@ -19,7 +19,7 @@ guardrail entrada → carregar memória → roteador ─┬→ produto ───
 | Roteador | — (LLM rápido + rede de segurança contra small talk mal roteado) |
 | Produto | `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`, `get_user_allergies` (Postgres) |
 | Ingrediente | `search_ingredient`, `get_ingredient_summary/properties/effects/regulations`, `get_user_allergies` (Postgres) |
-| Rotina | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `add_favorite`, `remove_favorite`, `suggest_routine`, `get_user_allergies` (Postgres) |
+| Rotina | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `remove_favorite`, `suggest_routine`, `get_user_allergies` (Postgres) |
 | FAQ (RAG) | `faq_retriever` (docs locais), `buscar_na_web` (Tavily/DuckDuckGo), tools MCP e A2A opcionais |
 | Juiz | — confere resposta × retorno bruto das tools (`evidencias_tools`) |
 | Orquestrador / Memória | — |
