@@ -16,7 +16,10 @@ Requisitos:
       DuckDuckGo.
     - Opcionais: `VENUS_USE_MCP=1` (FAQ passa a também usar as tools do
       servidor MCP do Venus, em subprocesso), `A2A_AGENTES_EXTERNOS`
-      (agente externo via A2A), `MONGODB_URI` (checkpointer persistente;
+      (agente externo via A2A), `VENUS_USE_GOOGLE_CALENDAR=1` (Rotina ganha
+      `check_availability` — exige GOOGLE_CLIENT_ID/SECRET/ENCRYPTION_KEY no
+      `.env` e um refresh_token salvo via `scripts/conectar_google_calendar.py`
+      para o `VENUS_USER_ID` usado), `MONGODB_URI` (checkpointer persistente;
       sem ele usa memória em RAM), `VENUS_USER_ID` (user_id do Postgres —
       1 ou 2 no seed) e `VENUS_USUARIO` (chave da memória de longo prazo).
 
@@ -56,6 +59,7 @@ from venus_sdk.memory import (
     criar_store_em_memoria,
 )
 from venus_sdk.rag import criar_indice_local
+from venus_sdk.tools.calendario import montar_tools_calendario
 
 # thread_id fixo (em vez de um uuid novo a cada execução): assim dá pra
 # fechar o script e rodar de novo que a conversa continua de onde parou —
@@ -226,8 +230,14 @@ async def main() -> None:
     if os.getenv("VENUS_USE_MCP") == "1":
         extras += await get_mcp_tools(apenas={"buscar_na_web"})
 
+    # Rotina: tool extra opcional (Google Calendar), no mesmo espírito do FAQ acima.
+    extras_rotina = []
+    if pool is not None and os.getenv("VENUS_USE_GOOGLE_CALENDAR") == "1":
+        extras_rotina = montar_tools_calendario(pool)
+
     grafo = compilar_grafo_venus(
-        checkpointer=checkpointer, store=store, pool=pool, indice_rag=indice, tools_faq_extras=extras
+        checkpointer=checkpointer, store=store, pool=pool, indice_rag=indice, tools_faq_extras=extras,
+        tools_rotina_extras=extras_rotina
     )
     config = {"configurable": {"thread_id": THREAD_ID_LOCAL}, "callbacks": [_Rastreio()] if DEBUG else []}
     identidade = {"usuario_id": os.getenv("VENUS_USUARIO", "usuario-demo")}
