@@ -26,7 +26,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio"]
+# pymongo: os testes do MongoDBStore (tests/test_store_mongo.py) usam as exceções dele.
+dev = ["pytest", "pytest-asyncio", "pymongo"]
 pdf = ["pypdf"]
 mongo = ["langgraph-checkpoint-mongodb", "pymongo"]
 a2a = ["a2a-sdk[http-server]", "uvicorn"]
