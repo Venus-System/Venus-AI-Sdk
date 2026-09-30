@@ -9,7 +9,7 @@ from typing import Any
 from langchain_core.tools import BaseTool, tool
 
 from venus_sdk.texto import remover_acentos
-from venus_sdk.tools._util import consultar, executar, exigir_pool, nao_encontrado
+from venus_sdk.tools._util import consultar, exigir_pool
 
 # Ordem de boas práticas por PALAVRA-CHAVE na categoria (limpeza antes de
 # tratamento, hidratante antes de protetor solar). O catálogo real tem ~120
@@ -178,8 +178,6 @@ _SQL_LISTAS_DO_USUARIO = """
 """
 
 
-_SQL_REMOVER_FAVORITO = "DELETE FROM venus.favorites WHERE fk_user_id = $1 AND fk_product_id = $2"
-
 _SQL_ALERGIAS_PARA_ROTINA = """SELECT lower(a.allergy_name) AS nome FROM venus.user_allergies ua
                JOIN venus.allergies a ON a.allergy_id = ua.fk_allergy_id
                WHERE ua.fk_user_id = $1"""
@@ -220,19 +218,6 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
                                vazio="o usuário não tem listas")
 
     @tool
-    async def remove_favorite(user_id: int, product_id: int) -> dict:
-        """Remove um produto dos favoritos do usuário."""
-        resultado = await executar(pool, "remove_favorite", _SQL_REMOVER_FAVORITO, user_id, product_id)
-        if isinstance(resultado, dict):
-            return resultado
-        # Status do asyncpg: "DELETE <n>".
-        partes_do_status = str(resultado).split()
-        removidos = int(partes_do_status[-1]) if partes_do_status else 0
-        if removidos == 0:
-            return nao_encontrado("esse produto não estava nos favoritos do usuário")
-        return {"ok": True, "mensagem": "produto removido dos favoritos"}
-
-    @tool
     async def suggest_routine(user_id: int, horario: str = "ambos") -> dict:
         """Monta uma rotina (`horario`: 'manha', 'noite' ou 'ambos') usando
         APENAS os favoritos do usuário, ordenados por boas práticas por
@@ -253,6 +238,6 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
                 termos += _termos_da_alergia(linha["nome"])
         return _montar_rotina(favoritos, termos, horario)
 
-    # Não existe tool para ADICIONAR favorito de propósito: salvar produto nos
-    # favoritos é decisão do usuário, feita por ele no app — a IA nunca faz.
-    return [get_user_profile, get_user_favorites, get_user_lists, remove_favorite, suggest_routine]
+    # Todas só leem. Não existe tool para adicionar nem remover favorito de
+    # propósito: mexer nos favoritos é decisão do usuário, feita por ele no app.
+    return [get_user_profile, get_user_favorites, get_user_lists, suggest_routine]

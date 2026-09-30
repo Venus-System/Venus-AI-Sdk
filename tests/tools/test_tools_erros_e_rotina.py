@@ -49,7 +49,6 @@ def test_resultado_vazio_e_estruturado_nunca_lista_vazia(fab, nome, args) -> Non
     (montar_tools_ingrediente, "get_ingredient_summary", {"ingredient_id": 1}),
     (montar_tools_compartilhadas, "get_user_allergies", {"user_id": 1}),
     (montar_tools_rotina, "get_user_profile", {"user_id": 1}),
-    (montar_tools_rotina, "remove_favorite", {"user_id": 1, "product_id": 1}),
     (montar_tools_rotina, "suggest_routine", {"user_id": 1}),
 ])
 def test_excecao_do_driver_vira_erro_estruturado(fab, nome, args) -> None:
@@ -105,16 +104,9 @@ def test_rotina_tools_sem_pool_levanta() -> None:
         montar_tools_rotina(None)
 
 
-def test_rotina_tem_as_5_tools_e_nenhuma_adiciona_favorito() -> None:
+def test_rotina_tem_as_4_tools_e_nenhuma_altera_favoritos() -> None:
     assert set(tools(montar_tools_rotina, ConexaoFalsa())) == {
-        "get_user_profile", "get_user_favorites", "get_user_lists", "remove_favorite", "suggest_routine"}
-
-
-def test_remove_favorite_reporta_quando_nao_havia() -> None:
-    t = tools(montar_tools_rotina, ConexaoFalsa(execute="DELETE 0"))["remove_favorite"]
-    assert run(t.ainvoke({"user_id": 1, "product_id": 9}))["encontrado"] is False
-    t = tools(montar_tools_rotina, ConexaoFalsa(execute="DELETE 1"))["remove_favorite"]
-    assert run(t.ainvoke({"user_id": 1, "product_id": 9}))["ok"] is True
+        "get_user_profile", "get_user_favorites", "get_user_lists", "suggest_routine"}
 
 
 def _conexao_rotina(alergias):

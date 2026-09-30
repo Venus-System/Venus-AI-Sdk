@@ -72,9 +72,9 @@ Você audita FIDELIDADE aos dados, não o mérito das escolhas das tools. Na
 rotina, os passos vêm de `suggest_routine`, que aplica as regras do Venus
 (ordem por categoria, exclusão por alergia): não reprove porque achou um
 produto ou uma ordem inadequados — só se a resposta mudar, inventar ou omitir
-passos em relação ao retorno da tool. Em ações (adicionar/remover favorito),
-reprove se a resposta disser que a ação foi feita sem a tool correspondente
-ter devolvido `"ok": true`.
+passos em relação ao retorno da tool. Reprove se a resposta disser que
+adicionou ou removeu algo dos favoritos: a IA nunca altera os dados do
+usuário.
 
 No FAQ/RAG, RESULTADOS_TOOLS traz os trechos recuperados (com `fonte`/`url`): reprove se a
 resposta afirma algo que nenhum trecho sustenta, ou se `fontes_usadas` cita

@@ -94,29 +94,22 @@ def _tools_entregues_ao_agente_de_rotina(pergunta: str) -> list[str]:
     return recebidas["tools"]
 
 
-def test_agente_de_rotina_sem_pedido_de_alteracao_nao_recebe_tools_de_escrita() -> None:
+def test_agente_de_rotina_so_recebe_tools_de_leitura() -> None:
     tools = _tools_entregues_ao_agente_de_rotina("Monta uma rotina de skincare de manhã pra mim.")
     assert "suggest_routine" in tools
-    assert "remove_favorite" not in tools
-
-
-def test_agente_de_rotina_recebe_tools_de_escrita_quando_o_usuario_pede() -> None:
-    tools = _tools_entregues_ao_agente_de_rotina("Remove o produto X dos meus favoritos.")
-    assert "remove_favorite" in tools
-
-
-def test_nem_o_conjunto_completo_de_tools_da_rotina_adiciona_favorito() -> None:
-    tools = _tools_entregues_ao_agente_de_rotina("Remove o produto X dos meus favoritos.")
-    assert not any("add" in nome for nome in tools)
+    assert not any(nome.startswith(("add_", "remove_", "delete_", "update_")) for nome in tools)
     assert "search_product" not in tools
 
 
 @pytest.mark.parametrize(("pergunta", "esperado"), [
     ("tira esse produto dos favoritos", True),
     ("Remove o produto X dos meus favoritos.", True),
+    ("desfavorita o sérum", True),
+    ("apaga o shampoo X da lista de favoritos", True),
     ("Adiciona o CeraVe aos meus favoritos", False),
     ("Quais são os meus produtos favoritos?", False),
     ("Monta uma rotina com meus favoritos", False),
+    ("Monta uma rotina com meus favoritos excluindo os que têm perfume", False),
     ("Remove o retinol da minha rotina", False),
 ])
 def test_pede_remocao_de_favorito(pergunta: str, esperado: bool) -> None:
@@ -134,19 +127,22 @@ def test_pede_para_adicionar_favorito(pergunta: str, esperado: bool) -> None:
     assert especialistas.pede_para_adicionar_favorito(pergunta) is esperado
 
 
-def test_pedido_para_adicionar_favorito_e_recusado_sem_llm_e_chega_intacto_ao_usuario() -> None:
+@pytest.mark.parametrize("pergunta", [
+    "Adiciona o CeraVe Loção Noite aos meus favoritos.",
+    "Remove o CeraVe Loção Noite dos meus favoritos.",
+])
+def test_pedido_para_alterar_favorito_e_recusado_sem_llm_e_chega_intacto_ao_usuario(pergunta: str) -> None:
     from venus_sdk.nodes.juiz import no_agente_juiz
 
     with patch.object(especialistas, "montar_agente_mcp", side_effect=AssertionError("sem agente")):
-        saida = asyncio.run(especialistas.montar_no_agente_rotina(object())(
-            {"pergunta_original": "Adiciona o CeraVe Loção Noite aos meus favoritos."}))
+        saida = asyncio.run(especialistas.montar_no_agente_rotina(object())({"pergunta_original": pergunta}))
     estado = {"rota": "rotina", **saida}
     with patch("venus_sdk.nodes.juiz.get_llm_juiz", side_effect=AssertionError("sem LLM")):
         estado.update(no_agente_juiz(estado))
     assert estado["aprovado_juiz"] is True
     with patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador", side_effect=AssertionError("sem LLM")):
         final = no_orquestrador(estado)["resposta_final"]
-    assert final.startswith("Eu não salvo produtos nos seus favoritos")
+    assert final.startswith("Eu não mexo nos seus favoritos")
 
 
 # --- resposta segura do orquestrador ---
@@ -231,22 +227,6 @@ def test_resposta_segura_de_favoritos_e_listas() -> None:
     ])
     assert "Seus produtos favoritos: Creme X, Loção Y." in texto
     assert '"Testar": Creme X, Loção Y.' in texto
-
-
-def test_resposta_segura_nunca_diz_que_removeu_sem_ok_da_tool() -> None:
-    texto = _resposta_segura("rotina", [
-        ("get_user_favorites", [{"product_id": 1, "name": "Loção Noite"}]),
-        ("remove_favorite", {"erro": "falha ao consultar o banco na tool remove_favorite", "detalhe": "InsufficientPrivilegeError"}),
-    ])
-    assert "Não consegui remover" in texto
-    assert "removi" not in texto
-
-
-def test_resposta_segura_de_remocao_de_produto_que_nao_era_favorito() -> None:
-    texto = _resposta_segura("rotina", [
-        ("remove_favorite", {"encontrado": False, "mensagem": "esse produto não estava nos favoritos do usuário"}),
-    ])
-    assert "não estava nos favoritos" in texto
 
 
 def test_resposta_segura_do_perfil() -> None:
