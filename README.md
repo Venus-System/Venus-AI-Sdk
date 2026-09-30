@@ -19,7 +19,7 @@ guardrail entrada → carregar memória → roteador ─┬→ produto ───
 | Roteador | — (LLM rápido + rede de segurança contra small talk mal roteado) |
 | Produto | `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`, `get_user_allergies` (Postgres) |
 | Ingrediente | `search_ingredient`, `get_ingredient_summary/properties/effects/regulations`, `get_user_allergies` (Postgres) |
-| Rotina | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `remove_favorite`, `suggest_routine`, `get_user_allergies` (Postgres) |
+| Rotina | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `remove_favorite`, `suggest_routine`, `get_user_allergies` (Postgres); `check_availability` (Google Calendar, opcional) |
 | FAQ (RAG) | `faq_retriever` (FAQ no Qdrant ou índice local), `buscar_na_web` (Tavily/DuckDuckGo), tools MCP e A2A opcionais |
 | Juiz | — confere resposta × retorno bruto das tools (`evidencias_tools`) |
 | Orquestrador / Memória | — |
@@ -28,6 +28,7 @@ guardrail entrada → carregar memória → roteador ─┬→ produto ───
 - **RAG**: `data/faq/*.md` → Qdrant (`python -m venus_sdk.rag.faq_ingest`, extra `rag`) quando há `QDRANT_URL`; sem ela, índice local em memória (`rag/indice.py`). A resposta cita as fontes em `fontes_usadas`.
 - **MCP**: `python -m venus_sdk.mcp.servidor` expõe as 18 tools; `mcp/tools.py` as consome (`get_mcp_tools`).
 - **A2A**: `a2a_server.py` (Venus como agente A2A, skills produto/ingrediente/rotina/faq; identidade via `metadata`) e `a2a_client.py` (Venus consulta agente externo).
+- **Google Calendar** (opcional, extra `google_calendar`): o agente de rotina consulta se o usuário tem compromisso num horário antes de sugerir a rotina (`check_availability`, só leitura — nunca cria evento). O login no Google é feito pelo backend do app; o SDK só guarda o `refresh_token` cifrado em `venus.google_oauth_tokens` e o usa (`integrations/google_calendar.py`). Para testar localmente: `python scripts/conectar_google_calendar.py --user-id 1` e `VENUS_USE_GOOGLE_CALENDAR=1`.
 - Detalhes em [`docs/architecture.md`](docs/architecture.md).
 
 ## Como rodar

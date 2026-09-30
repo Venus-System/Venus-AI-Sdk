@@ -50,7 +50,11 @@ from venus_sdk.state import EstadoVenus
 
 
 def montar_grafo_venus(
-    *, pool: Any | None = None, indice_rag: Any | None = None, tools_faq_extras: list[Any] | None = None
+    *,
+    pool: Any | None = None,
+    indice_rag: Any | None = None,
+    tools_faq_extras: list[Any] | None = None,
+    tools_rotina_extras: list[Any] | None = None,
 ) -> StateGraph:
     """Fábrica do grafo principal do Venus (não compilado — use
     `compilar_grafo_venus()` para obter um grafo executável).
@@ -62,7 +66,9 @@ def montar_grafo_venus(
     roteamento funciona), mas levantam `ValueError` se forem de fato
     invocados — só nesse momento, nunca aqui na montagem. O mesmo vale para
     `indice_rag` (`rag.criar_indice_faq`) no FAQ; `tools_faq_extras` são
-    tools MCP/A2A já carregadas, entregues ao agente FAQ.
+    tools MCP/A2A já carregadas, entregues ao agente FAQ. `tools_rotina_extras`
+    é o mesmo conceito para o agente de Rotina — hoje, `check_availability`
+    (`tools/calendario.py`), quando o Google Calendar está configurado.
     """
     grafo = StateGraph(EstadoVenus)
 
@@ -71,7 +77,7 @@ def montar_grafo_venus(
     grafo.add_node("roteador", no_roteador)
     grafo.add_node("agente_produto", montar_no_agente_produto(pool))
     grafo.add_node("agente_ingrediente", montar_no_agente_ingrediente(pool))
-    grafo.add_node("agente_rotina", montar_no_agente_rotina(pool))
+    grafo.add_node("agente_rotina", montar_no_agente_rotina(pool, tools_rotina_extras))
     grafo.add_node("agente_faq", montar_no_agente_faq(indice_rag, tools_faq_extras))
     grafo.add_node("agente_juiz", no_agente_juiz)
     grafo.add_node("orquestrador", no_orquestrador)
@@ -137,6 +143,7 @@ def compilar_grafo_venus(
     pool: Any | None = None,
     indice_rag: Any | None = None,
     tools_faq_extras: list[Any] | None = None,
+    tools_rotina_extras: list[Any] | None = None,
 ) -> Any:
     """Compila o grafo principal do Venus.
 
@@ -170,7 +177,14 @@ def compilar_grafo_venus(
 
     `indice_rag` (opcional) é o índice do FAQ (`rag.criar_indice_faq`);
     `tools_faq_extras` são tools MCP/A2A extras para o agente FAQ.
+    `tools_rotina_extras` são tools extras (somente leitura) para o agente de
+    Rotina — hoje, `check_availability`
+    (`tools/calendario.py::montar_tools_calendario`), quando o Google Calendar
+    está configurado (ver `integrations/google_calendar.py`).
     """
     return montar_grafo_venus(
-        pool=pool, indice_rag=indice_rag, tools_faq_extras=tools_faq_extras
+        pool=pool,
+        indice_rag=indice_rag,
+        tools_faq_extras=tools_faq_extras,
+        tools_rotina_extras=tools_rotina_extras,
     ).compile(checkpointer=checkpointer, store=store)

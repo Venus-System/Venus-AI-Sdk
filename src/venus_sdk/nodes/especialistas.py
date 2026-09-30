@@ -331,7 +331,7 @@ def montar_no_agente_ingrediente(pool: Any) -> NoEspecialista:
     )
 
 
-def montar_no_agente_rotina(pool: Any) -> NoEspecialista:
+def montar_no_agente_rotina(pool: Any, tools_extras: list[Any] | None = None) -> NoEspecialista:
     """Idem `montar_no_agente_produto`, para o agente de Rotina (ver
     `tools/rotina.py`) — perfil/favoritos/listas do usuário no Postgres.
     A IA não adiciona favoritos (não existe tool para isso).
@@ -340,12 +340,17 @@ def montar_no_agente_rotina(pool: Any) -> NoEspecialista:
     quando a pergunta do usuário pede isso explicitamente. No teste de 2026-09-26, ao montar uma rotina, o agente
     chamou `remove_favorite` para "corrigir" a rotina depois de uma
     reprovação do Juiz — só a própria pergunta autoriza escrita, nunca o
-    feedback do Juiz nem a interpretação do LLM."""
+    feedback do Juiz nem a interpretação do LLM.
+
+    `tools_extras` recebe tools de SOMENTE LEITURA já montadas por quem
+    monta o grafo — hoje, `check_availability`
+    (`tools/calendario.py::montar_tools_calendario`), quando o Google
+    Calendar está configurado. Sem nada aqui, o agente funciona como antes."""
     somente_leitura = _montar_no_especialista(
-        "rotina", ROTINA_PROMPT_COMPLETO, lambda: _tools_rotina(pool, com_escrita=False)
+        "rotina", ROTINA_PROMPT_COMPLETO, lambda: _tools_rotina(pool, com_escrita=False, extras=tools_extras)
     )
     com_escrita = _montar_no_especialista(
-        "rotina", ROTINA_PROMPT_COMPLETO, lambda: _tools_rotina(pool, com_escrita=True)
+        "rotina", ROTINA_PROMPT_COMPLETO, lambda: _tools_rotina(pool, com_escrita=True, extras=tools_extras)
     )
 
     async def no_agente_rotina(estado: EstadoVenus) -> EstadoVenus:
@@ -375,8 +380,8 @@ def pede_remocao_de_favorito(pergunta: str) -> bool:
     return bool(_FAVORITO_RE.search(texto) and _VERBO_DE_REMOCAO_RE.search(texto))
 
 
-def _tools_rotina(pool: Any, *, com_escrita: bool) -> list[Any]:
-    tools = montar_tools_rotina(pool) + montar_tools_compartilhadas(pool)
+def _tools_rotina(pool: Any, *, com_escrita: bool, extras: list[Any] | None = None) -> list[Any]:
+    tools = montar_tools_rotina(pool) + montar_tools_compartilhadas(pool) + list(extras or [])
     if com_escrita:
         return tools
     return [tool for tool in tools if tool.name not in _TOOLS_DE_ESCRITA]
