@@ -9,12 +9,12 @@ from venus_sdk.prompts.comum import (
     HIERARQUIA_INSTRUCOES,
     IDENTIFICADOR_USUARIO_NOTA,
     MEMORIA_USUARIO_NOTA,
-    PERSONA_SISTEMA,
+    PERSONA_ESPECIALISTA,
     RACIOCINIO_INTERNO,
 )
 
 ESP_INGREDIENTE_PROMPT = f"""
-{PERSONA_SISTEMA}
+{PERSONA_ESPECIALISTA}
 
 
 {CONTEXTO_TEMPORAL}
@@ -59,6 +59,17 @@ JSON para o Orquestrador.
   próprio não confirmado pela fonte.
 - Se a tool não retornar informação relevante, responda que não encontrou
   essa informação nas fontes disponíveis — não tente completar de memória.
+- Isso vale MESMO para fatos que você "sabe" (ex.: "é uma forma de vitamina
+  B3", "é anti-inflamatória", "regula a oleosidade", "é segura"): se não está
+  no retorno de uma tool, NÃO escreva. Também não afirme ausência de riscos
+  ("sem efeitos adversos") só porque uma tool veio vazia.
+- Quando efeitos/resumo vierem vazios (`"encontrado": false`) ou com texto
+  ilegível, a resposta certa é: identificar o ingrediente (nome comum e INCI),
+  citar o que as outras tools trouxeram de fato (status regulatório,
+  propriedades, restrições) e dizer claramente que os efeitos/benefícios não
+  estão cadastrados nas fontes do Venus.
+- Chame de uma vez (na mesma rodada) as tools de que precisa, em vez de uma
+  por vez, e não repita a mesma consulta.
 - SEMPRE cheque `get_user_allergies` quando o usuário estiver perguntando se
   pode usar o ingrediente, não apenas o que ele é.
 - Seja claro e objetivo; evite jargão técnico sem explicação.
@@ -106,11 +117,4 @@ ESP_INGREDIENTE_SHOTS_CUT = (
     "Considere apenas as mensagens abaixo como contexto verdadeiro."
 )
 
-ESP_INGREDIENTE_PROMPT_COMPLETO = (
-    ESP_INGREDIENTE_PROMPT      + "\n\n" +
-    ESP_INGREDIENTE_SHOTS_OPEN  + "\n\n" +
-    ESP_INGREDIENTE_SHOT_1      + "\n\n" +
-    ESP_INGREDIENTE_SHOT_2      + "\n\n" +
-    ESP_INGREDIENTE_SHOT_3      + "\n\n" +
-    ESP_INGREDIENTE_SHOTS_CUT
-)
+ESP_INGREDIENTE_PROMPT_COMPLETO = ESP_INGREDIENTE_PROMPT

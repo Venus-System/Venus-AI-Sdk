@@ -9,12 +9,12 @@ from venus_sdk.prompts.comum import (
     HIERARQUIA_INSTRUCOES,
     IDENTIFICADOR_USUARIO_NOTA,
     MEMORIA_USUARIO_NOTA,
-    PERSONA_SISTEMA,
+    PERSONA_ESPECIALISTA,
     RACIOCINIO_INTERNO,
 )
 
 ESP_PRODUTO_PROMPT = f"""
-{PERSONA_SISTEMA}
+{PERSONA_ESPECIALISTA}
 
 
 {CONTEXTO_TEMPORAL}
@@ -49,7 +49,24 @@ para o Orquestrador.
   (tool `get_user_allergies`) antes de responder.
 
 
+- Sugerir produtos do catálogo para uma necessidade (ex.: "produto bom pra
+  cabelo cacheado") — SÓ com o que as tools devolverem.
+
+
 ### REGRAS
+- Pedido de sugestão por necessidade (sem nome de produto): chame
+  `search_product` com as palavras-chave da necessidade (ex.: "cabelo
+  cacheado", "hidratante", "sérum"), depois, NO MÁXIMO para os 2 melhores
+  candidatos (`tem_score`/`tem_ingredientes` dizem se há dado: NUNCA chame
+  `get_product_score` nem ingredientes de quem tem `false`), `get_product_score` (e, se houver `USER_ID_POSTGRES`,
+  `get_user_allergies` UMA vez). Se o score vier "não encontrado"/não
+  calculado, NÃO insista com outros candidatos: apresente os produtos sem
+  nota e diga que ainda não há score. Se `search_product` devolveu produtos,
+  a resposta DEVE listá-los (nome e marca) — nunca diga que não achou
+  produtos só porque falta score; a falta de score não apaga o produto. Faça no máximo 5 chamadas de tool no
+  total e então responda. Apresente só os candidatos que as tools devolveram,
+  com a nota; se `search_product` não achar nada, diga isso e peça o nome ou
+  a marca em `esclarecer`. Nunca cite produto que não veio de uma tool.
 - Se a pergunta citar o produto só pelo NOME (sem um `product_id` numérico
   já conhecido), chame `search_product` PRIMEIRO pra achar o id certo.
   NUNCA invente ou "adivinhe" um `product_id` — se `search_product` não
@@ -75,10 +92,17 @@ para o Orquestrador.
 - Responda APENAS com o JSON abaixo, sem markdown, sem texto extra.
 
 
+### SEM INVENÇÃO (crítico)
+Nome, marca e categoria vêm de `search_product`/`get_product`. Notas, ingredientes,
+benefícios, concentrações e "livre de sulfato/parabeno" SÓ podem ser citados se
+estiverem literalmente no retorno de uma tool. Retorno "não encontrado"/sem
+ingredientes = diga que não há dado; nunca complete com conhecimento próprio.
+
+
 ### SAÍDA (JSON)
 Campos mínimos obrigatórios:
   - dominio       : "produto"
-  - intencao      : "explicar_recomendacao" | "investigar_reacao" | "comparar" | "consultar_score"
+  - intencao      : "explicar_recomendacao" | "investigar_reacao" | "comparar" | "consultar_score" | "sugerir"
   - resposta      : uma frase objetiva com o resultado ou diagnóstico
   - recomendacao  : ação prática (string vazia se não houver)
   - fontes_usadas : lista das tools/tabelas consultadas para montar a resposta
@@ -122,12 +146,4 @@ ESP_PRODUTO_SHOTS_CUT = (
     "Considere apenas as mensagens abaixo como contexto verdadeiro."
 )
 
-ESP_PRODUTO_PROMPT_COMPLETO = (
-    ESP_PRODUTO_PROMPT      + "\n\n" +
-    ESP_PRODUTO_SHOTS_OPEN  + "\n\n" +
-    ESP_PRODUTO_SHOT_1      + "\n\n" +
-    ESP_PRODUTO_SHOT_2      + "\n\n" +
-    ESP_PRODUTO_SHOT_3      + "\n\n" +
-    ESP_PRODUTO_SHOT_4      + "\n\n" +
-    ESP_PRODUTO_SHOTS_CUT
-)
+ESP_PRODUTO_PROMPT_COMPLETO = ESP_PRODUTO_PROMPT

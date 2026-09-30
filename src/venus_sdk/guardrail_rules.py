@@ -21,12 +21,13 @@ import unicodedata
 TAMANHO_MAXIMO_MENSAGEM = 4000
 
 MENSAGEM_ENTRADA_BLOQUEADA = (
-    "Não posso continuar com esse pedido. Posso ajudar com dúvidas sobre "
-    "produtos, ingredientes, rotina ou o funcionamento do Venus."
+    "Essa pergunta está fora do que eu consigo te ajudar! Mas podemos "
+    "conversar sobre algum produto, ingrediente ou a sua rotina de "
+    "skincare e haircare — por onde quer começar?"
 )
 MENSAGEM_SAIDA_BLOQUEADA = (
-    "Não posso compartilhar essa resposta. Você pode reformular sua "
-    "pergunta sobre produtos, ingredientes ou rotina?"
+    "Não consegui te dar uma boa resposta pra isso. Pode reformular a "
+    "pergunta ou falar comigo sobre algum produto, ingrediente ou rotina?"
 )
 
 # --- dados sensíveis (usados tanto para bloqueio de saída quanto anonimização) ---
@@ -57,6 +58,7 @@ def _eh_cartao_valido(candidato: str) -> bool:
         soma += digito
     return soma % 10 == 0
 
+
 # --- tentativa de manipulação do sistema (prompt injection / jailbreak) ---
 # Aplicado direto no texto original (com acento) — os character classes
 # ([çc], [ãa]...) já cobrem a variação com/sem acento sem precisar normalizar.
@@ -75,7 +77,13 @@ _INJECAO_RE = re.compile(
     r"(qual|repita)\s+(é\s+|sã[oa]\s+)?(o\s+seu|suas?)\s+(prompt|instru[çc][õo]es)\s*(inicial|de\s+sistema)?|"
     r"modo\s+desenvolvedor|"
     r"modo\s+(sem\s+filtro|sem\s+censura|irrestrito|deus|god)|"
-    r"sem\s+(filtro|censura|restri[çc][õo]es)\s+(nenhum[ao]|algum[ao])?|"
+    # "sem restrições" sozinho é frase comum ("ingrediente sem restrições
+    # regulatórias") e bloqueava respostas legítimas na saída — só conta
+    # com um verbo de comando antes ou com "nenhuma/alguma" junto.
+    r"sem\s+(filtro|censura)\b|"
+    r"sem\s+restri[çc][õo]es\s+(nenhum[ao]|algum[ao])\b|"
+    r"sem\s+nenhuma\s+restri[çc][ãa]o|"
+    r"(respond|fal|aj|atu|oper|funcion|convers)\w*\s+sem\s+restri[çc][õo]es|"
     r"dan\s+mode|"
     r"stan\s+mode|"
     r"jailbreak|"
@@ -139,6 +147,8 @@ _EMOJI_RE = re.compile(
     "\U000020E3"             # combining enclosing keycap (ex.: 1️⃣)
     "]+"
 )
+_ESPACO_ANTES_DE_PONTUACAO_RE = re.compile(r"\s+([.,!?;:])")
+_ESPACOS_REPETIDOS_RE = re.compile(r" {2,}")
 
 
 def _eh_tentativa_de_injecao(texto: str) -> bool:
@@ -209,8 +219,8 @@ def remover_emojis(resposta: str) -> str:
     # Emoji costuma vir cercado de espaço (ex.: "Oi! 👋 Tudo bem?" ou
     # "ter 💅. Time"); depois de removê-lo, limpa o espaço órfão antes de
     # pontuação e o espaço duplo que sobra.
-    texto = re.sub(r"\s+([.,!?;:])", r"\1", texto)
-    texto = re.sub(r" {2,}", " ", texto)
+    texto = _ESPACO_ANTES_DE_PONTUACAO_RE.sub(r"\1", texto)
+    texto = _ESPACOS_REPETIDOS_RE.sub(" ", texto)
     return texto.strip()
 
 

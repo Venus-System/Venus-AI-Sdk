@@ -29,11 +29,12 @@ from starlette.routing import Route
 
 logger = logging.getLogger(__name__)
 
-# Rotina e FAQ ficam de fora das skills: `nodes/especialistas.py::no_agente_rotina`
-# e `::no_agente_faq` ainda passam pelo client MCP genérico (stub em
-# `mcp/tools.py`) e levantam `NotImplementedError` ao serem chamados — ver
-# `docs/architecture.md`. Anunciar uma skill que quebra hoje seria pior que
-# não anunciá-la.
+_MODOS_TEXTO = ["text/plain"]
+_RESPOSTA_VAZIA = "Não consegui gerar uma resposta agora."
+_RESPOSTA_FALHA = "Não consegui processar sua mensagem agora — tente novamente em instantes."
+
+# Skills anunciadas no Agent Card — as quatro rotas do roteador (produto,
+# ingrediente, rotina e FAQ/RAG).
 _SKILLS = [
     AgentSkill(
         id="produto",
@@ -43,8 +44,8 @@ _SKILLS = [
             "perfil do usuário e investiga relatos de reação/uso."
         ),
         tags=["skincare", "haircare", "produto"],
-        input_modes=["text/plain"],
-        output_modes=["text/plain"],
+        input_modes=_MODOS_TEXTO,
+        output_modes=_MODOS_TEXTO,
         examples=["Por que esse produto foi recomendado pra mim?"],
     ),
     AgentSkill(
@@ -55,9 +56,33 @@ _SKILLS = [
             "restrições regulatórias."
         ),
         tags=["skincare", "haircare", "ingrediente"],
-        input_modes=["text/plain"],
-        output_modes=["text/plain"],
+        input_modes=_MODOS_TEXTO,
+        output_modes=_MODOS_TEXTO,
         examples=["Niacinamida faz mal pra pele oleosa?"],
+    ),
+    AgentSkill(
+        id="rotina",
+        name="Montar ou ajustar rotina",
+        description=(
+            "Monta rotinas de skincare/haircare a partir dos favoritos do "
+            "usuário, respeitando alergias declaradas."
+        ),
+        tags=["skincare", "haircare", "rotina"],
+        input_modes=_MODOS_TEXTO,
+        output_modes=_MODOS_TEXTO,
+        examples=["Monta uma rotina de manhã pra mim"],
+    ),
+    AgentSkill(
+        id="faq",
+        name="Dúvidas sobre o Venus (RAG)",
+        description=(
+            "Responde dúvidas sobre o sistema (score, privacidade, alergias) "
+            "com RAG sobre o FAQ oficial e busca na web, citando as fontes."
+        ),
+        tags=["faq", "rag", "privacidade"],
+        input_modes=_MODOS_TEXTO,
+        output_modes=_MODOS_TEXTO,
+        examples=["Como o Venus calcula o score?"],
     ),
 ]
 
@@ -76,11 +101,44 @@ def montar_agent_card(base_url: str) -> AgentCard:
         ),
         version="0.1.0",
         supported_interfaces=[AgentInterface(protocol_binding="JSONRPC", url=base_url)],
-        default_input_modes=["text/plain"],
-        default_output_modes=["text/plain"],
+        default_input_modes=_MODOS_TEXTO,
+        default_output_modes=_MODOS_TEXTO,
         capabilities=AgentCapabilities(streaming=False),
         skills=_SKILLS,
     )
+
+
+def _metadata(context: RequestContext) -> dict[str, Any]:
+    """Junta o metadata do request e o da mensagem (o da mensagem prevalece)."""
+    from google.protobuf.json_format import MessageToDict
+
+    juntos: dict[str, Any] = {}
+    metadata_do_request = getattr(context, "metadata", None)
+    metadata_da_mensagem = getattr(getattr(context, "message", None), "metadata", None)
+    for origem in (metadata_do_request, metadata_da_mensagem):
+        if not origem:
+            continue
+        try:
+            juntos.update(origem if isinstance(origem, dict) else MessageToDict(origem))
+        except Exception:  # noqa: BLE001
+            logger.warning("metadata A2A ilegível: %r", origem)
+    return juntos
+
+
+def _entrada_do_grafo(texto: str, metadata: dict[str, Any]) -> dict[str, Any]:
+    """Estado inicial do grafo: a mensagem e, se vierem no metadata do
+    request A2A (`params.metadata` ou `message.metadata`), a identidade do
+    usuário — `usuario_id` (memória de longo prazo, string) e
+    `usuario_id_postgres` (int, tools de alergia/score personalizado)."""
+    entrada: dict[str, Any] = {"mensagem_usuario": texto}
+    if metadata.get("usuario_id") is not None:
+        entrada["usuario_id"] = str(metadata["usuario_id"])
+    if metadata.get("usuario_id_postgres") is not None:
+        try:
+            entrada["usuario_id_postgres"] = int(metadata["usuario_id_postgres"])
+        except (TypeError, ValueError):
+            logger.warning("usuario_id_postgres inválido no metadata A2A: %r", metadata["usuario_id_postgres"])
+    return entrada
 
 
 class VenusAgentExecutor(AgentExecutor):
@@ -101,17 +159,18 @@ class VenusAgentExecutor(AgentExecutor):
         # chamadas, exatamente como `thread_id` faz hoje (ver
         # `flows/venus_flow.py`/`memory/checkpointer.py`).
         config = {"configurable": {"thread_id": context.context_id}}
+        entrada = _entrada_do_grafo(texto, _metadata(context))
 
         try:
-            estado = await self._grafo.ainvoke({"mensagem_usuario": texto}, config=config)
-            resposta = estado.get("resposta_final") or "Não consegui gerar uma resposta agora."
+            estado = await self._grafo.ainvoke(entrada, config=config)
+            resposta = estado.get("resposta_final") or _RESPOSTA_VAZIA
         except Exception:
             # Mesmo espírito de `nodes/especialistas.py::_executar_especialista`
             # e `nodes/juiz.py::no_agente_juiz` — uma falha de LLM/infra nunca
             # deve derrubar a resposta A2A; vira uma mensagem de erro tratada,
             # não um 500 cru pro sistema externo que chamou o Venus.
             logger.exception("Falha ao executar o grafo Venus via A2A")
-            resposta = "Não consegui processar sua mensagem agora — tente novamente em instantes."
+            resposta = _RESPOSTA_FALHA
 
         await event_queue.enqueue_event(
             new_text_message(resposta, context_id=context.context_id, role=Role.ROLE_AGENT)

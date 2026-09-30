@@ -41,9 +41,6 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
     bloqueado, motivo = guardrail_entrada(mensagem)
     mensagem_anonimizada = anonimizar_entrada(mensagem)
 
-    if bloqueado:
-        logger.info("Entrada bloqueada: %s", motivo)
-
     atualizacao: EstadoVenus = {
         "entrada_bloqueada": bloqueado,
         "motivo_bloqueio": motivo,
@@ -54,6 +51,7 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
         "feedback_juiz": None,
     }
     if bloqueado:
+        logger.info("Entrada bloqueada: %s", motivo)
         atualizacao["resposta_final"] = MENSAGEM_ENTRADA_BLOQUEADA
     return atualizacao
 

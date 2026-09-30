@@ -35,7 +35,7 @@ def test_decidir_pos_juiz(estado: dict, esperado: str) -> None:
 
 
 def test_no_agente_juiz_aprova() -> None:
-    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.juiz.get_llm_juiz") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm("RESULTADO=aprovado")
         resultado = no_agente_juiz(
             {
@@ -52,7 +52,7 @@ def test_no_agente_juiz_aprova() -> None:
 
 def test_no_agente_juiz_reprova_com_feedback() -> None:
     texto_llm = "RESULTADO=reprovado\nFEEDBACK=faltou fonte para a afirmação."
-    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.juiz.get_llm_juiz") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm(texto_llm)
         resultado = no_agente_juiz(
             {
@@ -68,7 +68,7 @@ def test_no_agente_juiz_reprova_com_feedback() -> None:
 
 
 def test_no_agente_juiz_acumula_tentativas() -> None:
-    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.juiz.get_llm_juiz") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm("RESULTADO=reprovado\nFEEDBACK=corrija x.")
         resultado = no_agente_juiz(
             {
@@ -87,7 +87,7 @@ def test_no_agente_juiz_inclui_evidencias_tools_na_entrada_do_llm() -> None:
     `fontes_usadas` realmente devolveu (achado do teste de conversa real em
     2026-09-10 — ver `EstadoVenus.evidencias_tools`)."""
     evidencias = [{"tool": "get_product_ingredients", "resultado": "[]"}]
-    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.juiz.get_llm_juiz") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm("RESULTADO=aprovado")
         no_agente_juiz(
             {
@@ -105,7 +105,7 @@ def test_no_agente_juiz_inclui_evidencias_tools_na_entrada_do_llm() -> None:
 
 
 def test_no_agente_juiz_sem_evidencias_nao_inclui_resultados_tools() -> None:
-    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.juiz.get_llm_juiz") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm("RESULTADO=aprovado")
         no_agente_juiz(
             {
@@ -124,7 +124,7 @@ def test_no_agente_juiz_tolera_colchetes_no_resultado_aprovado() -> None:
     """O prompt mostra o protocolo como `RESULTADO=[aprovado|reprovado]`
     (ver `prompts/juiz.py`); se o LLM ecoar o colchete ao pé da letra
     (`RESULTADO=[aprovado]`), o parser não pode tratar isso como reprovado."""
-    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.juiz.get_llm_juiz") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm("RESULTADO=[aprovado]")
         resultado = no_agente_juiz(
             {
@@ -139,7 +139,7 @@ def test_no_agente_juiz_tolera_colchetes_no_resultado_aprovado() -> None:
 
 def test_no_agente_juiz_tolera_colchetes_no_feedback() -> None:
     texto_llm = "RESULTADO=[reprovado]\nFEEDBACK=[faltou fonte para a afirmação.]"
-    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.juiz.get_llm_juiz") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = _resposta_llm(texto_llm)
         resultado = no_agente_juiz(
             {
@@ -158,7 +158,7 @@ def test_no_agente_juiz_trata_falha_do_llm_como_reprovado_sem_derrubar_o_grafo()
     a exceção subir crua até o `.ainvoke()` do grafo principal — vira uma
     reprovação sem feedback específico, reaproveitando o fluxo normal de
     retry/`esgotado` (ver `decidir_pos_juiz`)."""
-    with patch("venus_sdk.nodes.juiz.get_llm_rapido") as get_llm_mock:
+    with patch("venus_sdk.nodes.juiz.get_llm_juiz") as get_llm_mock:
         get_llm_mock.return_value.invoke.side_effect = RuntimeError("provedor indisponível")
         resultado = no_agente_juiz(
             {
@@ -171,3 +171,18 @@ def test_no_agente_juiz_trata_falha_do_llm_como_reprovado_sem_derrubar_o_grafo()
     assert resultado["aprovado_juiz"] is False
     assert resultado["feedback_juiz"] is None
     assert resultado["tentativas_juiz"] == 1
+
+
+def test_erro_tecnico_do_especialista_nao_gasta_llm_nem_retry() -> None:
+    """Falha de infraestrutura (cota/LLM fora) não é conteúdo ruim: o juiz
+    pula o LLM e o grafo vai direto pra "esgotado" (sem repetir a falha)."""
+    from unittest.mock import patch as _patch
+
+    from venus_sdk.nodes.juiz import MAX_TENTATIVAS_JUIZ, decidir_pos_juiz, no_agente_juiz
+
+    estado = {"resposta_especialista": {"dominio": "produto", "intencao": "erro_tecnico"}, "rota": "produto"}
+    with _patch("venus_sdk.nodes.juiz.get_llm_juiz") as llm:
+        saida = no_agente_juiz(estado)
+    llm.assert_not_called()
+    assert saida["aprovado_juiz"] is False and saida["tentativas_juiz"] == MAX_TENTATIVAS_JUIZ
+    assert decidir_pos_juiz({**estado, **saida}) == "esgotado"

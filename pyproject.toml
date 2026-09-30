@@ -14,18 +14,31 @@ dependencies = [
     "langchain-core",
     "langchain-google-genai",
     "langchain-groq",
+    "langchain-mistralai",
     "langgraph",
     "asyncpg",
+    "langchain-text-splitters",
+    "numpy",
+    "httpx",
+    "ddgs",
+    "mcp",
+    "langchain-mcp-adapters",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+# pymongo: os testes do MongoDBStore (tests/test_store_mongo.py) usam as exceções dele.
+dev = ["pytest", "pytest-asyncio", "pymongo"]
+pdf = ["pypdf"]
 mongo = ["langgraph-checkpoint-mongodb", "pymongo"]
-a2a = ["a2a-sdk[http-server]"]
-rag = ["qdrant_client", "llama_index-core", "llama_index-vector_stores-qdrant", "llama_index-embeddings-fastembed"]
+a2a = ["a2a-sdk[http-server]", "uvicorn"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: exige Postgres real em DATABASE_URL com schema+seed aplicados (scripts/init_db.py); pulado por padrão",
+]
+asyncio_mode = "auto"
+addopts = "-m 'not integration'"

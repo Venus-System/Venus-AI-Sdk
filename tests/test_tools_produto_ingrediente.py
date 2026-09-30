@@ -100,7 +100,7 @@ def test_search_product_devolve_candidatos() -> None:
     resultado = _rodar(_tool(tools, "search_product").ainvoke({"termo": "Sérum X"}))
 
     assert resultado == [{"product_id": 1, "name": "Sérum X", "brand_name": "Marca Y"}]
-    assert conexao.chamadas[0][1] == ("Sérum X",)
+    assert conexao.chamadas[0][1] == (["serum"],)  # palavras normalizadas ("x" é curta demais)
 
 
 def test_get_product_encontrado() -> None:
@@ -119,7 +119,7 @@ def test_get_product_nao_encontrado() -> None:
 
     resultado = _rodar(_tool(tools, "get_product").ainvoke({"product_id": 999}))
 
-    assert resultado == {"erro": "produto não encontrado"}
+    assert resultado == {"encontrado": False, "mensagem": "produto não encontrado"}
 
 
 def test_get_personalized_score_passa_product_id_e_user_id() -> None:
@@ -173,7 +173,7 @@ def test_get_ingredient_summary_nao_encontrado() -> None:
 
     resultado = _rodar(_tool(tools, "get_ingredient_summary").ainvoke({"ingredient_id": 999}))
 
-    assert resultado == {"erro": "ingrediente não encontrado"}
+    assert resultado == {"encontrado": False, "mensagem": "ingrediente não encontrado"}
 
 
 def test_get_ingredient_effects_sem_profile_tag_passa_none() -> None:

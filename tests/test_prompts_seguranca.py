@@ -32,14 +32,15 @@ _PROMPTS_COM_RACIOCINIO_INTERNO = [
     ESP_PRODUTO_PROMPT_COMPLETO,
     ESP_INGREDIENTE_PROMPT_COMPLETO,
     ROTINA_PROMPT_COMPLETO,
+    FAQ_PROMPT_COMPLETO,
 ]
 
-# Só produto/ingrediente têm hoje tools que exigem `user_id` (get_user_allergies,
-# get_personalized_score) — rotina/faq ainda não têm tools reais (ver
-# docs/architecture.md).
+# Produto/ingrediente/rotina têm tools que exigem `user_id` (get_user_allergies,
+# get_personalized_score, tools de rotina).
 _PROMPTS_COM_IDENTIFICADOR_USUARIO = [
     ESP_PRODUTO_PROMPT_COMPLETO,
     ESP_INGREDIENTE_PROMPT_COMPLETO,
+    ROTINA_PROMPT_COMPLETO,
 ]
 
 
