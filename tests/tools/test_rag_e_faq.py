@@ -11,7 +11,8 @@ import pytest
 from venus_sdk.rag import EmbeddingsHash, IndiceRAG, buscar_web, carregar_documentos, criar_indice_local
 from venus_sdk.tools.faq import montar_tools_faq
 
-FAQ = Path(__file__).resolve().parents[2] / "data" / "faq"
+# Pasta fixa: os testes do índice local não dependem do conteúdo real do FAQ.
+FAQ = Path(__file__).resolve().parents[1] / "fixtures" / "faq"
 
 
 def test_carregador_gera_chunks_com_fonte() -> None:

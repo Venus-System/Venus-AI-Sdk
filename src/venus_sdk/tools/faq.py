@@ -15,19 +15,20 @@ _TRECHOS_POR_BUSCA = 3
 
 
 def montar_tools_faq(indice: Any) -> list[BaseTool]:
-    """Monta `faq_retriever` (índice local) e `buscar_na_web`. `indice` é um
-    `IndiceRAG` (ou qualquer objeto com `.buscar(consulta, k)`); `None` levanta
-    `ValueError` só no primeiro uso do nó, como nas outras tools."""
+    """Monta `faq_retriever` (índice do FAQ) e `buscar_na_web`. `indice` é
+    um `IndiceQdrant`/`IndiceRAG` (ou qualquer objeto com `.buscar(consulta,
+    k)`); `None` levanta `ValueError` só no primeiro uso do nó, como nas
+    outras tools."""
     if indice is None:
         raise ValueError(
             "montar_tools_faq requer um índice RAG — use "
-            "venus_sdk.rag.criar_indice_local('data/faq') e passe via "
+            "venus_sdk.rag.criar_indice_faq() e passe via "
             "compilar_grafo_venus(indice_rag=...)."
         )
 
     @tool
     def faq_retriever(pergunta: str) -> list[dict] | dict:
-        """Busca no FAQ oficial do Venus (documentos locais indexados) os
+        """Busca no FAQ oficial do Venus (documentos indexados) os
         trechos mais relevantes para a pergunta. Cada resultado traz o
         `trecho`, a `fonte` (arquivo) e o `score` de similaridade. Use SEMPRE
         antes de responder dúvidas sobre o Venus."""

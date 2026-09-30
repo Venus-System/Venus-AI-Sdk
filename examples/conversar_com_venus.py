@@ -11,9 +11,10 @@ Requisitos:
     - GEMINI_API_KEY e GROQ_API_KEY configuradas no `.env`.
     - Postgres com schema+seed: `docker compose up -d && python scripts/init_db.py`
       e `DATABASE_URL` no `.env` (produto/ingrediente/rotina).
-    - RAG do FAQ: documentos em `data/faq/` (já incluídos) — índice local, sem
-      dependência externa; a busca na web usa Tavily (`TAVILY_API_KEY`) ou
-      DuckDuckGo.
+    - RAG do FAQ: com `QDRANT_URL`, busca na coleção do Qdrant (alimentada por
+      `python -m venus_sdk.rag.faq_ingest`); sem ela, índice local sobre
+      `data/faq/` (já incluído). A busca na web usa Tavily (`TAVILY_API_KEY`)
+      ou DuckDuckGo.
     - Opcionais: `VENUS_USE_MCP=1` (FAQ passa a também usar as tools do
       servidor MCP do Venus, em subprocesso), `A2A_AGENTES_EXTERNOS`
       (agente externo via A2A), `VENUS_USE_GOOGLE_CALENDAR=1` (Rotina ganha
@@ -58,7 +59,7 @@ from venus_sdk.memory import (
     criar_checkpointer_mongo,
     criar_store_em_memoria,
 )
-from venus_sdk.rag import criar_indice_local
+from venus_sdk.rag import criar_indice_faq
 from venus_sdk.tools.calendario import montar_tools_calendario
 
 # thread_id fixo (em vez de um uuid novo a cada execução): assim dá pra
@@ -223,9 +224,9 @@ async def main() -> None:
     elif DEBUG:
         print("DATABASE_URL não configurada — produto/ingrediente vão falhar até isso ser corrigido.\n")
 
-    # RAG: índice local sobre data/faq (fonte externa 1) + web (fonte 2);
+    # RAG: FAQ no Qdrant ou índice local sobre data/faq (fonte externa 1) + web (fonte 2);
     # tools extras: MCP e/ou A2A (fontes 3 e 4), entregues ao agente FAQ.
-    indice = criar_indice_local(FAQ_DIR, cache=".venus_cache/faq_index.npz")
+    indice = criar_indice_faq(FAQ_DIR, cache=".venus_cache/faq_index.npz")
     extras = list(montar_tool_a2a())
     if os.getenv("VENUS_USE_MCP") == "1":
         extras += await get_mcp_tools(apenas={"buscar_na_web"})

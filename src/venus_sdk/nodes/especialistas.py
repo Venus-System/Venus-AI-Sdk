@@ -385,8 +385,8 @@ def pede_remocao_de_favorito(pergunta: str) -> bool:
 def montar_no_agente_faq(indice: Any, tools_extras: list[Any] | None = None) -> NoEspecialista:
     """Fábrica do nó do agente FAQ — o agente com RAG.
 
-    `indice` é o índice vetorial local (`rag.criar_indice_local`); as tools
-    são `faq_retriever` (documentos locais) e `buscar_na_web` (internet).
+    `indice` é o índice do FAQ (`rag.criar_indice_faq`: Qdrant ou local); as
+    tools são `faq_retriever` (documentos do FAQ) e `buscar_na_web` (internet).
     `tools_extras` recebe tools já carregadas de fontes externas — tools MCP
     (`mcp.tools.get_mcp_tools`) e/ou A2A (`a2a_client.montar_tool_a2a`).
 

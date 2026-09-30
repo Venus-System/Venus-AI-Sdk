@@ -50,12 +50,12 @@ async def main(filtro: list[str]) -> None:
     from venus_sdk.flows.venus_flow import compilar_grafo_venus
     from venus_sdk.a2a_client import montar_tool_a2a
     from venus_sdk.memory import criar_checkpointer_em_memoria, criar_store_em_memoria
-    from venus_sdk.rag import criar_indice_local
+    from venus_sdk.rag import criar_indice_faq
 
     pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3)
     grafo = compilar_grafo_venus(
         checkpointer=criar_checkpointer_em_memoria(), store=criar_store_em_memoria(), pool=pool,
-        indice_rag=criar_indice_local(FAQ_DIR, cache=".venus_cache/faq_index.npz"),
+        indice_rag=criar_indice_faq(FAQ_DIR, cache=".venus_cache/faq_index.npz"),
         tools_faq_extras=list(montar_tool_a2a()),
     )
     try:
