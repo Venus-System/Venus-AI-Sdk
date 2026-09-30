@@ -14,6 +14,7 @@ essas dependências sozinho).
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from a2a.helpers import new_text_message
@@ -121,15 +122,24 @@ def _metadata(context: RequestContext) -> dict[str, Any]:
         try:
             juntos.update(origem if isinstance(origem, dict) else MessageToDict(origem))
         except Exception:  # noqa: BLE001
-            logger.warning("metadata A2A ilegível: %r", origem)
+            logger.warning("metadata A2A ilegível (%s)", type(origem).__name__)
     return juntos
 
 
+IdentificarUsuario = Callable[[RequestContext], dict[str, Any]]
+
+
+def identidade_do_metadata(context: RequestContext) -> dict[str, Any]:
+    """Lê `usuario_id`/`usuario_id_postgres` do metadata do request A2A
+    (`params.metadata` ou `message.metadata`). Só use atrás de uma camada que
+    já autenticou o chamador: o metadata é escrito por quem chama."""
+    return _metadata(context)
+
+
 def _entrada_do_grafo(texto: str, metadata: dict[str, Any]) -> dict[str, Any]:
-    """Estado inicial do grafo: a mensagem e, se vierem no metadata do
-    request A2A (`params.metadata` ou `message.metadata`), a identidade do
-    usuário — `usuario_id` (memória de longo prazo, string) e
-    `usuario_id_postgres` (int, tools de alergia/score personalizado)."""
+    """Estado inicial do grafo: a mensagem e a identidade do usuário que o
+    validador devolveu — `usuario_id` (memória de longo prazo, string) e
+    `usuario_id_postgres` (int, tools de dados da conta)."""
     entrada: dict[str, Any] = {"mensagem_usuario": texto}
     if metadata.get("usuario_id") is not None:
         entrada["usuario_id"] = str(metadata["usuario_id"])
@@ -137,7 +147,8 @@ def _entrada_do_grafo(texto: str, metadata: dict[str, Any]) -> dict[str, Any]:
         try:
             entrada["usuario_id_postgres"] = int(metadata["usuario_id_postgres"])
         except (TypeError, ValueError):
-            logger.warning("usuario_id_postgres inválido no metadata A2A: %r", metadata["usuario_id_postgres"])
+            logger.warning("usuario_id_postgres inválido no metadata A2A (%s)",
+                           type(metadata["usuario_id_postgres"]).__name__)
     return entrada
 
 
@@ -149,14 +160,22 @@ class VenusAgentExecutor(AgentExecutor):
     a cada turno, não há nada "long-running" pra acompanhar em etapas.
     """
 
-    def __init__(self, grafo: Any) -> None:
+    def __init__(self, grafo: Any, identificar_usuario: IdentificarUsuario | None = None) -> None:
         self._grafo = grafo
+        self._identificar_usuario = identificar_usuario
+
+    def _identidade(self, context: RequestContext) -> dict[str, Any]:
+        """Sem validador, o request roda sem usuário: o metadata é escrito pelo
+        chamador e não prova quem ele é."""
+        if self._identificar_usuario is None:
+            return {}
+        return self._identificar_usuario(context) or {}
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         texto = context.get_user_input()
         # `context_id` do A2A = `thread_id` do checkpointer (mesma conversa).
         config = {"configurable": {"thread_id": context.context_id}}
-        entrada = _entrada_do_grafo(texto, _metadata(context))
+        entrada = _entrada_do_grafo(texto, self._identidade(context))
 
         try:
             estado = await self._grafo.ainvoke(entrada, config=config)
@@ -174,17 +193,23 @@ class VenusAgentExecutor(AgentExecutor):
         raise UnsupportedOperationError("O Venus não suporta cancelamento de requisições em andamento.")
 
 
-def montar_app_a2a(*, grafo: Any, base_url: str, rpc_path: str = "/") -> Starlette:
+def montar_app_a2a(
+    *, grafo: Any, base_url: str, rpc_path: str = "/", identificar_usuario: IdentificarUsuario | None = None
+) -> Starlette:
     """Monta o app Starlette do servidor A2A do Venus.
 
     `grafo` é o grafo já compilado (`compilar_grafo_venus(...)`) — quem sobe
     o servidor de verdade decide checkpointer/store/pool e injeta aqui.
     `base_url` é a URL pública onde este servidor vai ficar acessível (vai
     pro Agent Card, pra quem descobrir o Venus saber onde chamar).
+    `identificar_usuario` recebe o request e devolve `usuario_id`/
+    `usuario_id_postgres` de um chamador JÁ autenticado; sem ele, as
+    mensagens rodam sem usuário (sem dados da conta).
+    `identidade_do_metadata` confia no metadata — só atrás de autenticação.
     """
     agent_card = montar_agent_card(base_url)
     request_handler = DefaultRequestHandler(
-        agent_executor=VenusAgentExecutor(grafo),
+        agent_executor=VenusAgentExecutor(grafo, identificar_usuario),
         task_store=InMemoryTaskStore(),
         agent_card=agent_card,
     )

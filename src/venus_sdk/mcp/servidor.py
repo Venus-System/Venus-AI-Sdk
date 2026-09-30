@@ -6,7 +6,11 @@ cliente MCP (o próprio Venus via `mcp/tools.py`, Claude Desktop, etc.).
 
 Variáveis: `DATABASE_URL` (Postgres, opcional — sem ela só as tools de FAQ
 sobem), `QDRANT_URL` (FAQ no Qdrant) e `FAQ_DIR` (índice local; padrão
-`data/faq`)."""
+`data/faq`).
+
+O servidor não autentica quem chama: as tools que leem dados de um usuário
+(`user_id`) ficam de fora, a não ser com `--dados-do-usuario` (só em rede
+confiável)."""
 
 from __future__ import annotations
 
@@ -37,10 +41,11 @@ _PORTA_HTTP_PADRAO = 8765
 
 
 def criar_servidor_mcp(*, pool: Any | None = None, indice: Any | None = None,
-                       nome: str = "venus") -> FastMCP:
+                       nome: str = "venus", incluir_dados_do_usuario: bool = False) -> FastMCP:
     """Monta o servidor registrando cada tool LangChain como tool MCP.
     `pool`/`indice` são injetados (o SDK não cria conexão sozinho); o que
-    for `None` simplesmente não é exposto."""
+    for `None` simplesmente não é exposto. Tools com `user_id` só entram com
+    `incluir_dados_do_usuario=True`: o MCP não sabe quem é o chamador."""
     servidor = FastMCP(nome)
     tools: list[Any] = []
     if pool is not None:
@@ -48,6 +53,8 @@ def criar_servidor_mcp(*, pool: Any | None = None, indice: Any | None = None,
             tools += fabrica(pool)
     if indice is not None:
         tools += montar_tools_faq(indice)
+    if not incluir_dados_do_usuario:
+        tools = [tool for tool in tools if "user_id" not in (tool.args or {})]
 
     for tool in tools:
         _registrar(servidor, tool)
@@ -80,7 +87,7 @@ def _assinatura(campos: dict[str, Any]) -> inspect.Signature:
     return inspect.Signature(parametros, return_annotation=str)
 
 
-async def _montar_do_ambiente() -> tuple[FastMCP, Any]:
+async def _montar_do_ambiente(incluir_dados_do_usuario: bool) -> tuple[FastMCP, Any]:
     from venus_sdk.config.settings import QDRANT_URL
     from venus_sdk.rag import criar_indice_faq
 
@@ -92,17 +99,19 @@ async def _montar_do_ambiente() -> tuple[FastMCP, Any]:
         pool = await asyncpg.create_pool(url)
     faq_dir = Path(os.getenv("FAQ_DIR", _PASTA_FAQ_PADRAO))
     indice = criar_indice_faq(faq_dir) if QDRANT_URL or faq_dir.is_dir() else None
-    return criar_servidor_mcp(pool=pool, indice=indice), pool
+    return criar_servidor_mcp(pool=pool, indice=indice, incluir_dados_do_usuario=incluir_dados_do_usuario), pool
 
 
 def main() -> None:  # pragma: no cover — entrypoint
     parser = argparse.ArgumentParser(description="Servidor MCP do Venus")
     parser.add_argument("--transport", choices=["stdio", "http"], default="stdio")
     parser.add_argument("--porta", type=int, default=_PORTA_HTTP_PADRAO)
+    parser.add_argument("--dados-do-usuario", action="store_true",
+                        help="expõe as tools com user_id (só em rede confiável: o MCP não autentica)")
     args = parser.parse_args()
 
     async def _rodar() -> None:
-        servidor, pool = await _montar_do_ambiente()
+        servidor, pool = await _montar_do_ambiente(args.dados_do_usuario)
         try:
             if args.transport == "stdio":
                 await servidor.run_stdio_async()

@@ -46,7 +46,7 @@ class IndiceQdrant:
     def buscar(self, consulta: str, k: int = 3, score_minimo: float | None = None) -> list[dict[str, Any]]:
         """Top-k trechos acima de `score_minimo` (padrão: o do construtor).
         Vazio = nada relevante; o agente deve dizer que não sabe, nunca inventar."""
-        if not consulta.strip():
+        if not consulta.strip() or k <= 0:
             return []
         minimo = self._score_minimo if score_minimo is None else score_minimo
         nos = self._indice_llama().as_retriever(similarity_top_k=k).retrieve(consulta)

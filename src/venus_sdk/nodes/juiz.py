@@ -8,6 +8,7 @@ import re
 from typing import Literal
 
 from venus_sdk.llm.models import get_llm_juiz
+from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 
@@ -44,8 +45,8 @@ _RE_AFIRMA_DADO = re.compile(
 def _resposta_honesta_sem_dado(estado: EstadoVenus) -> bool:
     """Sugestão de produtos que só lista o que a busca achou, sem afirmar nota/ingrediente:
     não há o que reprovar — o Juiz LLM só pediria dado que o banco não tem."""
-    especialista = estado.get("resposta_especialista") or {}
-    if especialista.get("dominio") != "produto" or especialista.get("intencao") != "sugerir":
+    especialista = estado.get("resposta_especialista")
+    if not isinstance(especialista, dict) or especialista.get("dominio") != "produto" or especialista.get("intencao") != "sugerir":
         return False
     evidencias = estado.get("evidencias_tools") or []
     if not any(isinstance(ev, dict) and ev.get("tool") == "search_product" for ev in evidencias):
@@ -83,7 +84,9 @@ def _ler_veredito_do_llm(texto: str) -> tuple[bool, str | None]:
 def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
     """Avalia `resposta_especialista` e atualiza `aprovado_juiz`,
     `feedback_juiz` e `tentativas_juiz`."""
-    especialista = estado.get("resposta_especialista") or {}
+    especialista = estado.get("resposta_especialista")
+    if not isinstance(especialista, dict):
+        especialista = {}
     if especialista.get("intencao") == "erro_tecnico":
         # O especialista falhou por infraestrutura (cota/rede/LLM fora do ar),
         # não por conteúdo ruim: reprovar e mandar tentar de novo só repetiria
@@ -101,7 +104,7 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
     if _resposta_honesta_sem_dado(estado):
         return _veredito(True, None, proxima_tentativa)
 
-    mensagens = [("system", JUIZ_PROMPT_COMPLETO), ("human", _montar_entrada_juiz(estado))]
+    mensagens = [("system", com_data_atual(JUIZ_PROMPT_COMPLETO)), ("human", _montar_entrada_juiz(estado))]
     try:
         resposta = get_llm_juiz().invoke(mensagens)
     except Exception:

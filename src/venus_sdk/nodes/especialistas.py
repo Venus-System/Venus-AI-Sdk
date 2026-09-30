@@ -9,21 +9,23 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import SystemMessage, ToolMessage
 
 from venus_sdk.flows.agente_mcp import montar_agente_mcp
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_especialista
 from venus_sdk.nodes._evidencias import dados_da_evidencia
+from venus_sdk.nodes._json import extrair_objeto_json
+from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.faq import FAQ_PROMPT_COMPLETO
 from venus_sdk.prompts.ingrediente import ESP_INGREDIENTE_PROMPT_COMPLETO
 from venus_sdk.prompts.produto import ESP_PRODUTO_PROMPT_COMPLETO
 from venus_sdk.prompts.rotina import ROTINA_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
-from venus_sdk.texto import remover_acentos
 from venus_sdk.tools.compartilhadas import montar_tools_compartilhadas
 from venus_sdk.tools.faq import montar_tools_faq
 from venus_sdk.tools.ingrediente import montar_tools_ingrediente
 from venus_sdk.tools.produto import montar_tools_produto
+from venus_sdk.tools._identidade import usuario_da_conversa
 from venus_sdk.tools.rotina import montar_tools_rotina
 
 logger = logging.getLogger(__name__)
@@ -43,9 +45,14 @@ _RESPOSTA_ERRO_FORMATO = "Não consegui estruturar uma resposta válida para ess
 _LIMITE_PASSOS_AGENTE = 24
 _TAMANHO_PREVIA_LOG = 80
 
-_FAVORITO_RE = re.compile(r"favorit", re.IGNORECASE)
-_VERBO_DE_ADICAO_RE = re.compile(
-    r"\b(adicion\w*|inclu\w*|coloc\w*|salv\w*|guard\w*|bot[ae]\w*|p[oõ]e|marc[ae]\w*)\b", re.IGNORECASE
+# Adição também exige o verbo apontando PARA os favoritos ("coloca X nos
+# favoritos", "marca como favorito") — "meus favoritos salvos", "favoritos da
+# marca X" e "rotina incluindo meus favoritos" são leitura.
+_ADICAO_DE_FAVORITO_RE = re.compile(
+    r"\bfavoritar\b|^\s*favorit[ae]\b|\bmarc\w*\s+(isso\s+|ele\s+|ela\s+)?como\s+favorit"
+    r"|\b(adicion\w*|inclu\w*|coloc\w*|salv\w*|guard\w*|bot[ae]\w*|p[oõ]e|p[oô]r)\b.{0,60}?"
+    r"\b(a|à|ao|aos|n[oa]s?|em|para|pr[oa]s?|de)\s+(meus\s+|minhas\s+|minha\s+lista\s+de\s+)?favorit",
+    re.IGNORECASE,
 )
 # Remoção exige o verbo apontando PARA os favoritos ("tira X dos meus
 # favoritos") — "monta uma rotina com meus favoritos excluindo X" não é pedido
@@ -63,8 +70,6 @@ _RESPOSTA_ALTERAR_FAVORITO = (
     "Eu não mexo nos seus favoritos — adicionar ou remover produtos é com você, direto no app. "
     "Posso te mostrar os favoritos que você já tem ou montar uma rotina com eles?"
 )
-
-_CERCA_MARKDOWN_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 
 
 # --- entrada do especialista ---
@@ -120,7 +125,11 @@ def _extrair_evidencias_tools(mensagens: list) -> list[dict[str, Any]]:
 
 def _logar_passo_do_agente(mensagem: Any, inicio: float) -> None:
     chamadas = [chamada.get("name") for chamada in (getattr(mensagem, "tool_calls", None) or [])]
-    previa = chamadas or str(getattr(mensagem, "content", ""))[:_TAMANHO_PREVIA_LOG]
+    # Retorno de tool traz dado pessoal (perfil, alergias): só o nome dela.
+    if isinstance(mensagem, ToolMessage):
+        previa = mensagem.name
+    else:
+        previa = chamadas or str(getattr(mensagem, "content", ""))[:_TAMANHO_PREVIA_LOG]
     logger.info("  [agente %.1fs] %s %s", time.perf_counter() - inicio, type(mensagem).__name__, previa)
 
 
@@ -155,35 +164,7 @@ async def _executar_com_log_de_passos(agente: Any, entrada_agente: dict[str, Any
 # --- leitura do JSON devolvido pelo especialista ---
 
 
-def _normalizar_chaves(dados: Any) -> Any:
-    """Modelos menores escrevem "domínio"/"intenção" (com acento): normaliza as chaves do
-    objeto de topo para o contrato (`dominio`, `intencao`...)."""
-    if isinstance(dados, dict):
-        return {remover_acentos(str(chave)): valor for chave, valor in dados.items()}
-    return dados
-
-
-def _candidatos_a_json(texto: str) -> list[str]:
-    """O texto como veio, sem a cerca ```json``` e só o trecho entre a 1ª `{` e a última `}`."""
-    bruto = (texto or "").strip()
-    candidatos = [bruto, _CERCA_MARKDOWN_RE.sub("", bruto).strip()]
-    inicio, fim = bruto.find("{"), bruto.rfind("}")
-    if inicio != -1 and fim > inicio:
-        candidatos.append(bruto[inicio : fim + 1])
-    return candidatos
-
-
-def _extrair_json(texto: str) -> Any:
-    """Faz `json.loads` tolerando o que os LLMs costumam fazer: cercar o JSON com
-    ```json ... ```, colocar uma frase antes/depois, quebrar linha DENTRO de uma string
-    (JSON inválido no modo estrito) e acentuar nomes de campo. Levanta
-    `ValueError`/`TypeError` se não houver um objeto JSON válido."""
-    for candidato in _candidatos_a_json(texto):
-        try:
-            return _normalizar_chaves(json.loads(candidato, strict=False))
-        except ValueError:
-            continue
-    raise ValueError("nenhum objeto JSON na resposta do especialista")
+_extrair_json = extrair_objeto_json
 
 
 def _garantir_passos_da_rotina(resposta: dict, evidencias: list[dict] | None) -> dict:
@@ -220,7 +201,8 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
     devolvido em `resposta_especialista` (ou um JSON de erro, se a saída não
     for JSON válido)."""
     try:
-        texto, evidencias = await _resposta_agente(agente, _montar_entrada(estado))
+        with usuario_da_conversa(estado.get("usuario_id_postgres")):
+            texto, evidencias = await _resposta_agente(agente, _montar_entrada(estado))
     except Exception:
         # Falha de LLM/tool nunca derruba o grafo: vira JSON de erro técnico.
         logger.exception("Especialista %s falhou ao chamar o LLM/tools", nome)
@@ -232,16 +214,25 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
     try:
         resposta_json = _extrair_json(texto)
     except (TypeError, ValueError):
-        logger.warning("Especialista %s não devolveu JSON válido: %r", nome, texto)
+        logger.warning("Especialista %s não devolveu JSON válido (%d caracteres)", nome, len(texto or ""))
         resposta_json = _resposta_de_falha(nome, "erro_formato", _RESPOSTA_ERRO_FORMATO)
 
-    if nome == "rotina" and isinstance(resposta_json, dict):
+    if nome == "rotina":
         resposta_json = _garantir_passos_da_rotina(resposta_json, evidencias)
 
     return {"resposta_especialista": resposta_json, "evidencias_tools": evidencias}
 
 
 # --- fábricas dos nós ---
+
+
+def _prompt_com_data_atual(prompt: str) -> Callable[[dict[str, Any]], list[Any]]:
+    """Prompt do agente ReAct com a data de cada chamada (o agente fica em cache)."""
+
+    def _mensagens(estado_agente: dict[str, Any]) -> list[Any]:
+        return [SystemMessage(content=com_data_atual(prompt)), *estado_agente["messages"]]
+
+    return _mensagens
 
 
 def _montar_no_especialista(
@@ -259,7 +250,7 @@ def _montar_no_especialista(
         if agente is None:
             # As tools primeiro: sem `pool`/`indice`, o erro que sobe é o delas.
             tools = montar_tools()
-            agente = montar_agente_mcp(get_llm_especialista(), prompt=prompt, tools=tools)
+            agente = montar_agente_mcp(get_llm_especialista(), prompt=_prompt_com_data_atual(prompt), tools=tools)
         return agente
 
     async def no_especialista(estado: EstadoVenus) -> EstadoVenus:
@@ -327,8 +318,7 @@ def pede_alteracao_de_favorito(pergunta: str) -> bool:
 
 def pede_para_adicionar_favorito(pergunta: str) -> bool:
     """True se a pergunta pede para salvar um produto nos favoritos."""
-    texto = pergunta or ""
-    return bool(_FAVORITO_RE.search(texto) and _VERBO_DE_ADICAO_RE.search(texto))
+    return bool(_ADICAO_DE_FAVORITO_RE.search(pergunta or ""))
 
 
 def pede_remocao_de_favorito(pergunta: str) -> bool:

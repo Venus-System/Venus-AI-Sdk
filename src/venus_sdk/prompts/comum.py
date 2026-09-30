@@ -1,10 +1,33 @@
 """Blocos de prompt compartilhados entre o roteador, os especialistas e o
 orquestrador (persona do sistema e contexto temporal)."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-_agora = datetime.now(timezone.utc).astimezone()
-_data_hora_fmt = _agora.strftime("%A, %d de %B de %Y — %H:%M:%S %Z")
+# Os prompts são montados na importação; a data entra na hora de cada chamada
+# (`com_data_atual`) — senão, numa API que fica dias no ar, "hoje" seria o dia
+# do deploy.
+MARCADOR_DATA_HORA = "<<DATA_HORA_ATUAL>>"
+# Brasil sem horário de verão desde 2019; offset fixo evita depender do tzdata.
+_FUSO_BRASILIA = timezone(timedelta(hours=-3), "BRT")
+# Nomes fixos em português: `strftime` usaria o idioma do servidor (inglês na AWS).
+_DIAS_DA_SEMANA = ("segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo")
+_MESES = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
+          "novembro", "dezembro")
+
+
+def data_hora_atual(agora: datetime | None = None) -> str:
+    """'terça-feira, 29 de setembro de 2026 — 14:05 (horário de Brasília)'."""
+    local = (agora or datetime.now(timezone.utc)).astimezone(_FUSO_BRASILIA)
+    return (
+        f"{_DIAS_DA_SEMANA[local.weekday()]}, {local.day:02d} de {_MESES[local.month - 1]} de {local.year} "
+        f"— {local:%H:%M} (horário de Brasília)"
+    )
+
+
+def com_data_atual(prompt: str) -> str:
+    """O prompt com a data e hora deste momento no lugar do marcador."""
+    return prompt.replace(MARCADOR_DATA_HORA, data_hora_atual())
+
 
 # ==============================================================================
 # PERSONA SISTEMA — bloco compartilhado repassado pelo Roteador a todos os agentes
@@ -66,7 +89,7 @@ afirma nada que não veio das tools. Sem emojis, sem gírias.
 
 CONTEXTO_TEMPORAL = f"""
 ### CONTEXTO TEMPORAL
-Data e hora atual (fornecida pelo sistema): {_data_hora_fmt}
+Data e hora atual (fornecida pelo sistema): {MARCADOR_DATA_HORA}
 Use esta referência para interpretar "hoje", "essa semana", montar rotinas de
 manhã/noite e calcular há quanto tempo o usuário usa um produto.
 """

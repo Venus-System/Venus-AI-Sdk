@@ -13,19 +13,40 @@ Módulo OPCIONAL — depende de `cryptography` por baixo (via
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import time
 from typing import Any
 
 import httpx
 from langchain_core.tools import BaseTool, tool
 
 from venus_sdk.integrations.google_calendar import obter_refresh_token, renovar_access_token
+from venus_sdk.tools._identidade import SEM_USUARIO_IDENTIFICADO, resolver_user_id
 from venus_sdk.tools._util import exigir_pool
 
 logger = logging.getLogger(__name__)
 
 FREEBUSY_URL = "https://www.googleapis.com/calendar/v3/freeBusy"
 _TIMEOUT_SEGUNDOS = 15
+# Renova um pouco antes de expirar (o Google devolve `expires_in`, ~3600 s).
+_MARGEM_EXPIRACAO_SEGUNDOS = 60
+_VALIDADE_PADRAO_SEGUNDOS = 3600
+
+# access_token por refresh_token (hash), por processo: sem isso, cada checagem
+# gastava uma renovação no Google.
+_access_tokens: dict[str, tuple[str, float]] = {}
+
+
+async def _access_token(refresh_token: str) -> str:
+    chave = hashlib.sha256(refresh_token.encode()).hexdigest()
+    guardado = _access_tokens.get(chave)
+    if guardado and guardado[1] > time.monotonic():
+        return guardado[0]
+    token = await renovar_access_token(refresh_token)
+    validade = float(token.get("expires_in") or _VALIDADE_PADRAO_SEGUNDOS) - _MARGEM_EXPIRACAO_SEGUNDOS
+    _access_tokens[chave] = (token["access_token"], time.monotonic() + validade)
+    return token["access_token"]
 
 
 def montar_tools_calendario(pool: Any) -> list[BaseTool]:
@@ -46,6 +67,9 @@ def montar_tools_calendario(pool: Any) -> list[BaseTool]:
         `{"conectado": True, "ocupado": bool, "compromissos": [...]}`
         quando conseguir checar; `{"erro": ...}` em falha de rede/token —
         também não impede seguir, só sem essa informação."""
+        user_id = resolver_user_id(user_id)
+        if user_id is None:
+            return SEM_USUARIO_IDENTIFICADO
         try:
             refresh_token = await obter_refresh_token(pool, user_id)
         except Exception as exc:  # noqa: BLE001 — GOOGLE_TOKEN_ENCRYPTION_KEY ausente, driver etc.
@@ -56,8 +80,7 @@ def montar_tools_calendario(pool: Any) -> list[BaseTool]:
             return {"conectado": False}
 
         try:
-            token = await renovar_access_token(refresh_token)
-            access_token = token["access_token"]
+            access_token = await _access_token(refresh_token)
             async with httpx.AsyncClient(timeout=_TIMEOUT_SEGUNDOS) as cliente:
                 resp = await cliente.post(
                     FREEBUSY_URL,

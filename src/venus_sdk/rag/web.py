@@ -12,6 +12,8 @@ from typing import Any
 
 import httpx
 
+from venus_sdk.guardrail_rules import contem_tentativa_de_injecao
+
 logger = logging.getLogger(__name__)
 
 _URL_TAVILY = "https://api.tavily.com/search"
@@ -49,6 +51,12 @@ def buscar_web(consulta: str, max_resultados: int = 3) -> list[dict[str, Any]] |
     except Exception as exc:  # noqa: BLE001
         logger.warning("Busca web falhou: %s", exc)
         return {"erro": "não consegui consultar a internet agora", "detalhe": type(exc).__name__}
+    # Página da web é conteúdo de terceiros: trecho com instrução ao sistema
+    # (injeção indireta) é descartado antes de chegar ao agente.
+    resultados = [
+        item for item in resultados
+        if not contem_tentativa_de_injecao(f"{item.get('titulo') or ''} {item.get('trecho') or ''}")
+    ]
     if not resultados:
         return {"encontrado": False, "mensagem": "nenhum resultado na web para essa consulta"}
     return resultados

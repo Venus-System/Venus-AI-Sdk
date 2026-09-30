@@ -15,6 +15,7 @@ from langchain_core.tools import BaseTool, tool
 from venus_sdk.tools._util import (
     LIMITE_BUSCA,
     consultar,
+    escapar_curingas_like,
     exigir_pool,
     normalizar_termo,
     radical_de_busca,
@@ -87,13 +88,18 @@ def montar_tools_ingrediente(pool: Any) -> list[BaseTool]:
         if not termo:
             return {"erro": "informe um nome de ingrediente para buscar"}
         vazio = "nenhum ingrediente encontrado — não invente um ingredient_id"
-        resultado = await consultar(pool, "search_ingredient", _SQL_BUSCAR_INGREDIENTE, termo, vazio=vazio)
+        resultado = await consultar(
+            pool, "search_ingredient", _SQL_BUSCAR_INGREDIENTE, escapar_curingas_like(termo), vazio=vazio
+        )
         if isinstance(resultado, dict) and resultado.get("encontrado") is False:
             # Português x INCI: "niacinamida" não é substring de "NIACINAMIDE".
             # Tenta de novo com o radical (sem as 2 últimas letras).
             radical = radical_de_busca(termo)
-            if radical != termo:
-                resultado = await consultar(pool, "search_ingredient", _SQL_BUSCAR_INGREDIENTE, radical, vazio=vazio)
+            # O ILIKE ignora maiúsculas: só vale tentar se o texto mudou mesmo.
+            if radical != termo.lower():
+                resultado = await consultar(
+                    pool, "search_ingredient", _SQL_BUSCAR_INGREDIENTE, escapar_curingas_like(radical), vazio=vazio
+                )
         return resultado
 
     @tool
@@ -116,6 +122,8 @@ def montar_tools_ingrediente(pool: Any) -> list[BaseTool]:
         """O que o ingrediente faz na pele/cabelo (hidrata, esfolia, pode
         irritar), opcionalmente filtrado por um perfil (ex.: 'pele
         oleosa'). Sem `profile_tag`, devolve todos os efeitos conhecidos."""
+        if profile_tag is not None:
+            profile_tag = escapar_curingas_like(profile_tag)
         return await consultar(pool, "get_ingredient_effects", _SQL_EFEITOS_INGREDIENTE, ingredient_id, profile_tag,
                                vazio="nenhum efeito cadastrado para este ingrediente/perfil")
 

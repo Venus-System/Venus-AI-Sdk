@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langgraph.prebuilt import create_react_agent
 
 
-def montar_agente_mcp(llm: BaseChatModel, *, prompt: str | None = None, tools: list[Any]) -> Any:
+def montar_agente_mcp(llm: BaseChatModel, *, prompt: str | Callable[..., Any] | None = None,
+                      tools: list[Any]) -> Any:
     """Monta um agente ReAct com as `tools` informadas — tools Postgres
     (`tools/produto.py`...), RAG (`tools/faq.py`) e/ou tools MCP/A2A já
     carregadas (`mcp/tools.py::get_mcp_tools`, `a2a_client.py`). Tools MCP são

@@ -104,7 +104,9 @@ async def main() -> int:
     cfg = {"venus": {"transport": "stdio", "command": sys.executable,
                      "args": ["-m", "venus_sdk.mcp.servidor"], "env": env, "cwd": str(RAIZ)}}
     mcp_tools = {x.name: x for x in await get_mcp_tools(cfg)}
-    registrar("MCP lista as 17 tools", len(mcp_tools) == 17, f"{len(mcp_tools)} tools")
+    # Sem --dados-do-usuario o servidor não expõe as 6 tools com user_id.
+    registrar("MCP lista as 11 tools sem dados de usuário", len(mcp_tools) == 11, f"{len(mcp_tools)} tools")
+    registrar("MCP não expõe get_user_allergies", "get_user_allergies" not in mcp_tools, "")
     if mcp_tools:
         await checar("MCP search_product", mcp_tools["search_product"].ainvoke({"termo": "niacinamida"}),
                      lambda r: "Niacinamida" in str(r))

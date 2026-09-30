@@ -58,7 +58,12 @@ from a2a.helpers import get_message_text, new_text_message  # noqa: E402
 from a2a.types import Role, SendMessageRequest  # noqa: E402
 from a2a.utils.errors import UnsupportedOperationError  # noqa: E402
 
-from venus_sdk.a2a_server import VenusAgentExecutor, montar_agent_card, montar_app_a2a  # noqa: E402
+from venus_sdk.a2a_server import (  # noqa: E402
+    VenusAgentExecutor,
+    identidade_do_metadata,
+    montar_agent_card,
+    montar_app_a2a,
+)
 
 URL = "http://agente-erro.teste"
 
@@ -111,7 +116,7 @@ async def test_a2a_usuario_id_postgres_invalido_e_ignorado_sem_derrubar() -> Non
     """`usuario_id_postgres` que não converte pra `int` é descartado (só
     logado) — a chamada tem que completar normalmente, sem esse campo."""
     grafo = _GrafoEspiaoMetadata()
-    app = montar_app_a2a(grafo=grafo, base_url=URL)
+    app = montar_app_a2a(grafo=grafo, base_url=URL, identificar_usuario=identidade_do_metadata)
     http = _http(app)
     client = await create_client(agent=montar_agent_card(URL),
                                  client_config=ClientConfig(httpx_client=http, streaming=False))
@@ -130,7 +135,7 @@ async def test_a2a_sem_metadata_nenhuma_nao_derruba() -> None:
     """Requisição sem `metadata` nenhum (nem no request, nem na mensagem) —
     caso mais comum de cliente A2A simples — precisa continuar funcionando."""
     grafo = _GrafoEspiaoMetadata()
-    app = montar_app_a2a(grafo=grafo, base_url=URL)
+    app = montar_app_a2a(grafo=grafo, base_url=URL, identificar_usuario=identidade_do_metadata)
     http = _http(app)
     client = await create_client(agent=montar_agent_card(URL),
                                  client_config=ClientConfig(httpx_client=http, streaming=False))

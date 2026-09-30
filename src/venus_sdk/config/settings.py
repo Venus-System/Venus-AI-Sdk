@@ -12,6 +12,9 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parents[3]
 
 load_dotenv(BASE_DIR / ".env")
+# Instalado via pip, BASE_DIR aponta para dentro do site-packages: vale também
+# o `.env` da pasta onde o processo roda (sem sobrescrever o que já veio).
+load_dotenv(Path.cwd() / ".env")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -19,7 +22,10 @@ MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 # Aceita MONGODB_URI (nome do atributo) e MONGODB_URL (legado) — opcional.
 MONGODB_URI = os.getenv("MONGODB_URI") or os.getenv("MONGODB_URL")
-FAQ_DIR = os.getenv("FAQ_DIR") or str(BASE_DIR / "data" / "faq")
+_FAQ_DO_REPOSITORIO = BASE_DIR / "data" / "faq"
+FAQ_DIR = os.getenv("FAQ_DIR") or str(
+    _FAQ_DO_REPOSITORIO if _FAQ_DO_REPOSITORIO.is_dir() else Path.cwd() / "data" / "faq"
+)
 # FAQ no Qdrant (extra `rag`) — opcional; sem QDRANT_URL o FAQ usa o índice
 # local sobre FAQ_DIR. Aceita QDRANT_API (nome antigo) para a chave.
 QDRANT_URL = os.getenv("QDRANT_URL")

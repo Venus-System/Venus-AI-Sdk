@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 # O modelo lê no máximo 512 tokens: seções longas do markdown são subdivididas.
 _TAMANHO_TRECHO = 400
 _SOBREPOSICAO = 50
+_PONTOS_POR_PAGINA = 256
 
 
 def ingerir_faq(pasta: str | Path = FAQ_DIR, *, cliente: Any | None = None, embed_model: Any | None = None) -> int:
@@ -45,25 +46,39 @@ def ingerir_faq(pasta: str | Path = FAQ_DIR, *, cliente: Any | None = None, embe
         MarkdownNodeParser().get_nodes_from_documents(documentos)
     )
     cliente = cliente or get_qdrant_client()
-    _esvaziar_colecao(cliente)
+    # Os antigos só saem depois que os novos estão gravados: se a ingestão
+    # falhar no meio, o FAQ continua no ar com o conteúdo anterior.
+    ids_antigos = _ids_dos_pontos(cliente)
     VectorStoreIndex(
         trechos,
         storage_context=StorageContext.from_defaults(vector_store=get_vector_store(cliente)),
         embed_model=embed_model or get_embed_model(),
     )
+    _apagar_pontos(cliente, ids_antigos)
     logger.info("%d documento(s), %d trecho(s) indexado(s) na coleção '%s'.", len(documentos), len(trechos), COLLECTION)
     return len(trechos)
 
 
-def _esvaziar_colecao(cliente: Any) -> None:
-    """Apaga os pontos antigos (a coleção continua existindo, com a mesma config)."""
+def _ids_dos_pontos(cliente: Any) -> list[Any]:
+    """Ids de todos os pontos já gravados na coleção (vazio se ela não existe)."""
+    if not cliente.collection_exists(COLLECTION):
+        return []
+    ids: list[Any] = []
+    proximo = None
+    while True:
+        pontos, proximo = cliente.scroll(
+            COLLECTION, limit=_PONTOS_POR_PAGINA, offset=proximo, with_payload=False, with_vectors=False
+        )
+        ids += [ponto.id for ponto in pontos]
+        if proximo is None:
+            return ids
+
+
+def _apagar_pontos(cliente: Any, ids: list[Any]) -> None:
     from qdrant_client import models
 
-    if cliente.collection_exists(COLLECTION) and cliente.get_collection(COLLECTION).points_count:
-        cliente.delete(
-            collection_name=COLLECTION,
-            points_selector=models.FilterSelector(filter=models.Filter(must=[])),
-        )
+    if ids:
+        cliente.delete(collection_name=COLLECTION, points_selector=models.PointIdsList(points=ids))
 
 
 if __name__ == "__main__":

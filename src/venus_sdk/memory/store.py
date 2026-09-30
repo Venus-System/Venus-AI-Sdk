@@ -216,11 +216,13 @@ class MongoDBStore(BaseStore):
 
     @staticmethod
     def _casa_condicao(namespace: tuple[str, ...], condicao: MatchCondition) -> bool:
-        caminho = [p for p in condicao.path if p != "*"]
+        caminho = list(condicao.path)
         if len(caminho) > len(namespace):
             return False
+        if not caminho:
+            return True
         alvo = namespace[: len(caminho)] if condicao.match_type == "prefix" else namespace[-len(caminho):]
-        return list(alvo) == caminho
+        return all(esperado in ("*", real) for esperado, real in zip(caminho, alvo))
 
     @staticmethod
     def _doc_para_item(doc: dict[str, Any], *, buscado: bool = False) -> Item:

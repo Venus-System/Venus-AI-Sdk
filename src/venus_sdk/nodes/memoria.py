@@ -19,7 +19,9 @@ from typing import Any
 
 from langgraph.store.base import BaseStore
 
+from venus_sdk.guardrail_rules import contem_tentativa_de_injecao
 from venus_sdk.llm.models import get_llm_rapido
+from venus_sdk.nodes._json import extrair_objeto_json
 from venus_sdk.prompts.memoria import MEMORIA_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 
@@ -66,7 +68,9 @@ def no_atualizar_memoria(estado: EstadoVenus, *, store: BaseStore) -> EstadoVenu
     usuário.
     """
     usuario_id = estado.get("usuario_id")
-    if store is None or not usuario_id:
+    if store is None or not usuario_id or estado.get("entrada_bloqueada"):
+        # Turno bloqueado: a mensagem não é confiável e a memória nem foi
+        # carregada — mesclar agora apagaria o perfil salvo.
         return {}
 
     # `pergunta_original` é a reformulação feita pelo LLM roteador (ver
@@ -94,8 +98,11 @@ def no_atualizar_memoria(estado: EstadoVenus, *, store: BaseStore) -> EstadoVenu
     if not fatos_novos:
         return {}
 
-    perfil_atualizado = _mesclar_perfil(perfil_atual, fatos_novos)
     try:
+        # Relê o perfil: outra conversa do mesmo usuário pode ter gravado
+        # fatos depois que este turno carregou a memória.
+        item = store.get(_namespace(usuario_id), CHAVE_PERFIL)
+        perfil_atualizado = _mesclar_perfil(item.value if item else perfil_atual, fatos_novos)
         store.put(_namespace(usuario_id), CHAVE_PERFIL, perfil_atualizado)
     except Exception:
         # A resposta já foi validada e está indo pro usuário: falha ao gravar
@@ -109,11 +116,16 @@ def _extrair_fatos_novos(texto: str) -> dict[str, Any] | None:
     if not texto or texto.strip().upper() == "NADA":
         return None
     try:
-        fatos = json.loads(texto)
-    except (TypeError, ValueError):
-        logger.warning("Extrator de memória não devolveu JSON válido: %r", texto)
+        fatos = extrair_objeto_json(texto)
+    except ValueError:
+        logger.warning("Extrator de memória não devolveu JSON válido (%d caracteres)", len(texto))
         return None
-    return fatos if isinstance(fatos, dict) and fatos else None
+    if contem_tentativa_de_injecao(json.dumps(fatos, ensure_ascii=False)):
+        # A memória volta ao prompt em todo turno: um "fato" com instrução
+        # viraria uma injeção permanente.
+        logger.warning("Fatos de memória descartados: parecem instrução ao sistema")
+        return None
+    return fatos or None
 
 
 def _mesclar_perfil(atual: dict[str, Any], novos: dict[str, Any]) -> dict[str, Any]:

@@ -7,6 +7,7 @@ from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
+from venus_sdk.tools._identidade import SEM_USUARIO_IDENTIFICADO, resolver_user_id
 from venus_sdk.tools._util import consultar, exigir_pool
 
 
@@ -35,6 +36,9 @@ def montar_tools_compartilhadas(pool: Any) -> list[BaseTool]:
         """Lista as alergias/sensibilidades que o usuário declarou (nome,
         tipo e severidade) — usada para nunca recomendar produto/ingrediente
         que bata com uma delas."""
+        user_id = resolver_user_id(user_id)
+        if user_id is None:
+            return SEM_USUARIO_IDENTIFICADO
         resposta = await consultar(pool, "get_user_allergies", _SQL_ALERGIAS_DO_USUARIO, user_id,
                                    vazio=_MARCADOR_SEM_ALERGIAS)
         if isinstance(resposta, dict) and resposta.get("mensagem") == _MARCADOR_SEM_ALERGIAS:
