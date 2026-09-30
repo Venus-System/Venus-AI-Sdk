@@ -231,3 +231,33 @@ def test_rotina_sem_passos_na_resposta_recebe_os_passos_reais_da_tool() -> None:
     # se a resposta já cita os produtos, não duplica
     ok = _garantir_passos_da_rotina({"resposta": "Use Gel X e depois Creme Y.", "recomendacao": ""}, ev)
     assert "Passos (" not in ok["resposta"]
+
+
+# --- tools extras do agente de rotina (Google Calendar) ---
+
+
+def test_agente_de_rotina_recebe_tools_extras_de_leitura_e_escrita() -> None:
+    from unittest.mock import patch as _patch
+
+    from langchain_core.tools import tool as _tool
+
+    from venus_sdk.nodes import especialistas as esp
+
+    @_tool
+    def check_availability(user_id: int, inicio: str, fim: str) -> dict:
+        """Tool falsa de disponibilidade."""
+        return {"conectado": False}
+
+    for pergunta in ("Monta uma rotina de manhã às 7h", "Remove o produto X dos meus favoritos"):
+        recebidas: dict = {}
+
+        def _montar(llm, *, prompt, tools):
+            recebidas["tools"] = [t.name for t in tools]
+            return "agente"
+
+        with _patch.object(esp, "montar_agente_mcp", side_effect=_montar), \
+             _patch.object(esp, "get_llm_especialista", return_value=None), \
+             _patch.object(esp, "_executar_especialista", return_value={}):
+            asyncio.run(esp.montar_no_agente_rotina(object(), tools_extras=[check_availability])(
+                {"pergunta_original": pergunta}))
+        assert "check_availability" in recebidas["tools"]

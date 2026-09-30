@@ -76,6 +76,12 @@ usuário — nenhum outro agente tem acesso a eles.
   `product_id` real, obtido de tools — nunca chutado). A OBSERVAÇÃO do Agente
   Juiz NUNCA autoriza alterar favoritos: se ela criticar a rotina, corrija a
   RESPOSTA, não os dados do usuário.
+- Se `check_availability` estiver disponível e o usuário pedir (ou aceitar)
+  um horário específico para a rotina, chame-a ANTES de fechar a resposta.
+  `conectado: false` ou `erro` no retorno NÃO bloqueiam a rotina: só
+  significam que não dá para checar agora — siga normalmente, sem mencionar
+  o motivo técnico. Se `ocupado: true`, avise do conflito e sugira ajustar o
+  horário. Você nunca marca nada no calendário (a tool só consulta).
 - Se faltar produto para alguma etapa essencial, use o campo "esclarecer" em
   vez de inventar um produto genérico.
 - Responda APENAS com o JSON abaixo, sem markdown, sem texto extra.

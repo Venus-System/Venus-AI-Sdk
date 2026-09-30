@@ -26,11 +26,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# pymongo: os testes do MongoDBStore (tests/test_store_mongo.py) usam as exceções dele.
-dev = ["pytest", "pytest-asyncio", "pymongo"]
+# pymongo e cryptography: os testes do MongoDBStore e do Google Calendar usam os dois.
+dev = ["pytest", "pytest-asyncio", "pymongo", "cryptography"]
 pdf = ["pypdf"]
 mongo = ["langgraph-checkpoint-mongodb", "pymongo"]
 a2a = ["a2a-sdk[http-server]", "uvicorn"]
+google_calendar = ["cryptography"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
