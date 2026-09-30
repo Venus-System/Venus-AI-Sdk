@@ -180,14 +180,8 @@ def _mensagens_para_o_roteador(estado: EstadoVenus) -> list:
     if memorias:
         mensagem = f"MEMORIA_USUARIO={json.dumps(memorias, ensure_ascii=False)}\n{mensagem}"
 
-    # `historico` já inclui a mensagem deste turno — `no_guardrail_entrada`
-    # grava `mensagem_anonimizada` nele (reducer `add_messages`, ver
-    # `state.py`) antes do roteador rodar, no mesmo `invoke`. Descartamos a
-    # última entrada aqui pra não duplicá-la no prompt do LLM (ela reaparece
-    # logo abaixo, já com o prefixo MEMORIA_USUARIO= quando houver). O
-    # roteador só roda 1x por turno agora — um retry do Agente Juiz volta
-    # direto pro especialista, não mais pro roteador (ver
-    # `nodes/juiz.py::decidir_pos_juiz`).
+    # O guardrail de entrada já pôs a mensagem deste turno no fim do
+    # histórico; ela sai daqui para não aparecer duas vezes no prompt.
     historico = list(estado.get("historico") or [])
     if historico:
         historico = historico[:-1]

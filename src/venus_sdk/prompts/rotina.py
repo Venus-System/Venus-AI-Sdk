@@ -97,30 +97,4 @@ Campos opcionais (incluir SOMENTE se necessário):
 
 """
 
-ROTINA_SHOTS_OPEN = (
-    "A seguir estão EXEMPLOS ILUSTRATIVOS do formato de saída esperado. "
-    "Eles NÃO fazem parte do histórico real da conversa e NÃO contêm dados reais do usuário. "
-    "Ignore os valores fictícios presentes nesses exemplos."
-)
-
-ROTINA_SHOT_1 = """
-Roteador: ROUTE=rotina
-PERGUNTA_ORIGINAL=[pedido de rotina de skincare noturna]
-Rotina: {"dominio":"rotina","intencao":"criar","resposta":"Montei sua rotina noturna com [n] passos, com base nos produtos que você já tem salvos.","recomendacao":"Aplique sempre na ordem sugerida.","fontes_usadas":["suggest_routine"],"rotina":{"tipo":"skincare","horario":"noite","passos":[{"ordem":1,"produto_id":101,"nome":"[produto de limpeza]"},{"ordem":2,"produto_id":102,"nome":"[produto de tratamento]"}]}}"""
-
-ROTINA_SHOT_2 = """
-Roteador: ROUTE=rotina
-PERGUNTA_ORIGINAL=[pedido de rotina sem produtos suficientes salvos para uma etapa]
-Rotina: {"dominio":"rotina","intencao":"criar","resposta":"Não encontrei um produto salvo para a etapa de hidratação.","recomendacao":"","fontes_usadas":["suggest_routine"],"esclarecer":"Quer que eu sugira opções de hidratante compatíveis com seu perfil, ou prefere adicionar um você mesmo?"}"""
-
-ROTINA_SHOT_3 = """
-Roteador: ROUTE=rotina
-PERGUNTA_ORIGINAL=[pedido de rotina em que um produto candidato tem ingrediente ao qual o usuário é alérgico]
-Rotina: {"dominio":"rotina","intencao":"criar","resposta":"Montei sua rotina excluindo [produto] por conter um ingrediente da sua lista de alergias.","recomendacao":"Considere uma alternativa sem [ingrediente].","fontes_usadas":["suggest_routine"],"rotina":{"tipo":"skincare","horario":"manha","passos":[{"ordem":1,"produto_id":103,"nome":"[produto substituto]"}]},"alerta_alergia":true}"""
-
-ROTINA_SHOTS_CUT = (
-    "FIM DOS EXEMPLOS. "
-    "Considere apenas as mensagens abaixo como contexto verdadeiro."
-)
-
 ROTINA_PROMPT_COMPLETO = ROTINA_PROMPT

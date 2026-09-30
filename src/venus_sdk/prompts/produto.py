@@ -115,35 +115,4 @@ Campos opcionais (incluir SOMENTE se necessário):
 
 """
 
-ESP_PRODUTO_SHOTS_OPEN = (
-    "A seguir estão EXEMPLOS ILUSTRATIVOS do formato de saída esperado. "
-    "Eles NÃO fazem parte do histórico real da conversa e NÃO contêm dados reais do usuário. "
-    "Ignore os valores fictícios presentes nesses exemplos."
-)
-
-ESP_PRODUTO_SHOT_1 = """
-Roteador: ROUTE=produto
-PERGUNTA_ORIGINAL=[pergunta sobre por que um produto foi recomendado]
-Produto: {"dominio":"produto","intencao":"explicar_recomendacao","resposta":"O produto [nome] foi recomendado porque [motivo baseado no score/perfil].","recomendacao":"[sugestão de uso ou observação]","fontes_usadas":["personalized_scores","product_ingredients"]}"""
-
-ESP_PRODUTO_SHOT_2 = """
-Roteador: ROUTE=produto
-PERGUNTA_ORIGINAL=[relato de que o produto foi usado e não funcionou, pele oleosa]
-Produto: {"dominio":"produto","intencao":"investigar_reacao","resposta":"Não encontrei alergia declarada a nenhum ingrediente de [produto]; a causa mais provável, pelos dados, é [hipótese apoiada em dado].","recomendacao":"[sugestão prática, ex.: tempo de uso ou frequência]","fontes_usadas":["get_user_allergies","product_ingredients"],"alerta_seguranca":false}"""
-
-ESP_PRODUTO_SHOT_3 = """
-Roteador: ROUTE=produto
-PERGUNTA_ORIGINAL=[relato de vermelhidão persistente após uso]
-Produto: {"dominio":"produto","intencao":"investigar_reacao","resposta":"Isso pode indicar sensibilidade ao produto, mas não posso avaliar a causa com segurança.","recomendacao":"Suspenda o uso e procure um dermatologista.","fontes_usadas":["get_user_allergies"],"encaminhar_profissional":true}"""
-
-ESP_PRODUTO_SHOT_4 = """
-Roteador: ROUTE=produto
-PERGUNTA_ORIGINAL=[pergunta cita só o nome do produto, sem product_id — search_product não achou nenhum candidato ou achou mais de um]
-Produto: {"dominio":"produto","intencao":"explicar_recomendacao","resposta":"Não consegui identificar com certeza qual produto é esse no seu histórico.","recomendacao":"","fontes_usadas":["search_product"],"esclarecer":"Você pode confirmar o nome completo do produto (ou me passar o produto pela tela do app) pra eu localizar certinho?"}"""
-
-ESP_PRODUTO_SHOTS_CUT = (
-    "FIM DOS EXEMPLOS. "
-    "Considere apenas as mensagens abaixo como contexto verdadeiro."
-)
-
 ESP_PRODUTO_PROMPT_COMPLETO = ESP_PRODUTO_PROMPT

@@ -23,20 +23,9 @@ DecisaoGuardrailEntrada = Literal["bloqueado", "liberado"]
 
 
 def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
-    """Aplica o guardrail de entrada e anonimiza a mensagem antes de logar.
-
-    Grava a mensagem (anonimizada) no histórico — o campo usa o reducer
-    `add_messages` (ver `state.py`), então isto soma à conversa acumulada em
-    vez de sobrescrevê-la.
-
-    Também zera o estado do Agente Juiz (`tentativas_juiz`/`aprovado_juiz`/
-    `feedback_juiz`) — este nó é o entry point do grafo e roda uma única vez
-    por turno (nunca de novo durante um retry do Juiz dentro do mesmo turno,
-    que volta direto pro especialista sem passar por aqui), então é o lugar
-    certo pra isso. Sem isto, `tentativas_juiz` persistia entre turnos via
-    checkpointer e podia disparar "esgotado" logo na 1ª rodada de um turno
-    novo, com o resíduo de um turno anterior.
-    """
+    """Aplica o guardrail de entrada, anonimiza a mensagem e a grava no
+    histórico. Também zera o estado do Juiz: este nó roda uma vez por turno,
+    e sem isso `tentativas_juiz` vinha do turno anterior pelo checkpointer."""
     mensagem = estado.get("mensagem_usuario", "") or ""
     bloqueado, motivo = guardrail_entrada(mensagem)
     mensagem_anonimizada = anonimizar_entrada(mensagem)
@@ -63,14 +52,8 @@ def decidir_pos_guardrail_entrada(estado: EstadoVenus) -> DecisaoGuardrailEntrad
 
 
 def no_guardrail_saida(estado: EstadoVenus) -> EstadoVenus:
-    """Aplica o guardrail de saída sobre `resposta_final` antes de responder.
-
-    Antes de validar, remove emoji da resposta — a persona proíbe emoji em
-    qualquer circunstância, e reforçar isso aqui (determinístico) cobre os
-    casos em que o LLM não segue a regra à risca. Grava a resposta final
-    (já sanitizada e sujeita ao bloqueio, se houver) no histórico — ver nota
-    do reducer em `no_guardrail_entrada`.
-    """
+    """Remove emoji (a persona proíbe; o LLM nem sempre obedece), aplica o
+    guardrail de saída e grava a resposta final no histórico."""
     resposta = remover_emojis(estado.get("resposta_final") or "")
     bloqueado, motivo = guardrail_saida(resposta)
     resposta_final = MENSAGEM_SAIDA_BLOQUEADA if bloqueado else resposta

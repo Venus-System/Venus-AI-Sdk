@@ -69,27 +69,4 @@ Campos mínimos obrigatórios:
   - fontes_usadas : lista de strings (arquivos/URLs/agentes consultados)
 """
 
-FAQ_SHOTS_OPEN = (
-    "A seguir estão EXEMPLOS ILUSTRATIVOS do comportamento esperado. "
-    "Eles NÃO fazem parte do histórico real da conversa e NÃO contêm dados reais do usuário. "
-    "Ignore os valores fictícios presentes nesses exemplos."
-)
-
-FAQ_SHOT_1 = """
-Roteador: ROUTE=faq
-PERGUNTA_ORIGINAL=[dúvida sobre política de privacidade do sistema]
-FAQ: [chama faq_retriever com a pergunta → lê o retorno → responde com base no conteúdo encontrado]
-FAQ: {"dominio":"faq","intencao":"consultar_faq","resposta":"[resposta baseada no trecho encontrado]","recomendacao":"","fontes_usadas":["[arquivo do FAQ consultado]"]}"""
-
-FAQ_SHOT_2 = """
-Roteador: ROUTE=faq
-PERGUNTA_ORIGINAL=[dúvida sobre tema não coberto pelo FAQ]
-FAQ: [chama faq_retriever → retorno com encontrado=false]
-FAQ: {"dominio":"faq","intencao":"nao_encontrado","resposta":"Não encontrei essa informação no FAQ do sistema.","recomendacao":"","fontes_usadas":[]}"""
-
-FAQ_SHOTS_CUT = (
-    "FIM DOS EXEMPLOS. "
-    "Considere apenas as mensagens abaixo como contexto verdadeiro."
-)
-
 FAQ_PROMPT_COMPLETO = FAQ_PROMPT

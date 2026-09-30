@@ -30,12 +30,8 @@ logger = logging.getLogger(__name__)
 
 NoEspecialista = Callable[[EstadoVenus], Awaitable[EstadoVenus]]
 
-# Fallback pra quando o especialista falha por completo (ex.: Gemini E Groq
-# indisponíveis ao mesmo tempo — ver nota em `_resposta_agente`) — evita que
-# um erro de provedor de LLM derrube a conversa inteira sem resposta
-# nenhuma; o Agente Juiz reprova isto naturalmente (fontes_usadas vazio),
-# então depois de `MAX_TENTATIVAS_JUIZ` o orquestrador ainda comunica o
-# problema com transparência (ver `nodes/juiz.py`/`nodes/orquestrador.py`).
+# Resposta quando o especialista falha por completo (todos os LLMs da cadeia
+# fora do ar): a conversa segue e o orquestrador comunica o problema.
 _RESPOSTA_ESPECIALISTA_FALLBACK = (
     "Tive um probleminha pra buscar essas informações agora. Pode tentar "
     "de novo em instantes?"
@@ -43,9 +39,7 @@ _RESPOSTA_ESPECIALISTA_FALLBACK = (
 _RESPOSTA_ERRO_FORMATO = "Não consegui estruturar uma resposta válida para essa pergunta."
 
 # Teto de passos do agente ReAct por pergunta; cada rodada de tool gasta 2
-# (LLM + tool). Com 14, o agente de ingrediente que consulta as 5 tools uma a
-# uma estourava o teto e devolvia "Sorry, need more steps to process this
-# request." no lugar do JSON (teste de 2026-09-26).
+# (LLM + tool) e o agente de ingrediente chega a consultar as 5 tools.
 _LIMITE_PASSOS_AGENTE = 24
 _TAMANHO_PREVIA_LOG = 80
 
@@ -87,11 +81,7 @@ def _montar_entrada(estado: EstadoVenus) -> str:
     memorias = estado.get("memorias_usuario")
     if memorias:
         partes.append(f"MEMORIA_USUARIO={json.dumps(memorias, ensure_ascii=False)}")
-    # ID inteiro do Postgres (distinto do usuario_id string da memória de
-    # longo prazo, ver `state.py`) — só incluído quando existe de verdade,
-    # nunca inventado aqui; ver `IDENTIFICADOR_USUARIO_NOTA` em
-    # `prompts/comum.py` pro protocolo completo (o que o especialista deve
-    # fazer com/sem esta linha).
+    # Só entra quando existe de verdade (ver `IDENTIFICADOR_USUARIO_NOTA`).
     usuario_id_postgres = estado.get("usuario_id_postgres")
     if usuario_id_postgres is not None:
         partes.append(f"USER_ID_POSTGRES={usuario_id_postgres}")
@@ -108,19 +98,9 @@ def _montar_entrada(estado: EstadoVenus) -> str:
 
 
 def _extrair_evidencias_tools(mensagens: list) -> list[dict[str, Any]]:
-    """Extrai nome+retorno de cada `ToolMessage` da execução do agente ReAct
-    — a evidência bruta que embasa (ou não) `resposta_especialista`, usada
-    pelo Agente Juiz pra cruzar contra `fontes_usadas` (ver
-    `nodes/juiz.py`). Sem isto, o Juiz só via o JSON final do especialista e
-    não tinha como perceber quando uma tool citada não sustentava, de
-    verdade, a afirmação feita (achado de um teste de conversa real em
-    2026-09-10 — ver `EstadoVenus.evidencias_tools`).
-
-    Inclui `argumentos` (os parâmetros da chamada, ex.: `ingredient_id`)
-    quando a chamada correspondente aparece nas mensagens: sem isso não dá
-    pra saber de QUAL item é cada retorno quando o agente consulta mais de um
-    (teste de 2026-09-26: detalhes de um ingrediente apareceram na resposta
-    sobre outro)."""
+    """Nome, retorno e `argumentos` de cada `ToolMessage` da execução — a
+    evidência que o Juiz confere. Os argumentos dizem de QUAL item é cada
+    retorno quando o agente consulta mais de um (ex.: dois `ingredient_id`)."""
     argumentos_por_chamada = {
         chamada.get("id"): chamada.get("args")
         for mensagem in mensagens
@@ -145,28 +125,12 @@ def _logar_passo_do_agente(mensagem: Any, inicio: float) -> None:
 
 
 async def _resposta_agente(agente: Any, entrada: str) -> tuple[str, list[dict[str, Any]]]:
-    """Roda o agente via `ainvoke` — as tools de produto/ingrediente são
-    async (asyncpg, ver `tools/produto.py`/`tools/ingrediente.py`).
+    """Roda o agente e devolve `(texto, evidencias_tools)`.
 
-    Precisa ser `await`ada dentro do MESMO event loop usado pra criar o
-    `pool` (ver `nodes/especialistas.py::montar_no_agente_produto` e o
-    exemplo em `examples/conversar_com_venus.py`) — nunca via
-    `asyncio.run()` aqui dentro: um `asyncpg.Pool` fica preso ao loop onde
-    foi criado, e `asyncio.run()` cria (e fecha) um loop novo a cada
-    chamada, o que quebrava esse pool com `RuntimeError: Event loop is
-    closed` assim que a segunda mensagem tentava reusá-lo. Por isso todo o
-    grafo principal roda via `ainvoke`/`compilar_grafo_venus(...).ainvoke`
-    — nós síncronos continuam funcionando nesse modo (o LangGraph os roda
-    numa thread separada), então isso não exige mudar os outros nós.
-
-    `extrair_texto_resposta` normaliza o `content` da última mensagem — o
-    gemini-3.6-flash (usado por `get_llm_especialista()`) às vezes devolve
-    uma lista de blocos (thought signature) em vez de string simples; sem
-    isso, `json.loads()` em `_executar_especialista` falhava e descartava a
-    resposta de verdade do especialista, caindo no fallback genérico de
-    erro de formato.
-
-    Devolve `(texto, evidencias_tools)` — ver `_extrair_evidencias_tools`."""
+    Sempre `await` no MESMO event loop em que o `pool` foi criado — nunca
+    `asyncio.run()` aqui: um `asyncpg.Pool` fica preso ao loop de origem.
+    O `content` pode vir como lista de blocos (Gemini), daí
+    `extrair_texto_resposta`."""
     entrada_agente = {"messages": [("human", entrada)]}
     if hasattr(agente, "astream"):
         mensagens = await _executar_com_log_de_passos(agente, entrada_agente)
@@ -258,10 +222,7 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
     try:
         texto, evidencias = await _resposta_agente(agente, _montar_entrada(estado))
     except Exception:
-        # Gemini E o fallback Groq falharam (ou algo mais quebrou dentro do
-        # agente ReAct) — nunca deixa isso subir cru até `.ainvoke()` do
-        # grafo principal (ver `_RESPOSTA_ESPECIALISTA_FALLBACK`); vira um
-        # JSON reprovável normalmente pelo Agente Juiz, não um crash.
+        # Falha de LLM/tool nunca derruba o grafo: vira JSON de erro técnico.
         logger.exception("Especialista %s falhou ao chamar o LLM/tools", nome)
         return {
             "resposta_especialista": _resposta_de_falha(nome, "erro_tecnico", _RESPOSTA_ESPECIALISTA_FALLBACK),
@@ -291,13 +252,15 @@ def _montar_no_especialista(
     O agente só é montado (e as tools só exigem `pool`/`indice` de verdade)
     no primeiro uso real do nó, nunca na montagem do grafo; depois fica em
     cache, um por instância da fábrica."""
-    cache: dict[str, Any] = {}
+    agente: Any = None
 
     def _agente() -> Any:
-        if nome not in cache:
+        nonlocal agente
+        if agente is None:
+            # As tools primeiro: sem `pool`/`indice`, o erro que sobe é o delas.
             tools = montar_tools()
-            cache[nome] = montar_agente_mcp(get_llm_especialista(), prompt=prompt, tools=tools)
-        return cache[nome]
+            agente = montar_agente_mcp(get_llm_especialista(), prompt=prompt, tools=tools)
+        return agente
 
     async def no_especialista(estado: EstadoVenus) -> EstadoVenus:
         """Roda o agente e grava o JSON em `resposta_especialista`."""
@@ -307,18 +270,9 @@ def _montar_no_especialista(
 
 
 def montar_no_agente_produto(pool: Any) -> NoEspecialista:
-    """Fábrica do nó do agente de Produto — recebe o `pool` do Postgres (ver
-    `tools/produto.py`) e devolve o nó pronto pra registrar no grafo
-    (`flows/venus_flow.py::montar_grafo_venus`).
-
-    O agente ReAct só é montado (e as tools só exigem `pool` de verdade) no
-    primeiro uso real do nó, nunca na montagem do grafo (ver
-    `_montar_no_especialista`).
-
-    O nó é `async def` (ver `_resposta_agente`) — o grafo precisa ser
-    invocado via `.ainvoke()`/`.astream()`, nunca `.invoke()`, quando `pool`
-    não for `None` (ver `examples/conversar_com_venus.py`).
-    """
+    """Nó do agente de Produto (tools em `tools/produto.py`). O agente só é
+    montado no primeiro uso; o nó é async, então o grafo roda via
+    `.ainvoke()`/`.astream()`."""
     return _montar_no_especialista(
         "produto",
         ESP_PRODUTO_PROMPT_COMPLETO,
@@ -390,10 +344,8 @@ def montar_no_agente_faq(indice: Any, tools_extras: list[Any] | None = None) -> 
     `tools_extras` recebe tools já carregadas de fontes externas — tools MCP
     (`mcp.tools.get_mcp_tools`) e/ou A2A (`a2a_client.montar_tool_a2a`).
 
-    Diferente do desenho antigo, o FAQ agora devolve JSON estruturado (com
-    `fontes_usadas` = arquivos/URLs realmente consultados) e passa pelo Agente
-    Juiz, que confere a resposta contra os trechos recuperados
-    (`evidencias_tools`) — mitigação de alucinação também no RAG.
+    Devolve JSON com `fontes_usadas` e passa pelo Juiz, que confere a
+    resposta contra os trechos recuperados.
     """
     return _montar_no_especialista(
         "faq",

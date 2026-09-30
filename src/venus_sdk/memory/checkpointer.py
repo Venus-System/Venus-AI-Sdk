@@ -14,10 +14,6 @@ Duas opções hoje:
   `sqlalchemy`, `numpy`), por isso não vem instalada por padrão; só quem
   for usar Mongo paga esse custo.
 
-(Chegamos a ter uma terceira opção em SQLite — descartada porque a
-opção de produção já é o Mongo, e manter as duas persistentes era
-redundante; ver histórico do git se precisar recuperar.)
-
 Em qualquer um dos casos, o resto do SDK não muda, já que só depende da
 interface `BaseCheckpointSaver` que `compilar_grafo_venus(checkpointer=...)`
 espera.
@@ -25,7 +21,7 @@ espera.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from langgraph.checkpoint.memory import InMemorySaver
 
@@ -94,12 +90,17 @@ def criar_checkpointer_mongo(
             "`pip install langgraph-checkpoint-mongodb`)."
         ) from erro
 
+    cliente = _cliente_mongo(MongoClient, uri, timeout_ms)
+    return MongoDBSaver(cliente, db_name=db_name, ttl=ttl_segundos)
+
+
+def _cliente_mongo(classe_cliente: Any, uri: str | None, timeout_ms: int) -> Any:
+    """`MongoClient` para `uri` (ou `MONGODB_URI`), com timeout curto.
+    Levanta `ValueError` se nenhuma URI for encontrada."""
     uri_final = uri or MONGODB_URI
     if not uri_final:
         raise ValueError(
             "Nenhuma URI de MongoDB configurada — defina MONGODB_URI no "
             ".env ou passe `uri=` explicitamente."
         )
-
-    cliente = MongoClient(uri_final, serverSelectionTimeoutMS=timeout_ms, connectTimeoutMS=timeout_ms)
-    return MongoDBSaver(cliente, db_name=db_name, ttl=ttl_segundos)
+    return classe_cliente(uri_final, serverSelectionTimeoutMS=timeout_ms, connectTimeoutMS=timeout_ms)

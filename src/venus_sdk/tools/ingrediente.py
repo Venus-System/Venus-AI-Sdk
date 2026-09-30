@@ -2,14 +2,8 @@
 curado (ETL a partir de ANVISA/CosIng/PubChem, materializado no Postgres,
 schema `venus`), via `asyncpg`.
 
-Importante: isso NÃO é RAG, mesmo a base tendo origem externa — é consulta
-estruturada por ID/termo a tabelas já povoadas. RAG de verdade (o sentido
-cobrado pela disciplina) é o `faq_retriever` (ver `tools/faq.py` e `rag/`).
-
-Validado manualmente em 2026-09-05 contra o Postgres de teste real (as 5
-tools, com dado de verdade — busca por termo, ingrediente com/sem
-regulação). Mesma nota de `tools/produto.py` sobre não ter teste
-automatizado no CI.
+Isso NÃO é RAG, mesmo a base tendo origem externa — é consulta estruturada
+por ID/termo a tabelas já povoadas. O RAG é o `faq_retriever` (`tools/faq.py`).
 """
 
 from __future__ import annotations

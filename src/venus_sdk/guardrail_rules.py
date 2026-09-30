@@ -63,13 +63,8 @@ def _eh_cartao_valido(candidato: str) -> bool:
 # Aplicado direto no texto original (com acento) — os character classes
 # ([çc], [ãa]...) já cobrem a variação com/sem acento sem precisar normalizar.
 _INJECAO_RE = re.compile(
-    # até 3 palavras de preenchimento entre "ignore"/"ignora" e "instruções"
-    # (ex.: "ignore TODAS AS SUAS instruções anteriores") — sem isso, só
-    # "ignore instruções"/"ignore as instruções" batiam, e uma frase natural
-    # como essa passava direto pelo guardrail determinístico (visto de
-    # verdade rodando o grafo completo em 2026-09-10; a defesa em prompt via
-    # HIERARQUIA_INSTRUCOES pegou dessa vez, mas essa camada não deveria
-    # depender só dela).
+    # até 3 palavras entre "ignore" e "instruções" ("ignore TODAS AS SUAS
+    # instruções anteriores").
     r"ignor[ea]\s+(?:\w+\s+){0,3}instru[çc][õo]es|"
     r"esque[çc]a\s+(tudo|as\s+regras)|"
     r"revele\s+(seu\s+)?(system\s?)?prompt|"

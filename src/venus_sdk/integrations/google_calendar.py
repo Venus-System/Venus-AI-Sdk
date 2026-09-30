@@ -34,6 +34,8 @@ import logging
 import os
 from typing import Any
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -51,7 +53,7 @@ def _fernet() -> Any:
             "`python -c \"from cryptography.fernet import Fernet; "
             "print(Fernet.generate_key().decode())\"`."
         )
-    return Fernet(chave.encode() if isinstance(chave, str) else chave)
+    return Fernet(chave.encode())
 
 
 def cifrar_token(texto: str) -> bytes:
@@ -83,24 +85,12 @@ async def trocar_codigo_por_token(
     `refresh_token`/`scope`. Chamado pelo backend do mobile/web logo depois
     do redirect do Google. Levanta em falha de rede/protocolo (ver docstring
     do módulo) — o chamador decide como tratar."""
-    import httpx
-
     cid, secret = _credenciais(client_id, client_secret)
-    fechar = httpx_client is None
-    cliente = httpx_client or httpx.AsyncClient(timeout=_TIMEOUT_SEGUNDOS)
-    try:
-        resp = await cliente.post(
-            TOKEN_URL,
-            data={
-                "code": code, "client_id": cid, "client_secret": secret,
-                "redirect_uri": redirect_uri, "grant_type": "authorization_code",
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()
-    finally:
-        if fechar:
-            await cliente.aclose()
+    dados = {
+        "code": code, "client_id": cid, "client_secret": secret,
+        "redirect_uri": redirect_uri, "grant_type": "authorization_code",
+    }
+    return await _post_token(dados, httpx_client)
 
 
 async def renovar_access_token(
@@ -111,23 +101,24 @@ async def renovar_access_token(
     ~1h de validade) — chamado toda vez que uma tool precisar falar com a
     API do Google Calendar. Levanta em falha de rede/protocolo (inclusive
     refresh_token revogado pelo usuário — `400 invalid_grant`)."""
-    import httpx
-
     cid, secret = _credenciais(client_id, client_secret)
-    fechar = httpx_client is None
+    dados = {
+        "refresh_token": refresh_token, "client_id": cid,
+        "client_secret": secret, "grant_type": "refresh_token",
+    }
+    return await _post_token(dados, httpx_client)
+
+
+async def _post_token(dados: dict[str, str], httpx_client: Any | None) -> dict:
+    """POST no endpoint de token do Google; usa `httpx_client` se vier (e não o
+    fecha) ou abre um cliente só para esta chamada."""
     cliente = httpx_client or httpx.AsyncClient(timeout=_TIMEOUT_SEGUNDOS)
     try:
-        resp = await cliente.post(
-            TOKEN_URL,
-            data={
-                "refresh_token": refresh_token, "client_id": cid,
-                "client_secret": secret, "grant_type": "refresh_token",
-            },
-        )
+        resp = await cliente.post(TOKEN_URL, data=dados)
         resp.raise_for_status()
         return resp.json()
     finally:
-        if fechar:
+        if httpx_client is None:
             await cliente.aclose()
 
 

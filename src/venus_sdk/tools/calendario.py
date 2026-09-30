@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import httpx
 from langchain_core.tools import BaseTool, tool
 
 from venus_sdk.integrations.google_calendar import obter_refresh_token, renovar_access_token
@@ -45,8 +46,6 @@ def montar_tools_calendario(pool: Any) -> list[BaseTool]:
         `{"conectado": True, "ocupado": bool, "compromissos": [...]}`
         quando conseguir checar; `{"erro": ...}` em falha de rede/token —
         também não impede seguir, só sem essa informação."""
-        import httpx
-
         try:
             refresh_token = await obter_refresh_token(pool, user_id)
         except Exception as exc:  # noqa: BLE001 — GOOGLE_TOKEN_ENCRYPTION_KEY ausente, driver etc.

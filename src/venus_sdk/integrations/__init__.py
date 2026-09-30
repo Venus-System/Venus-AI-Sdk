@@ -6,5 +6,3 @@ sem dono de conta), tudo aqui pressupõe um backend externo (mobile/web) que
 já conduziu o consentimento do usuário — o SDK nunca inicia OAuth sozinho,
 só troca/renova/guarda o token depois que ele já existe.
 """
-
-from __future__ import annotations

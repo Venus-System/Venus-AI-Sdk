@@ -45,8 +45,7 @@ from langgraph.store.base import (
 )
 from langgraph.store.memory import InMemoryStore
 
-from venus_sdk.config.settings import MONGODB_URI
-from venus_sdk.memory.checkpointer import DB_MONGO_PADRAO, TIMEOUT_MONGO_MS_PADRAO
+from venus_sdk.memory.checkpointer import DB_MONGO_PADRAO, TIMEOUT_MONGO_MS_PADRAO, _cliente_mongo
 
 if TYPE_CHECKING:
     from pymongo import MongoClient
@@ -162,7 +161,7 @@ class MongoDBStore(BaseStore):
         filtro = _filtro(op.namespace, op.key)
         if op.value is None:
             self._colecao.delete_one(filtro)
-            return None
+            return
 
         agora = datetime.now(timezone.utc)
         atualizacao = {
@@ -172,7 +171,6 @@ class MongoDBStore(BaseStore):
             "$setOnInsert": {"created_at": agora, "namespace": list(op.namespace)},
         }
         self._upsert(filtro, atualizacao)
-        return None
 
     def _upsert(self, filtro: dict[str, Any], atualizacao: dict[str, Any]) -> None:
         """`update_one(upsert=True)` com uma nova tentativa: quando duas
@@ -281,12 +279,5 @@ def criar_store_mongo(
             "`pip install venus-ai-sdk[mongo]` (ou `pip install pymongo`)."
         ) from erro
 
-    uri_final = uri or MONGODB_URI
-    if not uri_final:
-        raise ValueError(
-            "Nenhuma URI de MongoDB configurada — defina MONGODB_URI no "
-            ".env ou passe `uri=` explicitamente."
-        )
-
-    cliente = MongoClient(uri_final, serverSelectionTimeoutMS=timeout_ms, connectTimeoutMS=timeout_ms)
+    cliente = _cliente_mongo(MongoClient, uri, timeout_ms)
     return MongoDBStore(cliente, db_name=db_name, collection_name=collection_name)
