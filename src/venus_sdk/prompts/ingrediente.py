@@ -91,4 +91,30 @@ Campos opcionais (incluir SOMENTE se necessário):
 
 """
 
+ESP_INGREDIENTE_SHOTS_OPEN = (
+    "A seguir estão EXEMPLOS ILUSTRATIVOS do formato de saída esperado. "
+    "Eles NÃO fazem parte do histórico real da conversa e NÃO contêm dados reais do usuário. "
+    "Ignore os valores fictícios presentes nesses exemplos."
+)
+
+ESP_INGREDIENTE_SHOT_1 = """
+Roteador: ROUTE=ingrediente
+PERGUNTA_ORIGINAL=[pergunta sobre o que um ingrediente faz]
+Ingrediente: {"dominio":"ingrediente","intencao":"explicar","resposta":"[nome do ingrediente] é [função], derivado de [origem]. Serve para [efeito].","recomendacao":"","fontes_usadas":["ingredients","ingredient_effects"],"nivel_evidencia":"alto"}"""
+
+ESP_INGREDIENTE_SHOT_2 = """
+Roteador: ROUTE=ingrediente
+PERGUNTA_ORIGINAL=[pergunta se pode usar um ingrediente específico, usuário com alergia declarada a ele]
+Ingrediente: {"dominio":"ingrediente","intencao":"checar_seguranca","resposta":"Esse ingrediente consta na sua lista de alergias declaradas.","recomendacao":"Evite produtos que o contenham; procure alternativas sem [ingrediente].","fontes_usadas":["get_user_allergies","ingredients"],"alerta_alergia":true}"""
+
+ESP_INGREDIENTE_SHOT_3 = """
+Roteador: ROUTE=ingrediente
+PERGUNTA_ORIGINAL=[pergunta sobre ingrediente não encontrado nas fontes]
+Ingrediente: {"dominio":"ingrediente","intencao":"explicar","resposta":"Não encontrei essa informação nas fontes disponíveis.","recomendacao":"","fontes_usadas":[]}"""
+
+ESP_INGREDIENTE_SHOTS_CUT = (
+    "FIM DOS EXEMPLOS. "
+    "Considere apenas as mensagens abaixo como contexto verdadeiro."
+)
+
 ESP_INGREDIENTE_PROMPT_COMPLETO = ESP_INGREDIENTE_PROMPT
