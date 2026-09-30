@@ -76,9 +76,6 @@ async def main() -> int:
     await checar("get_user_profile", t["get_user_profile"].ainvoke({"user_id": 1}), ok_dict)
     await checar("get_user_favorites", t["get_user_favorites"].ainvoke({"user_id": 1}), ok_lista)
     await checar("get_user_lists", t["get_user_lists"].ainvoke({"user_id": 1}), ok_lista)
-    await checar("remove_favorite (produto que não é favorito)",
-                 t["remove_favorite"].ainvoke({"user_id": 2, "product_id": 999999}),
-                 lambda r: r.get("encontrado") is False)
     await checar("suggest_routine (exclui produtos com alergia)", t["suggest_routine"].ainvoke({"user_id": 1, "horario": "manha"}),
                  lambda r: {e["product_id"] for e in r["excluidos_por_alergia"]} == {1, 4})
     print("== FAQ / RAG ==")
@@ -107,7 +104,7 @@ async def main() -> int:
     cfg = {"venus": {"transport": "stdio", "command": sys.executable,
                      "args": ["-m", "venus_sdk.mcp.servidor"], "env": env, "cwd": str(RAIZ)}}
     mcp_tools = {x.name: x for x in await get_mcp_tools(cfg)}
-    registrar("MCP lista as 19 tools", len(mcp_tools) == 19, f"{len(mcp_tools)} tools")
+    registrar("MCP lista as 17 tools", len(mcp_tools) == 17, f"{len(mcp_tools)} tools")
     if mcp_tools:
         await checar("MCP search_product", mcp_tools["search_product"].ainvoke({"termo": "niacinamida"}),
                      lambda r: "Niacinamida" in str(r))

@@ -254,18 +254,6 @@ def _parte_ingredientes(evidencias: list[dict] | None) -> str | None:
     return f"Encontrei no catálogo: {nomes}." if nomes else None
 
 
-def _parte_acao_favorito(evidencias: list[dict] | None) -> str | None:
-    """Resultado REAL de remover favorito — nunca "feito" sem `ok`."""
-    resultado = dados_da_evidencia(evidencias, "remove_favorite")
-    if not isinstance(resultado, dict):
-        return None
-    if resultado.get("ok"):
-        return "Pronto, removi o produto dos seus favoritos."
-    if resultado.get("encontrado") is False:
-        return f"Não consegui remover: {resultado.get('mensagem')}."
-    return "Não consegui remover o produto dos seus favoritos agora — deu um erro ao gravar. Pode tentar de novo mais tarde?"
-
-
 def _parte_favoritos(evidencias: list[dict] | None) -> str | None:
     favoritos = dados_da_evidencia(evidencias, "get_user_favorites")
     if isinstance(favoritos, list) and favoritos:
@@ -328,7 +316,6 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     evidencias = estado.get("evidencias_tools")
     dados_da_conta = [
         parte for parte in (
-            _parte_acao_favorito(evidencias),
             _parte_rotina(evidencias),
             None if _parte_rotina(evidencias) else _parte_favoritos(evidencias),
             _parte_listas(evidencias),

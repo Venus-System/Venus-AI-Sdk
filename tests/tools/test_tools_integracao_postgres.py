@@ -62,8 +62,3 @@ async def test_rotina_respeita_alergia(t) -> None:
     assert excluidos == {1, 4}  # ambos têm Parfum e o usuário 1 é alérgico
     assert 1 not in {p["product_id"] for p in r["passos"]}
 
-
-async def test_remover_favorito_que_nao_existe(t) -> None:
-    # Não há tool para ADICIONAR favorito (a IA nunca salva favoritos), então
-    # o teste de escrita só cobre a remoção de um produto que não está lá.
-    assert (await t["remove_favorite"].ainvoke({"user_id": 2, "product_id": 999999}))["encontrado"] is False

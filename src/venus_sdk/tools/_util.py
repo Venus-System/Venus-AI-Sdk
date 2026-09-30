@@ -115,15 +115,6 @@ async def consultar(pool: Any, nome: str, query: str, *args: Any, uma_linha: boo
     return [_limpar(dict(linha)) for linha in linhas]
 
 
-async def executar(pool: Any, nome: str, query: str, *args: Any) -> Any:
-    """Para escritas (INSERT/UPDATE/DELETE): devolve o status ou o erro."""
-    try:
-        async with pool.acquire() as conn:
-            return await conn.execute(query, *args)
-    except Exception as exc:  # noqa: BLE001
-        return erro_tool(nome, exc)
-
-
 def _limpar(linha: dict) -> dict:
     """Converte tipos não serializáveis em JSON (Decimal, datetime)."""
     saida = {}
