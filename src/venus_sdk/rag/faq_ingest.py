@@ -21,7 +21,7 @@ from venus_sdk.rag.vector_build import COLLECTION, get_embed_model, get_qdrant_c
 
 logger = logging.getLogger(__name__)
 
-# O e5 lê no máximo 512 tokens: seções longas do markdown são subdivididas.
+# O modelo lê no máximo 512 tokens: seções longas do markdown são subdivididas.
 _TAMANHO_TRECHO = 400
 _SOBREPOSICAO = 50
 
