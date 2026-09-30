@@ -304,6 +304,8 @@ def _parte_perfil(evidencias: list[dict] | None) -> str | None:
 
 def _parte_alergias(evidencias: list[dict] | None) -> str | None:
     alergias = dados_da_evidencia(evidencias, "get_user_allergies")
+    if isinstance(alergias, dict) and alergias.get("encontrado") is False and "alergias" in alergias:
+        return "Você não declarou nenhuma alergia no seu cadastro."
     if not isinstance(alergias, list) or not alergias:
         return None
     nomes = ", ".join(str(a.get("allergy_name")) for a in alergias if isinstance(a, dict))
@@ -315,18 +317,23 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     (reprovado por inventar dado) NÃO chega ao usuário. Monta uma resposta só com o que as
     tools realmente devolveram."""
     evidencias = estado.get("evidencias_tools")
+    pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
     rotina_montada = _parte_rotina(evidencias)
+    # Favoritos e listas só entram se a pergunta citou um deles (ou nenhum):
+    # "quais são minhas listas?" não deve despejar os favoritos junto.
+    pede_favoritos = bool(_PEDE_FAVORITOS_RE.search(pergunta))
+    pede_listas = bool(_PEDE_LISTAS_RE.search(pergunta))
+    sem_preferencia = not (pede_favoritos or pede_listas)
     dados_da_conta = [
         parte for parte in (
             rotina_montada,
-            None if rotina_montada else _parte_favoritos(evidencias),
-            _parte_listas(evidencias),
+            None if rotina_montada or not (pede_favoritos or sem_preferencia) else _parte_favoritos(evidencias),
+            _parte_listas(evidencias) if pede_listas or sem_preferencia else None,
             _parte_perfil(evidencias),
         ) if parte
     ]
     # Numa pergunta sobre a conta, a busca de produto foi só um meio (achar o
     # id): listar o catálogo ali confunde mais do que ajuda.
-    pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
     texto_produtos, sem_dado = (None, False) if dados_da_conta else _parte_produtos(evidencias, pergunta)
     candidatas = [
         *dados_da_conta,

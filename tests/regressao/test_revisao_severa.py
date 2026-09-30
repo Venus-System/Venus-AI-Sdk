@@ -360,3 +360,26 @@ def test_access_token_do_google_e_reaproveitado():
         assert run(calendario._access_token("refresh")) == "tok"
         assert run(calendario._access_token("refresh")) == "tok"
     assert renovar.await_count == 1
+
+
+# --- rodada no QA (2026-09-30): resposta segura da conta ---
+
+
+def test_resposta_segura_diz_que_nao_ha_alergia_declarada():
+    estado = {"rota": "rotina", "pergunta_original": "me mostra minhas alergias", "evidencias_tools": [
+        _ev("get_user_allergies", {"encontrado": False, "alergias": [], "mensagem": "sem alergia"}),
+    ]}
+    assert "não declarou nenhuma alergia" in orq._resposta_segura_sem_aprovacao(estado)
+
+
+def test_resposta_segura_de_listas_nao_despeja_os_favoritos():
+    evidencias = [
+        _ev("get_user_favorites", [{"product_id": 1, "name": "Creme X"}]),
+        _ev("get_user_lists", [{"user_list_id": 1, "list_name": "Testar", "product_id": 2, "product_name": "Sérum Y"}]),
+    ]
+    so_listas = orq._resposta_segura_sem_aprovacao(
+        {"rota": "rotina", "pergunta_original": "quais são minhas listas?", "evidencias_tools": evidencias})
+    assert "Sérum Y" in so_listas and "Creme X" not in so_listas
+    tudo = orq._resposta_segura_sem_aprovacao(
+        {"rota": "rotina", "pergunta_original": "o que tenho salvo?", "evidencias_tools": evidencias})
+    assert "Sérum Y" in tudo and "Creme X" in tudo
