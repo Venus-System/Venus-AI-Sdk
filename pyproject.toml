@@ -27,10 +27,13 @@ dependencies = [
 
 [project.optional-dependencies]
 # pymongo: os testes do MongoDBStore (tests/test_store_mongo.py) usam as exceções dele.
-dev = ["pytest", "pytest-asyncio", "pymongo"]
+# qdrant-client/llama-index: os testes do FAQ no Qdrant (em memória, sem FastEmbed).
+dev = ["pytest", "pytest-asyncio", "pymongo", "qdrant-client", "llama-index-core", "llama-index-vector-stores-qdrant"]
 pdf = ["pypdf"]
 mongo = ["langgraph-checkpoint-mongodb", "pymongo"]
 a2a = ["a2a-sdk[http-server]", "uvicorn"]
+# FAQ no Qdrant (rag/faq.py, rag/faq_ingest.py).
+rag = ["qdrant-client", "llama-index-core", "llama-index-vector-stores-qdrant", "llama-index-embeddings-fastembed", "fastembed"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

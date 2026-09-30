@@ -20,12 +20,12 @@ guardrail entrada → carregar memória → roteador ─┬→ produto ───
 | Produto | `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`, `get_user_allergies` (Postgres) |
 | Ingrediente | `search_ingredient`, `get_ingredient_summary/properties/effects/regulations`, `get_user_allergies` (Postgres) |
 | Rotina | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `remove_favorite`, `suggest_routine`, `get_user_allergies` (Postgres) |
-| FAQ (RAG) | `faq_retriever` (docs locais), `buscar_na_web` (Tavily/DuckDuckGo), tools MCP e A2A opcionais |
+| FAQ (RAG) | `faq_retriever` (FAQ no Qdrant ou índice local), `buscar_na_web` (Tavily/DuckDuckGo), tools MCP e A2A opcionais |
 | Juiz | — confere resposta × retorno bruto das tools (`evidencias_tools`) |
 | Orquestrador / Memória | — |
 
 - **Sessões**: `thread_id` (checkpointer, histórico da conversa) + `usuario_id` (memória de longo prazo, `memory/store.py`).
-- **RAG**: `data/faq/*.md|txt|pdf` → índice local (`rag/`); a resposta cita as fontes em `fontes_usadas`.
+- **RAG**: `data/faq/*.md` → Qdrant (`python -m venus_sdk.rag.faq_ingest`, extra `rag`) quando há `QDRANT_URL`; sem ela, índice local em memória (`rag/indice.py`). A resposta cita as fontes em `fontes_usadas`.
 - **MCP**: `python -m venus_sdk.mcp.servidor` expõe as 18 tools; `mcp/tools.py` as consome (`get_mcp_tools`).
 - **A2A**: `a2a_server.py` (Venus como agente A2A, skills produto/ingrediente/rotina/faq; identidade via `metadata`) e `a2a_client.py` (Venus consulta agente externo).
 - Detalhes em [`docs/architecture.md`](docs/architecture.md).

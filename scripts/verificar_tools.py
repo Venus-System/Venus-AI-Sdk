@@ -41,7 +41,7 @@ async def main() -> int:
     if not url:
         print("Defina DATABASE_URL.")
         return 2
-    from venus_sdk.rag import criar_indice_local
+    from venus_sdk.rag import criar_indice_faq
     from venus_sdk.tools.compartilhadas import montar_tools_compartilhadas
     from venus_sdk.tools.faq import montar_tools_faq
     from venus_sdk.tools.ingrediente import montar_tools_ingrediente
@@ -49,7 +49,7 @@ async def main() -> int:
     from venus_sdk.tools.rotina import montar_tools_rotina
 
     pool = await asyncpg.create_pool(url, min_size=1, max_size=3)
-    indice = criar_indice_local(RAIZ / "data" / "faq")
+    indice = criar_indice_faq(RAIZ / "data" / "faq")
     t = {x.name: x for f in (montar_tools_produto, montar_tools_ingrediente, montar_tools_compartilhadas,
                              montar_tools_rotina) for x in f(pool)}
     faq = {x.name: x for x in montar_tools_faq(indice)}

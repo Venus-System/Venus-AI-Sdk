@@ -1,50 +1,71 @@
-from llama_index.core import SimpleDirectoryReader, StorageContext, VectorStoreIndex
-from llama_index.core.node_parser import MarkdownNodeParser
-from venus_sdk.config.settings import FAQ_PATH
-from venus_sdk.rag.vector_build import get_embed_model, get_vector_store, qdrant, COLLECTION
-from qdrant_client import models
+"""Ingestão do FAQ no Qdrant: lê os `.md` da pasta, divide em trechos, gera os
+embeddings e substitui o conteúdo da coleção.
 
-def ingerir_faq() -> int:
-    """Lê os arquivos da pasta configurada, gera os embeddings e envia à collection no Qdrant."""
+Roda uma vez por atualização dos documentos, fora da API:
 
-    if not FAQ_PATH.exists():
-        raise ValueError("Pasta de documentos não encontrada!")
+    python -m venus_sdk.rag.faq_ingest            # usa FAQ_DIR
+    python -m venus_sdk.rag.faq_ingest data/faq   # outra pasta
 
-    documentos = SimpleDirectoryReader(
-        input_dir=str(FAQ_PATH),
-        required_exts=[".md"],
-    ).load_data()
+A API só consulta a coleção (`rag.faq.IndiceQdrant`), então nenhuma instância
+precisa dos arquivos nem reindexa nada ao subir."""
 
+from __future__ import annotations
+
+import logging
+import sys
+from pathlib import Path
+from typing import Any
+
+from venus_sdk.config.settings import FAQ_DIR
+from venus_sdk.rag.vector_build import COLLECTION, get_embed_model, get_qdrant_client, get_vector_store
+
+logger = logging.getLogger(__name__)
+
+# O e5 lê no máximo 512 tokens: seções longas do markdown são subdivididas.
+_TAMANHO_TRECHO = 400
+_SOBREPOSICAO = 50
+
+
+def ingerir_faq(pasta: str | Path = FAQ_DIR, *, cliente: Any | None = None, embed_model: Any | None = None) -> int:
+    """Indexa os `.md` de `pasta` na coleção do FAQ e devolve quantos trechos
+    foram gravados. `cliente`/`embed_model` permitem injetar outros (testes)."""
+    from llama_index.core import SimpleDirectoryReader, StorageContext, VectorStoreIndex
+    from llama_index.core.node_parser import MarkdownNodeParser, SentenceSplitter
+
+    pasta = Path(pasta)
+    if not pasta.is_dir():
+        raise FileNotFoundError(f"Pasta de documentos do FAQ não encontrada: {pasta}")
+
+    documentos = SimpleDirectoryReader(input_dir=str(pasta), required_exts=[".md"]).load_data()
     if not documentos:
-        print("[ingest] Nenhum arquivo .md encontrado para indexar.")
+        logger.warning("Nenhum arquivo .md em %s — nada foi indexado.", pasta)
         return 0
 
-    print(f"[ingest] Documentos carregados: {len(documentos)}")
-
-    if qdrant.collection_exists(COLLECTION):
-        info = qdrant.get_collection(COLLECTION)
-        if info.points_count > 0:
-            print(f"[ingest] Limpando {info.points_count} ponto(s) existente(s) da coleção '{COLLECTION}'...")
-            qdrant.delete(
-                collection_name=COLLECTION,
-                points_selector=models.FilterSelector(filter=models.Filter(must=[])),
-            )
-
-    node_parser = MarkdownNodeParser()
-    storage_context = StorageContext.from_defaults(vector_store=get_vector_store())
-
-    index = VectorStoreIndex.from_documents(
-        documentos,
-        storage_context=storage_context,
-        transformations=[node_parser],
-        embed_model=get_embed_model(),
-        show_progress=True,
+    trechos = SentenceSplitter(chunk_size=_TAMANHO_TRECHO, chunk_overlap=_SOBREPOSICAO)(
+        MarkdownNodeParser().get_nodes_from_documents(documentos)
     )
+    cliente = cliente or get_qdrant_client()
+    _esvaziar_colecao(cliente)
+    VectorStoreIndex(
+        trechos,
+        storage_context=StorageContext.from_defaults(vector_store=get_vector_store(cliente)),
+        embed_model=embed_model or get_embed_model(),
+    )
+    logger.info("%d documento(s), %d trecho(s) indexado(s) na coleção '%s'.", len(documentos), len(trechos), COLLECTION)
+    return len(trechos)
 
-    total = len(index.docstore.docs)
-    print(f"[ingest] Concluído! {total} chunk(s) indexado(s) no Qdrant.")
-    return total
+
+def _esvaziar_colecao(cliente: Any) -> None:
+    """Apaga os pontos antigos (a coleção continua existindo, com a mesma config)."""
+    from qdrant_client import models
+
+    if cliente.collection_exists(COLLECTION) and cliente.get_collection(COLLECTION).points_count:
+        cliente.delete(
+            collection_name=COLLECTION,
+            points_selector=models.FilterSelector(filter=models.Filter(must=[])),
+        )
 
 
 if __name__ == "__main__":
-    ingerir_faq()
+    logging.basicConfig(level=logging.INFO, format="[ingest] %(message)s")
+    ingerir_faq(*sys.argv[1:2])

@@ -20,6 +20,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # Aceita MONGODB_URI (nome do atributo) e MONGODB_URL (legado) — opcional.
 MONGODB_URI = os.getenv("MONGODB_URI") or os.getenv("MONGODB_URL")
 FAQ_DIR = os.getenv("FAQ_DIR") or str(BASE_DIR / "data" / "faq")
+# FAQ no Qdrant (extra `rag`) — opcional; sem QDRANT_URL o FAQ usa o índice
+# local sobre FAQ_DIR. Aceita QDRANT_API (nome antigo) para a chave.
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY") or os.getenv("QDRANT_API")
 
 # Lidas direto do ambiente por quem usa (ver `.env.example`), todas opcionais:
 # LLM_PROVIDER e LLM_CADEIA_* (llm/models.py), TAVILY_API_KEY (rag/web.py),
