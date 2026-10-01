@@ -65,7 +65,7 @@ def montar_grafo_venus(
     Sem `pool`, os nós de produto/ingrediente ainda entram no grafo (o
     roteamento funciona), mas levantam `ValueError` se forem de fato
     invocados — só nesse momento, nunca aqui na montagem. O mesmo vale para
-    `indice_rag` (`rag.criar_indice_local`) no FAQ; `tools_faq_extras` são
+    `indice_rag` (`rag.criar_indice_faq`) no FAQ; `tools_faq_extras` são
     tools MCP/A2A já carregadas, entregues ao agente FAQ. `tools_rotina_extras`
     é o mesmo conceito para o agente de Rotina — hoje, `check_availability`
     (`tools/calendario.py`), quando o Google Calendar está configurado.
@@ -175,7 +175,7 @@ def compilar_grafo_venus(
     pra consultar o Postgres. Sem ele, produto/ingrediente levantam
     `ValueError` se forem invocados (ver `montar_grafo_venus`).
 
-    `indice_rag` (opcional) é o índice do FAQ (`rag.criar_indice_local`);
+    `indice_rag` (opcional) é o índice do FAQ (`rag.criar_indice_faq`);
     `tools_faq_extras` são tools MCP/A2A extras para o agente FAQ.
     `tools_rotina_extras` são tools extras (somente leitura) para o agente de
     Rotina — hoje, `check_availability`
