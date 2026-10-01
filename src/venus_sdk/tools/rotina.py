@@ -46,6 +46,7 @@ _CATEGORIAS_ESSENCIAIS = (
     ("Protetor solar", ("protetor", "solar", "fps")),
 )
 _HORARIOS_VALIDOS = {"manha", "noite", "ambos"}
+_SEM_FAVORITOS = "o usuário não tem produtos favoritos"
 _TAMANHO_MINIMO_TERMO_ALERGIA = 3
 
 
@@ -190,7 +191,7 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
 
     async def _favoritos_com_ingredientes(user_id: int) -> Any:
         return await consultar(pool, "suggest_routine", _SQL_FAVORITOS_COM_INGREDIENTES, user_id,
-                               vazio="o usuário não tem produtos favoritos")
+                               vazio=_SEM_FAVORITOS)
 
     @tool
     async def get_user_profile(user_id: int) -> dict:
@@ -209,7 +210,7 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
         """Lista os produtos favoritados pelo usuário (id, nome, marca,
         categoria). A rotina só pode usar produtos daqui ou das listas."""
         return await consultar(pool, "get_user_favorites", _SQL_FAVORITOS_DO_USUARIO, user_id,
-                               vazio="o usuário não tem produtos favoritos")
+                               vazio=_SEM_FAVORITOS)
 
     @tool
     async def get_user_lists(user_id: int) -> list[dict] | dict:

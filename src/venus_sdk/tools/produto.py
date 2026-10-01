@@ -1,22 +1,9 @@
 """Tools do agente Produto — consulta estruturada ao Postgres (schema
 `venus`), via `asyncpg`. Não é RAG (ver nota em `tools/ingrediente.py`).
 
-Colunas/FKs conferidas direto no catálogo do Postgres de teste (`DATABASE_URL`)
-em 2026-09-05 — a PK de cada tabela é `<tabela>_id` (`product_id`,
-`brand_id`...), não `id` genérico como a documentação resumida sugeria.
-
-Validado manualmente em 2026-09-05 contra o Postgres de teste real (as 4
-tools originais, com dado de verdade — produto com/sem score, com/sem
-ingrediente cadastrado). Sem teste automatizado no CI pela mesma razão do
-checkpointer/store Mongo (ver `tests/tools/test_tools_produto_ingrediente.py`):
-evita bater num serviço externo de verdade a cada execução da suíte.
-
-`search_product` foi adicionada em 2026-09-10 (não fazia parte da validação
-manual acima) — sem ela, uma pergunta que só cita o NOME do produto (sem
-`product_id`) não tinha como ser resolvida: o especialista tinha que
-adivinhar o id, o que gerou uma alucinação confirmada ao vivo (produto sem
-ingrediente/score cadastrado, mas a resposta "inventou" ingredientes) — ver
-`docs/architecture.md`.
+A PK de cada tabela é `<tabela>_id` (`product_id`, `brand_id`...).
+`search_product` é a porta de entrada quando a pergunta só cita o nome: sem
+ela o especialista teria de adivinhar o `product_id`.
 """
 
 from __future__ import annotations
@@ -35,11 +22,9 @@ from venus_sdk.tools._util import (
 )
 
 # Casa QUALQUER palavra com nome, marca, categoria ou descrição e ordena por
-# quantas palavras bateram — "produto bom pra cabelo cacheado" acha
-# shampoo/condicionador mesmo sem o nome exato. `tem_score` só é verdadeiro
-# com alguma nota acima de zero: linha toda zerada é "score não calculado"
-# (mesma regra de `get_product_score`) — antes a busca dizia `tem_score: true`
-# e o score dizia "não calculado", e o Juiz reprovava a resposta correta.
+# quantas palavras bateram. `tem_score` exige alguma nota acima de zero —
+# linha toda zerada é "score não calculado", a mesma regra de
+# `get_product_score` (senão busca e score se contradiziam).
 _SQL_BUSCAR_PRODUTO = f"""
     SELECT p.product_id, p.name, b.name AS brand_name, pc.name AS category_name,
            count(DISTINCT tok) AS relevancia,

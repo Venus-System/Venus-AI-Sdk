@@ -154,10 +154,7 @@ class VenusAgentExecutor(AgentExecutor):
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         texto = context.get_user_input()
-        # `context_id` do A2A vira o `thread_id` do checkpointer do Venus —
-        # a mesma conversa (mesmo `context_id`) mantém o histórico entre
-        # chamadas, exatamente como `thread_id` faz hoje (ver
-        # `flows/venus_flow.py`/`memory/checkpointer.py`).
+        # `context_id` do A2A = `thread_id` do checkpointer (mesma conversa).
         config = {"configurable": {"thread_id": context.context_id}}
         entrada = _entrada_do_grafo(texto, _metadata(context))
 
@@ -165,10 +162,7 @@ class VenusAgentExecutor(AgentExecutor):
             estado = await self._grafo.ainvoke(entrada, config=config)
             resposta = estado.get("resposta_final") or _RESPOSTA_VAZIA
         except Exception:
-            # Mesmo espírito de `nodes/especialistas.py::_executar_especialista`
-            # e `nodes/juiz.py::no_agente_juiz` — uma falha de LLM/infra nunca
-            # deve derrubar a resposta A2A; vira uma mensagem de erro tratada,
-            # não um 500 cru pro sistema externo que chamou o Venus.
+            # Falha de LLM/infra vira mensagem tratada, não um 500 cru.
             logger.exception("Falha ao executar o grafo Venus via A2A")
             resposta = _RESPOSTA_FALHA
 
@@ -177,8 +171,6 @@ class VenusAgentExecutor(AgentExecutor):
         )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        # O grafo do Venus responde de forma síncrona (sem Task de longa
-        # duração pra cancelar) — não há o que cancelar no meio do caminho.
         raise UnsupportedOperationError("O Venus não suporta cancelamento de requisições em andamento.")
 
 

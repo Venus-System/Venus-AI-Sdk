@@ -10,6 +10,8 @@ import logging
 import os
 from typing import Any
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 _URL_TAVILY = "https://api.tavily.com/search"
@@ -17,8 +19,6 @@ _TIMEOUT_TAVILY_SEGUNDOS = 15
 
 
 def _tavily(consulta: str, chave: str, max_resultados: int) -> list[dict[str, Any]]:
-    import httpx
-
     resposta = httpx.post(
         _URL_TAVILY,
         json={"api_key": chave, "query": consulta, "max_results": max_resultados},

@@ -13,30 +13,16 @@ from langchain_groq import ChatGroq
 
 from venus_sdk.config.settings import GEMINI_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY
 
-# ==============================================================================
-# MODELOS E AGENTES  (sem checkpointer — a memória fica no grafo)
-# ==============================================================================
-#
-# Cada client é criado sob demanda, na primeira chamada de cada get_llm_*(),
-# e reaproveitado depois (via lru_cache) — não na hora do import deste
-# módulo. Isso evita que só importar `venus_sdk.llm.models` (o que os nós
-# fazem no topo do arquivo) já exija GEMINI_API_KEY/GROQ_API_KEY presentes,
-# algo que quebra em qualquer ambiente sem `.env`/secrets configurados, como
-# o runner do CI.
+# Cada client é criado na primeira chamada de get_llm_*() (lru_cache), nunca
+# no import: importar o módulo não pode exigir chave de API (ex.: no CI).
 
 
 def extrair_texto_resposta(resposta: Any) -> str:
-    """Normaliza `AIMessage.content` pra string simples.
+    """Normaliza `AIMessage.content` para string.
 
-    O gemini-3.6-flash (um dos elos das cadeias abaixo) às vezes devolve `content` como uma LISTA de blocos —
-    `[{"type": "text", "text": "...", "extras": {"signature": "..."}}]`,
-    a "thought signature" desse modelo — em vez da string simples que
-    `gemini-2.5-flash` devolvia. Chamar `.strip()`/`json.loads()` direto
-    nisso quebra com `AttributeError`/`TypeError` (visto de verdade rodando
-    o grafo completo em 2026-09-08). Extrai só o texto de cada bloco
-    (ignora blocos sem `"text"`, como o de assinatura) e concatena — usada
-    em todo lugar que lê `resposta.content` como texto (roteador, juiz,
-    orquestrador, memória, especialistas).
+    O Gemini às vezes devolve uma LISTA de blocos
+    (`[{"type": "text", "text": "..."}, {"extras": {"signature": ...}}]`):
+    junta só o texto de cada bloco e ignora os demais (ex.: a assinatura).
     """
     conteudo = resposta.content
     if isinstance(conteudo, str):
@@ -91,6 +77,9 @@ _TIMEOUT_RAPIDO = 45
 _TIMEOUT_ESPECIALISTA = 75
 _TIMEOUT_GEMINI = 30
 _MAX_TOKENS_RAPIDO_COM_RACIOCINIO = 1024
+# Temperatura dos especialistas por provedor (o modelo rápido usa sempre 0).
+_TEMPERATURA_MISTRAL = 0.3
+_TEMPERATURA_GROQ = 0.7
 
 
 def _criar_gemini(modelo: str) -> BaseChatModel:
@@ -113,7 +102,7 @@ def _criar_mistral(modelo: str, *, rapido: bool, temperatura: float | None = Non
     return ChatMistralAI(
         model=modelo,
         api_key=MISTRAL_API_KEY,
-        temperature=_temperatura(rapido, temperatura, 0.3),
+        temperature=_temperatura(rapido, temperatura, _TEMPERATURA_MISTRAL),
         timeout=_TIMEOUT_RAPIDO if rapido else _TIMEOUT_ESPECIALISTA,
         max_retries=2,
     )
@@ -121,7 +110,7 @@ def _criar_mistral(modelo: str, *, rapido: bool, temperatura: float | None = Non
 
 def _criar_groq(modelo: str, *, rapido: bool, temperatura: float | None = None) -> BaseChatModel:
     parametros: dict[str, Any] = {
-        "temperature": _temperatura(rapido, temperatura, 0.7),
+        "temperature": _temperatura(rapido, temperatura, _TEMPERATURA_GROQ),
         "api_key": GROQ_API_KEY,
         "request_timeout": _TIMEOUT_RAPIDO if rapido else _TIMEOUT_ESPECIALISTA,
         "max_retries": 0,  # 429 -> próximo elo da cadeia

@@ -1,8 +1,5 @@
-"""Tool compartilhada entre produto, ingrediente e rotina.
-
-Schema real conferido direto no Postgres de teste (`venus.user_allergies` /
-`venus.allergies`) — não a notação comprimida do doc. Validado manualmente
-em 2026-09-05 contra dado real; ver nota em `tools/produto.py`."""
+"""Tool compartilhada entre produto, ingrediente e rotina
+(`venus.user_allergies` + `venus.allergies`)."""
 
 from __future__ import annotations
 
@@ -19,6 +16,9 @@ _SQL_ALERGIAS_DO_USUARIO = """
     JOIN venus.allergies a ON a.allergy_id = ua.fk_allergy_id
     WHERE ua.fk_user_id = $1
 """
+# Marcador interno: `consultar` devolve `nao_encontrado(vazio)` sem linhas, e
+# "sem alergia declarada" tem resposta própria (é válida, não erro).
+_MARCADOR_SEM_ALERGIAS = "__sem_alergias__"
 
 
 def montar_tools_compartilhadas(pool: Any) -> list[BaseTool]:
@@ -35,10 +35,9 @@ def montar_tools_compartilhadas(pool: Any) -> list[BaseTool]:
         """Lista as alergias/sensibilidades que o usuário declarou (nome,
         tipo e severidade) — usada para nunca recomendar produto/ingrediente
         que bata com uma delas."""
-        # Sem linhas = usuário sem alergia declarada (resposta válida, não erro).
         resposta = await consultar(pool, "get_user_allergies", _SQL_ALERGIAS_DO_USUARIO, user_id,
-                                   vazio="__sem_alergias__")
-        if isinstance(resposta, dict) and resposta.get("mensagem") == "__sem_alergias__":
+                                   vazio=_MARCADOR_SEM_ALERGIAS)
+        if isinstance(resposta, dict) and resposta.get("mensagem") == _MARCADOR_SEM_ALERGIAS:
             return {"encontrado": False, "alergias": [],
                     "mensagem": "o usuário não declarou nenhuma alergia"}
         return resposta

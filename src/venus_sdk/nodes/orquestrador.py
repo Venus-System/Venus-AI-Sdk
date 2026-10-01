@@ -45,7 +45,6 @@ _CONVITE_PARA_DETALHAR = "Quer que eu detalhe mais alguma coisa?"
 # Quantos itens de cada busca entram na resposta montada sem o LLM.
 _MAX_PRODUTOS_LISTADOS = 6
 _MAX_INGREDIENTES_LISTADOS = 5
-_MAX_INGREDIENTES_DO_PRODUTO = 15
 
 _TIPOS_DE_RESTRICAO = {"prohibited": "proibido", "restricted": "uso restrito"}
 
@@ -314,10 +313,11 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     (reprovado por inventar dado) NÃO chega ao usuário. Monta uma resposta só com o que as
     tools realmente devolveram."""
     evidencias = estado.get("evidencias_tools")
+    rotina_montada = _parte_rotina(evidencias)
     dados_da_conta = [
         parte for parte in (
-            _parte_rotina(evidencias),
-            None if _parte_rotina(evidencias) else _parte_favoritos(evidencias),
+            rotina_montada,
+            None if rotina_montada else _parte_favoritos(evidencias),
             _parte_listas(evidencias),
             _parte_perfil(evidencias),
         ) if parte
