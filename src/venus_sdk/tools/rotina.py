@@ -203,14 +203,28 @@ _SQL_ALERGIAS_PARA_ROTINA = """SELECT lower(a.allergy_name) AS nome FROM venus.u
                WHERE ua.fk_user_id = $1"""
 
 
+async def montar_rotina_do_usuario(pool: Any, user_id: int, horario: str) -> dict:
+    """A rotina do usuário para `horario` ('manha', 'noite' ou 'ambos'): só
+    favoritos, sem o que bate com alergia, em ordem de boas práticas. Devolve
+    o dict de `suggest_routine` ou um `{"erro"|"encontrado": ...}`."""
+    favoritos = await consultar(pool, "suggest_routine", _SQL_FAVORITOS_COM_INGREDIENTES, user_id,
+                                vazio=_SEM_FAVORITOS)
+    if isinstance(favoritos, dict):
+        return favoritos
+    alergias = await consultar(pool, "suggest_routine", _SQL_ALERGIAS_PARA_ROTINA, user_id, vazio="sem alergias")
+    if isinstance(alergias, dict) and "erro" in alergias:
+        return {**alergias, "mensagem": "não consegui checar as alergias; a rotina não foi montada"}
+    termos: list[str] = []
+    if isinstance(alergias, list):
+        for linha in alergias:
+            termos += _termos_da_alergia(linha["nome"])
+    return _montar_rotina(favoritos, termos, horario)
+
+
 def montar_tools_rotina(pool: Any) -> list[BaseTool]:
     """Monta as tools do agente Rotina, com o `pool` capturado por closure.
     Levanta `ValueError` se `pool` for `None` (só no primeiro uso real)."""
     exigir_pool(pool, "montar_tools_rotina")
-
-    async def _favoritos_com_ingredientes(user_id: int) -> Any:
-        return await consultar(pool, "suggest_routine", _SQL_FAVORITOS_COM_INGREDIENTES, user_id,
-                               vazio=_SEM_FAVORITOS)
 
     @tool
     async def get_user_profile(user_id: int) -> dict:
@@ -260,17 +274,7 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
         user_id = resolver_user_id(user_id)
         if user_id is None:
             return SEM_USUARIO_IDENTIFICADO
-        favoritos = await _favoritos_com_ingredientes(user_id)
-        if isinstance(favoritos, dict):
-            return favoritos
-        alergias = await consultar(pool, "suggest_routine", _SQL_ALERGIAS_PARA_ROTINA, user_id, vazio="sem alergias")
-        if isinstance(alergias, dict) and "erro" in alergias:
-            return {**alergias, "mensagem": "não consegui checar as alergias; a rotina não foi montada"}
-        termos: list[str] = []
-        if isinstance(alergias, list):
-            for linha in alergias:
-                termos += _termos_da_alergia(linha["nome"])
-        return _montar_rotina(favoritos, termos, horario)
+        return await montar_rotina_do_usuario(pool, user_id, horario)
 
     # Todas só leem. Não existe tool para adicionar nem remover favorito de
     # propósito: mexer nos favoritos é decisão do usuário, feita por ele no app.

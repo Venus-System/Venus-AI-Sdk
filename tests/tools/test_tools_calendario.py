@@ -33,8 +33,7 @@ def _cliente_mockado(handler):
 
 
 def _tool():
-    (check_availability,) = montar_tools_calendario(pool=object())
-    return check_availability
+    return {t.name: t for t in montar_tools_calendario(pool=object())}["check_availability"]
 
 
 def test_montar_tools_calendario_sem_pool_levanta_erro_claro() -> None:

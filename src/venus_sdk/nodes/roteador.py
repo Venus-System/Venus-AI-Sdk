@@ -8,6 +8,7 @@ import re
 from typing import Literal
 
 from venus_sdk.llm.models import get_llm_rapido
+from venus_sdk.nodes.agendamento import eh_confirmacao, eh_negacao
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.router import ROUTER_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
@@ -247,6 +248,10 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     # A mensagem anonimizada é a que segue para os especialistas: CPF, e-mail
     # etc. não podem voltar pelas redes de segurança nem pelo fallback.
     mensagem_usuario = estado.get("mensagem_anonimizada") or estado.get("mensagem_usuario", "")
+    pendente = estado.get("agendamento_pendente")
+    if pendente and (eh_confirmacao(mensagem_usuario) or eh_negacao(mensagem_usuario)):
+        # Resposta a uma proposta de agendamento: quem decide é o código.
+        return {"rota": "rotina", "pergunta_original": mensagem_usuario}
     mensagens = _mensagens_para_o_roteador(estado)
 
     texto = _invocar_roteador(mensagens)
@@ -261,12 +266,15 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     if rota not in _ROTAS_VALIDAS:
         # Small talk ou fora de escopo: o próprio roteador já formulou a
         # resposta final ao usuário — segue direto para o guardrail de saída.
-        return {"rota": None, "resposta_final": texto or _RESPOSTA_DIRETA_FALLBACK}
+        # Uma proposta de agendamento sem resposta expira aqui.
+        return {"rota": None, "resposta_final": texto or _RESPOSTA_DIRETA_FALLBACK, "agendamento_pendente": None}
 
     match_pergunta = _PERGUNTA_RE.search(texto)
     pergunta_original = match_pergunta.group(1).strip() if match_pergunta else mensagem_usuario
 
-    return {"rota": rota, "pergunta_original": pergunta_original}  # type: ignore[typeddict-item]
+    return {  # type: ignore[typeddict-item]
+        "rota": rota, "pergunta_original": pergunta_original, "agendamento_pendente": None,
+    }
 
 
 def decidir_especialista(estado: EstadoVenus) -> DecisaoRoteador:

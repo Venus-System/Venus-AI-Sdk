@@ -15,6 +15,15 @@ from venus_sdk.flows.agente_mcp import montar_agente_mcp
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_especialista
 from venus_sdk.nodes._evidencias import dados_da_evidencia
 from venus_sdk.nodes._json import extrair_objeto_json
+from venus_sdk.nodes.agendamento import (
+    INTENCAO_AGENDAMENTO,
+    RESPOSTA_CANCELADO,
+    eh_confirmacao,
+    eh_negacao,
+    executar_propostas,
+    propostas_das_evidencias,
+    propostas_validas,
+)
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.faq import FAQ_PROMPT_COMPLETO
 from venus_sdk.prompts.ingrediente import ESP_INGREDIENTE_PROMPT_COMPLETO
@@ -299,6 +308,9 @@ def montar_no_agente_rotina(pool: Any, tools_extras: list[Any] | None = None) ->
 
     async def no_agente_rotina(estado: EstadoVenus) -> EstadoVenus:
         pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario", "")
+        resposta_ao_agendamento = await _responder_agendamento_pendente(estado, pool)
+        if resposta_ao_agendamento is not None:
+            return resposta_ao_agendamento
         if pede_alteracao_de_favorito(pergunta):
             return {
                 "resposta_especialista": _resposta_de_falha(
@@ -306,9 +318,32 @@ def montar_no_agente_rotina(pool: Any, tools_extras: list[Any] | None = None) ->
                 ),
                 "evidencias_tools": None,
             }
-        return await agente(estado)
+        saida = await agente(estado)
+        # Proposta preparada agora fica guardada até a próxima mensagem.
+        saida["agendamento_pendente"] = propostas_das_evidencias(saida.get("evidencias_tools")) or None
+        return saida
 
     return no_agente_rotina
+
+
+async def _responder_agendamento_pendente(estado: EstadoVenus, pool: Any) -> EstadoVenus | None:
+    """Se há proposta de agendamento e a mensagem é "sim"/"não", resolve aqui,
+    em código, sem LLM. `None` = a mensagem não é resposta a uma proposta."""
+    pendentes = estado.get("agendamento_pendente")
+    mensagem = estado.get("mensagem_anonimizada") or estado.get("mensagem_usuario", "")
+    if not pendentes:
+        return None
+    if eh_confirmacao(mensagem):
+        texto = await executar_propostas(pool, estado.get("usuario_id_postgres"), propostas_validas(pendentes))
+    elif eh_negacao(mensagem):
+        texto = RESPOSTA_CANCELADO
+    else:
+        return None
+    return {
+        "resposta_especialista": _resposta_de_falha("rotina", INTENCAO_AGENDAMENTO, texto),
+        "evidencias_tools": None,
+        "agendamento_pendente": None,
+    }
 
 
 def pede_alteracao_de_favorito(pergunta: str) -> bool:

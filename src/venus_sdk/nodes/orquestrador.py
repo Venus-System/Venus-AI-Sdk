@@ -398,7 +398,7 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
     if especialista_e_objeto and especialista_json.get("intencao") in _INTENCOES_DE_ERRO:
         return {"resposta_final": _RESPOSTA_ORQUESTRADOR_FALLBACK}
     # Recusa fixa escrita no código: vai como está, sem reescrita do LLM.
-    if especialista_e_objeto and especialista_json.get("intencao") == "nao_suportado":
+    if especialista_e_objeto and especialista_json.get("intencao") in ("nao_suportado", "agendamento"):
         return {"resposta_final": especialista_json.get("resposta") or _RESPOSTA_ORQUESTRADOR_FALLBACK}
     # Juiz reprovou (tentativas esgotadas) em domínio com dado no banco: nunca repassa o texto
     # reprovado (ele costuma conter invenção); usa só a evidência das tools.
@@ -426,7 +426,20 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
     if texto and _omitiu_dados_das_tools(texto, estado):
         texto = _resposta_segura_sem_aprovacao(estado)
 
-    return {"resposta_final": texto or _RESPOSTA_ORQUESTRADOR_FALLBACK}
+    texto = texto or _RESPOSTA_ORQUESTRADOR_FALLBACK
+    pendentes = estado.get("agendamento_pendente")
+    if pendentes:
+        # O que será gravado é mostrado pelo código, não pelo LLM: o "sim"
+        # confirma exatamente este texto.
+        texto = f"{texto}\n\n{_pedido_de_confirmacao(pendentes)}"
+    return {"resposta_final": texto}
+
+
+def _pedido_de_confirmacao(propostas: list[dict]) -> str:
+    from venus_sdk.tools.calendario import resumo_da_proposta
+
+    itens = "\n".join(f"- {resumo_da_proposta(proposta)}" for proposta in propostas)
+    return f"Vou fazer na sua agenda Google:\n{itens}\n\nPosso? Responda **sim** para confirmar ou **não** para cancelar."
 
 
 def _omitiu_dados_das_tools(texto: str, estado: EstadoVenus) -> bool:
