@@ -41,7 +41,7 @@ cp .env.example .env                        # preencha GEMINI_API_KEY e GROQ_API
 
 docker compose up -d                        # Postgres 16
 python scripts/init_db.py                   # schema `venus` + seed fictício
-python scripts/verificar_tools.py           # chama CADA tool (Postgres, RAG, web, MCP, A2A)
+python tests/manual/verificar_tools.py           # chama CADA tool (Postgres, RAG, web, MCP, A2A)
 
 python examples/conversar_com_venus.py      # conversa no terminal (VENUS_USER_ID=1 para personalização)
 ```

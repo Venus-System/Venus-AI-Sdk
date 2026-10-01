@@ -8,7 +8,7 @@ em 2026-09-05 — a PK de cada tabela é `<tabela>_id` (`product_id`,
 Validado manualmente em 2026-09-05 contra o Postgres de teste real (as 4
 tools originais, com dado de verdade — produto com/sem score, com/sem
 ingrediente cadastrado). Sem teste automatizado no CI pela mesma razão do
-checkpointer/store Mongo (ver `tests/test_tools_produto_ingrediente.py`):
+checkpointer/store Mongo (ver `tests/tools/test_tools_produto_ingrediente.py`):
 evita bater num serviço externo de verdade a cada execução da suíte.
 
 `search_product` foi adicionada em 2026-09-10 (não fazia parte da validação
