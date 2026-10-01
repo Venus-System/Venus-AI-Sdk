@@ -2,7 +2,7 @@
 Sai com código != 0 se qualquer verificação falhar.
 
     docker compose up -d && python scripts/init_db.py
-    python scripts/verificar_tools.py
+    python tests/manual/verificar_tools.py
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import asyncpg
 
-RAIZ = Path(__file__).resolve().parents[1]
+RAIZ = Path(__file__).resolve().parents[2]
 resultados: list[tuple[str, bool, str]] = []
 
 
