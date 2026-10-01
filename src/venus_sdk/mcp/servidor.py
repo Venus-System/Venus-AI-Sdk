@@ -5,7 +5,8 @@ cliente MCP (o próprio Venus via `mcp/tools.py`, Claude Desktop, etc.).
     python -m venus_sdk.mcp.servidor --transport http --porta 8765
 
 Variáveis: `DATABASE_URL` (Postgres, opcional — sem ela só as tools de FAQ
-sobem) e `FAQ_DIR` (padrão `data/faq`)."""
+sobem), `QDRANT_URL` (FAQ no Qdrant) e `FAQ_DIR` (índice local; padrão
+`data/faq`)."""
 
 from __future__ import annotations
 
@@ -80,7 +81,8 @@ def _assinatura(campos: dict[str, Any]) -> inspect.Signature:
 
 
 async def _montar_do_ambiente() -> tuple[FastMCP, Any]:
-    from venus_sdk.rag import criar_indice_local
+    from venus_sdk.config.settings import QDRANT_URL
+    from venus_sdk.rag import criar_indice_faq
 
     pool = None
     url = os.getenv("DATABASE_URL")
@@ -89,7 +91,7 @@ async def _montar_do_ambiente() -> tuple[FastMCP, Any]:
 
         pool = await asyncpg.create_pool(url)
     faq_dir = Path(os.getenv("FAQ_DIR", _PASTA_FAQ_PADRAO))
-    indice = criar_indice_local(faq_dir) if faq_dir.is_dir() else None
+    indice = criar_indice_faq(faq_dir) if QDRANT_URL or faq_dir.is_dir() else None
     return criar_servidor_mcp(pool=pool, indice=indice), pool
 
 
