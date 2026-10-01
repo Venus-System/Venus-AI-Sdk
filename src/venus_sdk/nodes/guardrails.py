@@ -42,6 +42,8 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
     if bloqueado:
         logger.info("Entrada bloqueada: %s", motivo)
         atualizacao["resposta_final"] = MENSAGEM_ENTRADA_BLOQUEADA
+        # O "sim" de um agendamento só vale na mensagem logo seguinte à proposta.
+        atualizacao["agendamento_pendente"] = None
     return atualizacao
 
 

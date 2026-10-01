@@ -57,5 +57,10 @@ class EstadoVenus(TypedDict, total=False):
     # --- orquestrador ---
     resposta_final: str | None
 
+    # --- agendamento na agenda Google (ver nodes/agendamento.py) ---
+    # Propostas preparadas neste turno e ainda não confirmadas. Só a próxima
+    # mensagem do usuário pode confirmá-las ("sim"); qualquer outra descarta.
+    agendamento_pendente: list[dict[str, Any]] | None
+
     # --- guardrail de saída ---
     saida_bloqueada: bool

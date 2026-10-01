@@ -30,13 +30,13 @@ from urllib.parse import parse_qs, urlencode, urlparse
 import asyncpg
 
 from venus_sdk.config.settings import DATABASE_URL  # também carrega o .env
-from venus_sdk.integrations.google_calendar import salvar_refresh_token, trocar_codigo_por_token
+from venus_sdk.integrations.google_calendar import ESCOPOS_VENUS, salvar_refresh_token, trocar_codigo_por_token
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
-ESCOPO = "https://www.googleapis.com/auth/calendar.freebusy"
+ESCOPO = ESCOPOS_VENUS
 
 
 def _capturar_code(porta: int) -> str:

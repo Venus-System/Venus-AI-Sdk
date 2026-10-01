@@ -39,6 +39,12 @@ import httpx
 logger = logging.getLogger(__name__)
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
+ESCOPO_DISPONIBILIDADE = "https://www.googleapis.com/auth/calendar.freebusy"
+ESCOPO_EVENTOS = "https://www.googleapis.com/auth/calendar.events"
+# O que o backend pede no consentimento: consultar horários livres e
+# criar/atualizar/remover os eventos de rotina que o usuário confirmar.
+ESCOPOS_VENUS = f"{ESCOPO_DISPONIBILIDADE} {ESCOPO_EVENTOS}"
+_ESCOPO_AGENDA_COMPLETA = "https://www.googleapis.com/auth/calendar"
 _TIMEOUT_SEGUNDOS = 30
 
 
@@ -141,19 +147,33 @@ async def salvar_refresh_token(pool: Any, user_id: int, refresh_token: str, *, e
         )
 
 
+async def obter_credencial(pool: Any, user_id: int) -> tuple[str, str] | None:
+    """`(refresh_token decifrado, escopo concedido)`, ou `None` se o usuário
+    nunca conectou o Google Calendar."""
+    async with pool.acquire() as conn:
+        linha = await conn.fetchrow(
+            "SELECT encrypted_refresh_token, scope FROM venus.google_oauth_tokens WHERE fk_user_id = $1",
+            user_id,
+        )
+    if linha is None:
+        return None
+    return decifrar_token(linha["encrypted_refresh_token"]), linha.get("scope") or ""
+
+
 async def obter_refresh_token(pool: Any, user_id: int) -> str | None:
     """Devolve o refresh_token decifrado do usuário, ou `None` se ele nunca
     conectou o Google Calendar. `None` não é erro — `tools/calendario.py`
     trata isso como resposta estruturada ("usuário não conectou"), nunca
     como exceção."""
-    async with pool.acquire() as conn:
-        linha = await conn.fetchrow(
-            "SELECT encrypted_refresh_token FROM venus.google_oauth_tokens WHERE fk_user_id = $1",
-            user_id,
-        )
-    if linha is None:
-        return None
-    return decifrar_token(linha["encrypted_refresh_token"])
+    credencial = await obter_credencial(pool, user_id)
+    return credencial[0] if credencial else None
+
+
+def pode_criar_eventos(escopo: str) -> bool:
+    """True se o consentimento inclui criar eventos (quem conectou só com
+    `calendar.freebusy` precisa reconectar para agendar)."""
+    concedidos = set((escopo or "").split())
+    return bool(concedidos & {ESCOPO_EVENTOS, _ESCOPO_AGENDA_COMPLETA})
 
 
 async def remover_refresh_token(pool: Any, user_id: int) -> None:

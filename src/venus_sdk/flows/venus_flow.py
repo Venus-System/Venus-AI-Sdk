@@ -180,7 +180,9 @@ def compilar_grafo_venus(
     `tools_rotina_extras` são tools extras (somente leitura) para o agente de
     Rotina — hoje, `check_availability`
     (`tools/calendario.py::montar_tools_calendario`), quando o Google Calendar
-    está configurado (ver `integrations/google_calendar.py`).
+    está configurado (ver `integrations/google_calendar.py`). Para AGENDAR,
+    o grafo precisa de `checkpointer`: a proposta de agendamento fica no
+    estado da conversa até o "sim" da mensagem seguinte.
     """
     return montar_grafo_venus(
         pool=pool,
