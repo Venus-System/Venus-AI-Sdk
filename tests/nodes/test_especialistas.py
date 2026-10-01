@@ -236,7 +236,7 @@ def test_rotina_sem_passos_na_resposta_recebe_os_passos_reais_da_tool() -> None:
 # --- tools extras do agente de rotina (Google Calendar) ---
 
 
-def test_agente_de_rotina_recebe_tools_extras_de_leitura_e_escrita() -> None:
+def test_agente_de_rotina_recebe_tools_extras() -> None:
     from unittest.mock import patch as _patch
 
     from langchain_core.tools import tool as _tool
@@ -248,7 +248,7 @@ def test_agente_de_rotina_recebe_tools_extras_de_leitura_e_escrita() -> None:
         """Tool falsa de disponibilidade."""
         return {"conectado": False}
 
-    for pergunta in ("Monta uma rotina de manhã às 7h", "Remove o produto X dos meus favoritos"):
+    for pergunta in ("Monta uma rotina de manhã às 7h", "Quais são meus favoritos?"):
         recebidas: dict = {}
 
         def _montar(llm, *, prompt, tools):

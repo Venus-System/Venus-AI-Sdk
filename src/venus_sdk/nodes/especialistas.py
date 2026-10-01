@@ -49,19 +49,24 @@ _RESPOSTA_ERRO_FORMATO = "Não consegui estruturar uma resposta válida para ess
 _LIMITE_PASSOS_AGENTE = 24
 _TAMANHO_PREVIA_LOG = 80
 
-_TOOLS_DE_ESCRITA = {"remove_favorite"}
 _FAVORITO_RE = re.compile(r"favorit", re.IGNORECASE)
 _VERBO_DE_ADICAO_RE = re.compile(
     r"\b(adicion\w*|inclu\w*|coloc\w*|salv\w*|guard\w*|bot[ae]\w*|p[oõ]e|marc[ae]\w*)\b", re.IGNORECASE
 )
-_VERBO_DE_REMOCAO_RE = re.compile(r"\b(remov\w*|tir[ae]\w*|exclu\w*|apag\w*|desfavorit\w*)", re.IGNORECASE)
+# Remoção exige o verbo apontando PARA os favoritos ("tira X dos meus
+# favoritos") — "monta uma rotina com meus favoritos excluindo X" não é pedido
+# de remoção e segue para o agente normalmente.
+_REMOCAO_DE_FAVORITO_RE = re.compile(
+    r"\bdesfavorit\w*|\b(remov\w*|tir[ae]\w*|exclu\w*|apag\w*)\b.{0,60}?\b(d[oae]s?)\s+(meus\s+)?favorit",
+    re.IGNORECASE,
+)
 
-# A IA nunca salva favoritos: o pedido é recusado sem passar pelo LLM (não
-# há tool para isso, e deixar o LLM responder gerava recusas que o Juiz
-# reprovava por "não ter fonte" — o usuário recebia uma resposta genérica).
+# A IA nunca altera os favoritos (nem adiciona, nem remove): o pedido é
+# recusado sem passar pelo LLM — não há tool para isso, e deixar o LLM
+# responder gerava recusas que o Juiz reprovava por "não ter fonte".
 INTENCAO_NAO_SUPORTADA = "nao_suportado"
-_RESPOSTA_ADICIONAR_FAVORITO = (
-    "Eu não salvo produtos nos seus favoritos — isso é você quem escolhe e faz direto no app. "
+_RESPOSTA_ALTERAR_FAVORITO = (
+    "Eu não mexo nos seus favoritos — adicionar ou remover produtos é com você, direto no app. "
     "Posso te mostrar os favoritos que você já tem ou montar uma rotina com eles?"
 )
 
@@ -333,39 +338,37 @@ def montar_no_agente_ingrediente(pool: Any) -> NoEspecialista:
 
 def montar_no_agente_rotina(pool: Any, tools_extras: list[Any] | None = None) -> NoEspecialista:
     """Idem `montar_no_agente_produto`, para o agente de Rotina (ver
-    `tools/rotina.py`) — perfil/favoritos/listas do usuário no Postgres.
-    A IA não adiciona favoritos (não existe tool para isso).
-
-    A tool que ALTERA dados (`remove_favorite`) só é entregue ao agente
-    quando a pergunta do usuário pede isso explicitamente. No teste de 2026-09-26, ao montar uma rotina, o agente
-    chamou `remove_favorite` para "corrigir" a rotina depois de uma
-    reprovação do Juiz — só a própria pergunta autoriza escrita, nunca o
-    feedback do Juiz nem a interpretação do LLM.
+    `tools/rotina.py`) — perfil/favoritos/listas do usuário no Postgres,
+    só leitura. A IA nunca altera os favoritos: pedido para adicionar ou
+    remover recebe a recusa fixa `_RESPOSTA_ALTERAR_FAVORITO`, sem LLM.
 
     `tools_extras` recebe tools de SOMENTE LEITURA já montadas por quem
     monta o grafo — hoje, `check_availability`
     (`tools/calendario.py::montar_tools_calendario`), quando o Google
     Calendar está configurado. Sem nada aqui, o agente funciona como antes."""
-    somente_leitura = _montar_no_especialista(
-        "rotina", ROTINA_PROMPT_COMPLETO, lambda: _tools_rotina(pool, com_escrita=False, extras=tools_extras)
-    )
-    com_escrita = _montar_no_especialista(
-        "rotina", ROTINA_PROMPT_COMPLETO, lambda: _tools_rotina(pool, com_escrita=True, extras=tools_extras)
+    agente = _montar_no_especialista(
+        "rotina",
+        ROTINA_PROMPT_COMPLETO,
+        lambda: montar_tools_rotina(pool) + montar_tools_compartilhadas(pool) + list(tools_extras or []),
     )
 
     async def no_agente_rotina(estado: EstadoVenus) -> EstadoVenus:
         pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario", "")
-        if pede_para_adicionar_favorito(pergunta):
+        if pede_alteracao_de_favorito(pergunta):
             return {
                 "resposta_especialista": _resposta_de_falha(
-                    "rotina", INTENCAO_NAO_SUPORTADA, _RESPOSTA_ADICIONAR_FAVORITO
+                    "rotina", INTENCAO_NAO_SUPORTADA, _RESPOSTA_ALTERAR_FAVORITO
                 ),
                 "evidencias_tools": None,
             }
-        no = com_escrita if pede_remocao_de_favorito(pergunta) else somente_leitura
-        return await no(estado)
+        return await agente(estado)
 
     return no_agente_rotina
+
+
+def pede_alteracao_de_favorito(pergunta: str) -> bool:
+    """True se a pergunta pede para adicionar ou remover um produto dos favoritos."""
+    return pede_para_adicionar_favorito(pergunta) or pede_remocao_de_favorito(pergunta)
 
 
 def pede_para_adicionar_favorito(pergunta: str) -> bool:
@@ -376,15 +379,7 @@ def pede_para_adicionar_favorito(pergunta: str) -> bool:
 
 def pede_remocao_de_favorito(pergunta: str) -> bool:
     """True se a pergunta pede para tirar um produto dos favoritos."""
-    texto = pergunta or ""
-    return bool(_FAVORITO_RE.search(texto) and _VERBO_DE_REMOCAO_RE.search(texto))
-
-
-def _tools_rotina(pool: Any, *, com_escrita: bool, extras: list[Any] | None = None) -> list[Any]:
-    tools = montar_tools_rotina(pool) + montar_tools_compartilhadas(pool) + list(extras or [])
-    if com_escrita:
-        return tools
-    return [tool for tool in tools if tool.name not in _TOOLS_DE_ESCRITA]
+    return bool(_REMOCAO_DE_FAVORITO_RE.search(pergunta or ""))
 
 
 def montar_no_agente_faq(indice: Any, tools_extras: list[Any] | None = None) -> NoEspecialista:
