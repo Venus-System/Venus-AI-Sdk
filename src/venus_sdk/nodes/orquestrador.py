@@ -65,6 +65,12 @@ _PEDE_INGREDIENTES_RE = re.compile(
 _PEDE_FAVORITOS_RE = re.compile(r"favorit", re.IGNORECASE)
 _PEDE_LISTAS_RE = re.compile(r"\blistas?\b", re.IGNORECASE)
 
+# Antes do "sim", nada foi gravado: o texto não pode afirmar o contrário.
+_AFIRMA_AGENDAMENTO_RE = re.compile(
+    r"\b(agendei|agendad[oa]s?|marquei|coloquei na (sua )?agenda|adicionei (à|a|na) (sua )?agenda|"
+    r"removi|tirei)\b", re.IGNORECASE,
+)
+_RESPOSTA_ANTES_DA_CONFIRMACAO = "Preparei o agendamento da sua rotina — só falta você confirmar."
 # `[nome do produto]` é placeholder; `[FAQ](https://...)` é link markdown.
 _PLACEHOLDER_RE = re.compile(r"\[[^\]\n]{2,40}\](?!\()")
 _NOME_DO_PASSO_RE = re.compile(r"\d+\) (.+?) \(")
@@ -428,6 +434,9 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
 
     texto = texto or _RESPOSTA_ORQUESTRADOR_FALLBACK
     pendentes = estado.get("agendamento_pendente")
+    if pendentes and _AFIRMA_AGENDAMENTO_RE.search(texto):
+        logger.warning("Orquestrador afirmou um agendamento ainda não confirmado; texto substituído")
+        texto = _RESPOSTA_ANTES_DA_CONFIRMACAO
     if pendentes:
         # O que será gravado é mostrado pelo código, não pelo LLM: o "sim"
         # confirma exatamente este texto.
