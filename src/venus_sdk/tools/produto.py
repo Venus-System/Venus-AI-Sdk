@@ -12,6 +12,7 @@ from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
+from venus_sdk.tools._identidade import SEM_USUARIO_IDENTIFICADO, resolver_user_id
 from venus_sdk.tools._util import (
     LIMITE_BUSCA,
     consultar,
@@ -156,6 +157,9 @@ def montar_tools_produto(pool: Any) -> list[BaseTool]:
     async def get_personalized_score(product_id: int, user_id: int) -> dict:
         """Traz a nota calculada especificamente para este usuário sobre
         este produto — o que justifica por que foi recomendado pra ele."""
+        user_id = resolver_user_id(user_id)
+        if user_id is None:
+            return SEM_USUARIO_IDENTIFICADO
         return await consultar(pool, "get_personalized_score", _SQL_SCORE_PERSONALIZADO, product_id, user_id,
                                uma_linha=True,
                                vazio="score personalizado não encontrado para este usuário/produto")

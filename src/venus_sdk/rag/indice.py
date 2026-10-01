@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -48,7 +49,7 @@ class EmbeddingsHash(Embeddings):
         tokens = _tokens(texto)
         bigramas = [f"{anterior}_{atual}" for anterior, atual in zip(tokens, tokens[1:])]
         for grama in tokens + bigramas:
-            posicao = int(hashlib.md5(grama.encode()).hexdigest(), 16) % self.dim
+            posicao = int(hashlib.md5(grama.encode(), usedforsecurity=False).hexdigest(), 16) % self.dim
             vetor[posicao] += 1.0
         norma = float(np.linalg.norm(vetor))
         return (vetor / norma).tolist() if norma else vetor.tolist()
@@ -79,7 +80,7 @@ class IndiceRAG:
         """Top-k chunks por cosseno. Devolve `[{trecho, fonte, score, ...}]`
         (vazio se nada passar de `score_minimo` — o agente deve então dizer
         que não sabe, nunca inventar)."""
-        if not self.documentos:
+        if not self.documentos or k <= 0:
             return []
         vetor_consulta = np.array(self.embeddings.embed_query(consulta), dtype=np.float32)
         norma_consulta = float(np.linalg.norm(vetor_consulta))
@@ -110,7 +111,7 @@ def _assinatura(pasta: Path) -> str:
         for caminho in sorted(pasta.rglob("*"))
         if caminho.is_file() and caminho.suffix.lower() in EXTENSOES
     ]
-    return hashlib.md5(json.dumps(itens).encode()).hexdigest()
+    return hashlib.md5(json.dumps(itens).encode(), usedforsecurity=False).hexdigest()
 
 
 def criar_indice_local(pasta: str | Path, embeddings: Embeddings | None = None, *,
@@ -130,16 +131,25 @@ def criar_indice_local(pasta: str | Path, embeddings: Embeddings | None = None, 
         return IndiceRAG(documentos, None, matriz)
 
     indice = IndiceRAG(documentos, embeddings)
-    arquivo_cache.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(arquivo_cache, assinatura=np.array(assinatura), matriz=indice.matriz)
+    _gravar_cache(arquivo_cache, assinatura, indice.matriz)
     return indice
+
+
+def _gravar_cache(arquivo_cache: Path, assinatura: str, matriz: np.ndarray) -> None:
+    """Grava num temporário e troca de uma vez: dois processos gerando o cache
+    ao mesmo tempo nunca deixam um arquivo pela metade."""
+    arquivo_cache.parent.mkdir(parents=True, exist_ok=True)
+    temporario = arquivo_cache.with_name(f"{arquivo_cache.name}.{os.getpid()}.tmp")
+    with open(temporario, "wb") as saida:
+        np.savez(saida, assinatura=np.array(assinatura), matriz=matriz)
+    os.replace(temporario, arquivo_cache)
 
 
 def _matriz_do_cache(arquivo_cache: Path, assinatura: str, total_documentos: int) -> np.ndarray | None:
     """Matriz salva, se o cache existir e ainda corresponder aos arquivos atuais."""
     if not arquivo_cache.exists():
         return None
-    dados = np.load(arquivo_cache, allow_pickle=False)
-    if str(dados["assinatura"]) == assinatura and dados["matriz"].shape[0] == total_documentos:
-        return dados["matriz"]
+    with np.load(arquivo_cache, allow_pickle=False) as dados:
+        if str(dados["assinatura"]) == assinatura and dados["matriz"].shape[0] == total_documentos:
+            return dados["matriz"]
     return None

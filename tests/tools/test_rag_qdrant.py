@@ -97,3 +97,18 @@ def test_cliente_sem_qdrant_url_levanta(monkeypatch) -> None:
     vector_build.get_qdrant_client.cache_clear()
     with pytest.raises(ValueError, match="QDRANT_URL"):
         vector_build.get_qdrant_client()
+
+
+class _EmbedQuebrado(_EmbedHash):
+    def _get_text_embedding(self, text: str) -> list[float]:
+        raise RuntimeError("provedor de embeddings fora do ar")
+
+    def _get_text_embeddings(self, texts: list[str]) -> list[list[float]]:
+        raise RuntimeError("provedor de embeddings fora do ar")
+
+
+def test_ingestao_que_falha_no_meio_mantem_o_faq_anterior(cliente: QdrantClient) -> None:
+    total = ingerir_faq(FAQ, cliente=cliente, embed_model=_EmbedHash())
+    with pytest.raises(RuntimeError):
+        ingerir_faq(FAQ, cliente=cliente, embed_model=_EmbedQuebrado())
+    assert cliente.count(COLLECTION).count == total

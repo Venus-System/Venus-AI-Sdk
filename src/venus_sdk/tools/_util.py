@@ -43,6 +43,12 @@ _PALAVRAS_VAZIAS = {
 }
 
 
+def escapar_curingas_like(texto: str) -> str:
+    """Escapa `%`, `_` e `\\` para o texto valer literalmente num LIKE/ILIKE
+    (a barra invertida é o escape padrão do Postgres)."""
+    return texto.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def palavras_de_busca(termo: str) -> list[str]:
     """Palavras relevantes (sem acento, minúsculas, >=3 letras, sem palavras
     vazias) para busca por qualquer-palavra. Sem sobrar nenhuma, devolve `[]`."""

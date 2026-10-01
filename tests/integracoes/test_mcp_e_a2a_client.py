@@ -78,7 +78,7 @@ from a2a.helpers import get_message_text, new_text_message  # noqa: E402
 from a2a.types import Role, SendMessageRequest  # noqa: E402
 
 from venus_sdk.a2a_client import consultar_agente_externo, montar_tool_a2a  # noqa: E402
-from venus_sdk.a2a_server import montar_agent_card, montar_app_a2a  # noqa: E402
+from venus_sdk.a2a_server import identidade_do_metadata, montar_agent_card, montar_app_a2a  # noqa: E402
 
 URL = "http://agente-externo.teste"
 
@@ -98,7 +98,7 @@ def _http(app) -> httpx.AsyncClient:
 
 async def test_a2a_repassa_identidade_do_usuario_via_metadata() -> None:
     grafo = _GrafoEspiao()
-    app = montar_app_a2a(grafo=grafo, base_url=URL)
+    app = montar_app_a2a(grafo=grafo, base_url=URL, identificar_usuario=identidade_do_metadata)
     http = _http(app)
     client = await create_client(agent=montar_agent_card(URL),
                                  client_config=ClientConfig(httpx_client=http, streaming=False))
@@ -113,6 +113,26 @@ async def test_a2a_repassa_identidade_do_usuario_via_metadata() -> None:
     assert enviado["entrada"]["usuario_id"] == "u-42"
     assert enviado["entrada"]["usuario_id_postgres"] == 7
     assert enviado["config"]["configurable"]["thread_id"] == "ctx-1"
+    assert get_message_text(ev.message) == "eco: oi"
+
+
+async def test_a2a_sem_validador_ignora_identidade_do_metadata() -> None:
+    """O metadata é escrito por quem chama: sem validador, ninguém se passa
+    por outro usuário."""
+    grafo = _GrafoEspiao()
+    app = montar_app_a2a(grafo=grafo, base_url=URL)
+    http = _http(app)
+    client = await create_client(agent=montar_agent_card(URL),
+                                 client_config=ClientConfig(httpx_client=http, streaming=False))
+    req = SendMessageRequest(
+        message=new_text_message("oi", context_id="ctx-2", role=Role.ROLE_USER),
+        metadata={"usuario_id": "u-42", "usuario_id_postgres": 7},
+    )
+    [ev] = [e async for e in client.send_message(req)]
+    await client.close(); await http.aclose()
+
+    entrada = grafo.entradas[0]["entrada"]
+    assert "usuario_id" not in entrada and "usuario_id_postgres" not in entrada
     assert get_message_text(ev.message) == "eco: oi"
 
 

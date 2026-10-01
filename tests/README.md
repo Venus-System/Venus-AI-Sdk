@@ -14,6 +14,7 @@ pytest -m integration     # exige Postgres com schema+seed (scripts/init_db.py)
 | `guardrails/` | Guardrails de entrada/saída e segurança dos prompts |
 | `llm/` | Cadeias de fallback entre provedores de LLM |
 | `integracoes/` | MCP e A2A (servidor e cliente) |
+| `regressao/` | Um teste por bug corrigido na revisão (cenário que falhava → comportamento certo) |
 | `manual/` | Scripts rodados à mão contra serviços reais (o `pytest` não os executa) |
 | `fixtures/` | Dados de apoio dos testes |
 

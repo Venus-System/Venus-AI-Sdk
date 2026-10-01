@@ -15,6 +15,8 @@ from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
+from venus_sdk.guardrail_rules import contem_tentativa_de_injecao
+
 logger = logging.getLogger(__name__)
 
 _TIMEOUT_HTTP_SEGUNDOS = 60
@@ -80,6 +82,9 @@ def montar_tool_a2a(agentes: dict[str, str] | None = None, *, httpx_client: Any 
         except Exception as exc:  # noqa: BLE001
             logger.warning("Falha ao consultar agente A2A %s: %s", agente, exc)
             return {"erro": "não consegui consultar o agente externo agora", "detalhe": type(exc).__name__}
+        if contem_tentativa_de_injecao(resposta or ""):
+            logger.warning("Resposta do agente A2A %s descartada: parece instrução ao sistema", agente)
+            return {"erro": "a resposta do agente externo foi descartada por segurança"}
         return {"agente": agente, "url": agentes[agente], "resposta": resposta or "(sem resposta)"}
 
     _consultar.description += f" Agentes disponíveis: {nomes_disponiveis}."

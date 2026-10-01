@@ -8,6 +8,7 @@ import re
 from typing import Literal
 
 from venus_sdk.llm.models import get_llm_rapido
+from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.router import ROUTER_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 
@@ -185,7 +186,7 @@ def _mensagens_para_o_roteador(estado: EstadoVenus) -> list:
     historico = list(estado.get("historico") or [])
     if historico:
         historico = historico[:-1]
-    return [("system", ROUTER_PROMPT_COMPLETO), *historico, ("human", mensagem)]
+    return [("system", com_data_atual(ROUTER_PROMPT_COMPLETO)), *historico, ("human", mensagem)]
 
 
 def _rota_do_texto(texto: str) -> str | None:
@@ -243,7 +244,9 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     protocolo `ROUTE=.../PERGUNTA_ORIGINAL=...` (ou responde diretamente em
     caso de small talk/fora de escopo).
     """
-    mensagem_usuario = estado.get("mensagem_usuario", "")
+    # A mensagem anonimizada é a que segue para os especialistas: CPF, e-mail
+    # etc. não podem voltar pelas redes de segurança nem pelo fallback.
+    mensagem_usuario = estado.get("mensagem_anonimizada") or estado.get("mensagem_usuario", "")
     mensagens = _mensagens_para_o_roteador(estado)
 
     texto = _invocar_roteador(mensagens)

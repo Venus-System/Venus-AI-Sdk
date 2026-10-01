@@ -9,6 +9,7 @@ from typing import Any
 from langchain_core.tools import BaseTool, tool
 
 from venus_sdk.texto import remover_acentos
+from venus_sdk.tools._identidade import SEM_USUARIO_IDENTIFICADO, resolver_user_id
 from venus_sdk.tools._util import consultar, exigir_pool
 
 # Ordem de boas práticas por PALAVRA-CHAVE na categoria (limpeza antes de
@@ -24,7 +25,10 @@ _ORDEM_PALAVRAS = [
 ]
 # Categoria sem nenhuma palavra-chave acima vai para o fim da rotina.
 _ORDEM_DESCONHECIDA = 99
-_SO_NOITE = ("tratamento", "retinol", "acido", "renovador", "noite", "night")
+_SO_NOITE = (
+    "tratamento", "retinol", "retinal", "tretinoina", "renovador", "noite", "night", "peeling",
+    "acido glicolico", "acido salicilico", "acido lactico", "acido mandelico", "aha", "bha",
+)
 _SO_MANHA = ("protetor", "solar", "fps", "spf", "dia ", "day")
 
 # Alergias no catálogo vêm em português/inglês; os ingredientes vêm como INCI.
@@ -37,6 +41,12 @@ _SINONIMOS_ALERGIA = {
     "silicone": ("dimethicone", "siloxane", "silicone"),
     "alcool": ("alcohol denat", "alcohol"),
 }
+# Álcoois graxos (emolientes) não são o "álcool" das alergias/sensibilidades.
+_ALCOOIS_GRAXOS = (
+    "cetyl", "stearyl", "cetearyl", "behenyl", "myristyl", "lauryl alcohol", "oleyl", "arachidyl",
+    "cetilico", "estearilico", "cetoestearilico", "behenilico", "miristilico", "oleilico",
+)
+_TERMOS_DE_ALCOOL = ("alcool", "alcohol")
 
 
 # Categorias essenciais de uma rotina e as palavras-chave que as identificam.
@@ -77,13 +87,22 @@ def _rotulo(produto: dict) -> str:
     return _minusculo_sem_acento(produto["category_name"] + " " + produto["name"])
 
 
+def _bate_com_alergia(termo: str, ingrediente: str) -> bool:
+    if termo not in ingrediente:
+        return False
+    eh_termo_de_alcool = any(alcool in termo for alcool in _TERMOS_DE_ALCOOL)
+    return not (eh_termo_de_alcool and any(graxo in ingrediente for graxo in _ALCOOIS_GRAXOS))
+
+
 def _separar_por_alergia(favoritos: list[dict], termos: list[str]) -> tuple[list[dict], list[dict]]:
     """`(excluidos, candidatos)`; cada item ganha `motivo` = termos de alergia que bateram."""
     excluidos: list[dict] = []
     candidatos: list[dict] = []
     for produto in favoritos:
         ingredientes = [_minusculo_sem_acento(ingrediente) for ingrediente in produto["inci_names"]]
-        em_conflito = [termo for termo in termos if any(termo in ingrediente for ingrediente in ingredientes)]
+        em_conflito = [
+            termo for termo in termos if any(_bate_com_alergia(termo, ingrediente) for ingrediente in ingredientes)
+        ]
         (excluidos if em_conflito else candidatos).append({**produto, "motivo": em_conflito})
     return excluidos, candidatos
 
@@ -199,6 +218,9 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
         — base para montar ou ajustar uma rotina."""
         # `to_jsonb(up)` em vez de colunas fixas: o schema do perfil evolui (a coluna
         # `hair_type` já sumiu do banco real) e uma coluna a menos não pode derrubar a tool.
+        user_id = resolver_user_id(user_id)
+        if user_id is None:
+            return SEM_USUARIO_IDENTIFICADO
         resultado = await consultar(pool, "get_user_profile", _SQL_PERFIL_DO_USUARIO, user_id, uma_linha=True,
                                     vazio="o usuário não tem perfil cadastrado")
         if isinstance(resultado, dict) and "perfil" in resultado:
@@ -209,12 +231,18 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
     async def get_user_favorites(user_id: int) -> list[dict] | dict:
         """Lista os produtos favoritados pelo usuário (id, nome, marca,
         categoria). A rotina só pode usar produtos daqui ou das listas."""
+        user_id = resolver_user_id(user_id)
+        if user_id is None:
+            return SEM_USUARIO_IDENTIFICADO
         return await consultar(pool, "get_user_favorites", _SQL_FAVORITOS_DO_USUARIO, user_id,
                                vazio=_SEM_FAVORITOS)
 
     @tool
     async def get_user_lists(user_id: int) -> list[dict] | dict:
         """Lista as listas de produtos do usuário e os produtos de cada uma."""
+        user_id = resolver_user_id(user_id)
+        if user_id is None:
+            return SEM_USUARIO_IDENTIFICADO
         return await consultar(pool, "get_user_lists", _SQL_LISTAS_DO_USUARIO, user_id,
                                vazio="o usuário não tem listas")
 
@@ -229,10 +257,15 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
         horario = (horario or "ambos").lower().replace("ã", "a")
         if horario not in _HORARIOS_VALIDOS:
             return {"erro": "horario deve ser 'manha', 'noite' ou 'ambos'"}
+        user_id = resolver_user_id(user_id)
+        if user_id is None:
+            return SEM_USUARIO_IDENTIFICADO
         favoritos = await _favoritos_com_ingredientes(user_id)
         if isinstance(favoritos, dict):
             return favoritos
         alergias = await consultar(pool, "suggest_routine", _SQL_ALERGIAS_PARA_ROTINA, user_id, vazio="sem alergias")
+        if isinstance(alergias, dict) and "erro" in alergias:
+            return {**alergias, "mensagem": "não consegui checar as alergias; a rotina não foi montada"}
         termos: list[str] = []
         if isinstance(alergias, list):
             for linha in alergias:

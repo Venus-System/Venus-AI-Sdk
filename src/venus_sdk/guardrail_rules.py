@@ -33,7 +33,9 @@ MENSAGEM_SAIDA_BLOQUEADA = (
 # --- dados sensíveis (usados tanto para bloqueio de saída quanto anonimização) ---
 _CPF_RE = re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b")
 _RG_RE = re.compile(r"\b\d{1,2}\.\d{3}\.\d{3}-[\dXx]\b")
-_CEP_RE = re.compile(r"\b\d{5}-?\d{3}\b")
+# CEP: com hífen, ou 8 dígitos logo depois da palavra "CEP" — 8 dígitos
+# soltos são quase sempre outra coisa (código de produto, pedido...).
+_CEP_RE = re.compile(r"\b(cep\W{0,3})?(\d{5}-\d{3}|\d{8})\b", re.IGNORECASE)
 # Candidato a cartão: só a contagem de dígitos (13-19) não é filtro nenhum —
 # batia em qualquer sequência longa de dígitos (ex.: código de barras EAN-13
 # de produto, CEP+número concatenado). O regex aqui só encontra candidatos;
@@ -42,6 +44,28 @@ _CEP_RE = re.compile(r"\b\d{5}-?\d{3}\b")
 _CARTAO_RE = re.compile(r"\b(?:\d[ -]?){13,19}\b")
 _EMAIL_RE = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
 _TELEFONE_RE = re.compile(r"\b(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}-?\d{4}\b")
+
+
+def _eh_cpf(candidato: str) -> bool:
+    """CPF formatado (com ponto ou hífen) conta sempre; 11 dígitos soltos só
+    com os dígitos verificadores certos — senão é código de barras, telefone..."""
+    if not candidato.isdigit():
+        return True
+    digitos = [int(c) for c in candidato]
+    if len(set(digitos)) == 1:
+        return False
+    for tamanho in (9, 10):
+        soma = sum(d * peso for d, peso in zip(digitos[:tamanho], range(tamanho + 1, 1, -1)))
+        if (soma * 10 % 11) % 10 != digitos[tamanho]:
+            return False
+    return True
+
+
+def _mascarar_cep(match: re.Match[str]) -> str:
+    prefixo, numero = match.group(1), match.group(2)
+    if prefixo or "-" in numero:
+        return f"{prefixo or ''}[CEP]"
+    return match.group()
 
 
 def _eh_cartao_valido(candidato: str) -> bool:
@@ -75,7 +99,10 @@ _INJECAO_RE = re.compile(
     # "sem restrições" sozinho é frase comum ("ingrediente sem restrições
     # regulatórias") e bloqueava respostas legítimas na saída — só conta
     # com um verbo de comando antes ou com "nenhuma/alguma" junto.
-    r"sem\s+(filtro|censura)\b|"
+    # "sem filtro" sozinho é vocabulário de protetor solar ("sem filtro
+    # químico"): só conta com um verbo de comando antes.
+    r"sem\s+censura\b|"
+    r"(respond|fal|aj|atu|oper|funcion|convers|modo)\w*\s+sem\s+filtros?\b|"
     r"sem\s+restri[çc][õo]es\s+(nenhum[ao]|algum[ao])\b|"
     r"sem\s+nenhuma\s+restri[çc][ãa]o|"
     r"(respond|fal|aj|atu|oper|funcion|convers)\w*\s+sem\s+restri[çc][õo]es|"
@@ -101,8 +128,8 @@ _INJECAO_EVASAO_RE = re.compile(
     r"esqueca\s+(tudo|as\s+regras)|"
     r"revele\s+(seu\s+)?prompt|"
     r"modo\s+desenvolvedor|"
-    r"sem\s+filtro|"
     r"sem\s+censura|"
+    r"(respond|fal|aj|atu|oper|funcion|convers|modo)\w*\s+sem\s+filtros?\b|"
     r"dan\s+mode|"
     r"jailbreak|"
     r"hypothetically|"
@@ -133,17 +160,30 @@ _EMOJI_RE = re.compile(
     "["
     "\U0001F1E6-\U0001F1FF"  # bandeiras (pares de letras regionais)
     "\U0001F300-\U0001FAFF"  # símbolos/pictogramas diversos, emoticons, transporte etc.
-    "\U00002190-\U000021FF"  # setas (ex.: ↔️)
     "\U00002300-\U000023FF"  # símbolos técnicos diversos (ex.: ⌚ ⏰ ⏱)
-    "\U000025A0-\U000027BF"  # formas geométricas, símbolos diversos e dingbats (☀-➿, ▶️, ✨💅-like ranges)
     "\U00002B00-\U00002BFF"  # setas/estrelas adicionais
     "\U0000FE0F"             # variation selector usado por emoji
     "\U0000200D"             # zero-width joiner (emoji composto, ex.: família)
     "\U000020E3"             # combining enclosing keycap (ex.: 1️⃣)
     "]+"
 )
+# Seta ou símbolo seguido do seletor de emoji (U+FE0F, ex.: "▶️", "↔️") é
+# emoji; sem ele, é texto ("→", "✓").
+_SIMBOLO_EM_FORMA_DE_EMOJI_RE = re.compile("[←-⇿■-➿]️")
+# Faixa de símbolos diversos/dingbats (☀ ✨ ❤): emoji, exceto os símbolos
+# tipográficos que aparecem em texto comum.
+_SIMBOLOS_DIVERSOS_RE = re.compile("[\U000025A0-\U000027BF]")
+_SIMBOLOS_DE_TEXTO = frozenset("■□▪▫▲△▶▷►▼▽◀◁◆◇○●◦★☆✓✔✗✘•")
 _ESPACO_ANTES_DE_PONTUACAO_RE = re.compile(r"\s+([.,!?;:])")
-_ESPACOS_REPETIDOS_RE = re.compile(r" {2,}")
+# Só espaços no meio do texto: a indentação no início da linha (listas
+# aninhadas) é preservada.
+_ESPACOS_REPETIDOS_RE = re.compile(r"(?<=\S) {2,}")
+
+
+def contem_tentativa_de_injecao(texto: str) -> bool:
+    """True se o texto tenta manipular o sistema (prompt injection) — também
+    usado em conteúdo que vem de fora (web, A2A, memória)."""
+    return _eh_tentativa_de_injecao(texto)
 
 
 def _eh_tentativa_de_injecao(texto: str) -> bool:
@@ -158,11 +198,15 @@ def _tem_cartao(texto: str) -> bool:
     return any(_eh_cartao_valido(m.group()) for m in _CARTAO_RE.finditer(texto))
 
 
+def _tem_cpf(texto: str) -> bool:
+    return any(_eh_cpf(m.group()) for m in _CPF_RE.finditer(texto))
+
+
 def _tem_dado_sensivel_critico(texto: str) -> bool:
     """CPF/RG/cartão — dados que nunca devem sair na resposta. CEP fica de
     fora daqui (baixo risco, mas gera falso positivo com mais frequência;
     ver `anonimizar_entrada`, que mascara CEP na entrada mesmo assim)."""
-    return bool(_CPF_RE.search(texto) or _RG_RE.search(texto) or _tem_cartao(texto))
+    return bool(_tem_cpf(texto) or _RG_RE.search(texto) or _tem_cartao(texto))
 
 
 def guardrail_entrada(mensagem: str) -> tuple[bool, str | None]:
@@ -210,7 +254,9 @@ def remover_emojis(resposta: str) -> str:
     absoluta — ver PERSONA_SISTEMA). Prompt sozinho não garante 100% de
     aderência de um LLM a uma regra de estilo, então isso é reforçado aqui
     de forma determinística, na saída."""
-    texto = _EMOJI_RE.sub("", resposta or "")
+    texto = _SIMBOLO_EM_FORMA_DE_EMOJI_RE.sub("", resposta or "")
+    texto = _EMOJI_RE.sub("", texto)
+    texto = _SIMBOLOS_DIVERSOS_RE.sub(lambda m: m.group() if m.group() in _SIMBOLOS_DE_TEXTO else "", texto)
     # Emoji costuma vir cercado de espaço (ex.: "Oi! 👋 Tudo bem?" ou
     # "ter 💅. Time"); depois de removê-lo, limpa o espaço órfão antes de
     # pontuação e o espaço duplo que sobra.
@@ -222,10 +268,10 @@ def remover_emojis(resposta: str) -> str:
 def anonimizar_entrada(mensagem: str) -> str:
     """Remove/mascara dados sensíveis da mensagem do usuário antes de logar."""
     texto = mensagem or ""
-    texto = _CPF_RE.sub("[CPF]", texto)
+    texto = _CPF_RE.sub(lambda m: "[CPF]" if _eh_cpf(m.group()) else m.group(), texto)
     texto = _RG_RE.sub("[RG]", texto)
     texto = _EMAIL_RE.sub("[EMAIL]", texto)
     texto = _CARTAO_RE.sub(lambda m: "[CARTAO]" if _eh_cartao_valido(m.group()) else m.group(), texto)
-    texto = _CEP_RE.sub("[CEP]", texto)
+    texto = _CEP_RE.sub(_mascarar_cep, texto)
     texto = _TELEFONE_RE.sub("[TELEFONE]", texto)
     return texto

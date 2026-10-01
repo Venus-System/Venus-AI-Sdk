@@ -9,6 +9,7 @@ from typing import Any
 
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_orquestrador
 from venus_sdk.nodes._evidencias import argumentos_da_evidencia, dados_da_evidencia
+from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 from venus_sdk.texto import remover_acentos
@@ -37,8 +38,8 @@ _SEGURA_GENERICA = (
 )
 _AVISO_SEM_NOTA_NEM_INGREDIENTES = (
     "Esses ainda não têm nota nem ingredientes cadastrados aqui, então não consigo dizer qual "
-    "é o melhor sem chutar. Se você me contar seu tipo de cacho/fio e o que quer (hidratar, definir, "
-    "reduzir frizz), eu te ajudo a escolher entre eles — ou posso ver algum em particular."
+    "é o melhor sem chutar. Se você me contar o que procura (seu tipo de pele ou cabelo e o "
+    "objetivo), eu te ajudo a escolher entre eles — ou posso ver algum em particular."
 )
 _CONVITE_PARA_DETALHAR = "Quer que eu detalhe mais alguma coisa?"
 
@@ -64,7 +65,8 @@ _PEDE_INGREDIENTES_RE = re.compile(
 _PEDE_FAVORITOS_RE = re.compile(r"favorit", re.IGNORECASE)
 _PEDE_LISTAS_RE = re.compile(r"\blistas?\b", re.IGNORECASE)
 
-_PLACEHOLDER_RE = re.compile(r"\[[^\]\n]{2,40}\]")
+# `[nome do produto]` é placeholder; `[FAQ](https://...)` é link markdown.
+_PLACEHOLDER_RE = re.compile(r"\[[^\]\n]{2,40}\](?!\()")
 _NOME_DO_PASSO_RE = re.compile(r"\d+\) (.+?) \(")
 _MARCA_PASSOS_DA_ROTINA = "Passos ("
 
@@ -302,6 +304,8 @@ def _parte_perfil(evidencias: list[dict] | None) -> str | None:
 
 def _parte_alergias(evidencias: list[dict] | None) -> str | None:
     alergias = dados_da_evidencia(evidencias, "get_user_allergies")
+    if isinstance(alergias, dict) and alergias.get("encontrado") is False and "alergias" in alergias:
+        return "Você não declarou nenhuma alergia no seu cadastro."
     if not isinstance(alergias, list) or not alergias:
         return None
     nomes = ", ".join(str(a.get("allergy_name")) for a in alergias if isinstance(a, dict))
@@ -313,18 +317,23 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     (reprovado por inventar dado) NÃO chega ao usuário. Monta uma resposta só com o que as
     tools realmente devolveram."""
     evidencias = estado.get("evidencias_tools")
+    pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
     rotina_montada = _parte_rotina(evidencias)
+    # Favoritos e listas só entram se a pergunta citou um deles (ou nenhum):
+    # "quais são minhas listas?" não deve despejar os favoritos junto.
+    pede_favoritos = bool(_PEDE_FAVORITOS_RE.search(pergunta))
+    pede_listas = bool(_PEDE_LISTAS_RE.search(pergunta))
+    sem_preferencia = not (pede_favoritos or pede_listas)
     dados_da_conta = [
         parte for parte in (
             rotina_montada,
-            None if rotina_montada else _parte_favoritos(evidencias),
-            _parte_listas(evidencias),
+            None if rotina_montada or not (pede_favoritos or sem_preferencia) else _parte_favoritos(evidencias),
+            _parte_listas(evidencias) if pede_listas or sem_preferencia else None,
             _parte_perfil(evidencias),
         ) if parte
     ]
     # Numa pergunta sobre a conta, a busca de produto foi só um meio (achar o
     # id): listar o catálogo ali confunde mais do que ajuda.
-    pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
     texto_produtos, sem_dado = (None, False) if dados_da_conta else _parte_produtos(evidencias, pergunta)
     candidatas = [
         *dados_da_conta,
@@ -398,7 +407,7 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
 
     pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
     entrada = _montar_entrada_orquestrador(especialista_json, aprovado, pergunta)
-    mensagens = [("system", ORQUESTRADOR_PROMPT_COMPLETO), ("human", entrada)]
+    mensagens = [("system", com_data_atual(ORQUESTRADOR_PROMPT_COMPLETO)), ("human", entrada)]
     texto = _invocar_orquestrador(mensagens)
     if not texto:
         # Falha pontual do LLM (conteúdo vazio, ou exceção — ver
