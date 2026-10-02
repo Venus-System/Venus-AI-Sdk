@@ -12,11 +12,12 @@ from unittest.mock import patch
 from _fakes import ConexaoFalsa, LLMScript, PoolFalso, chamada_tool
 from langchain_core.messages import AIMessage
 
+from venus_sdk.config.settings import FAQ_DIR
 from venus_sdk.flows.venus_flow import compilar_grafo_venus
 from venus_sdk.memory import criar_checkpointer_em_memoria
 from venus_sdk.rag import criar_indice_local
 
-FAQ = Path(__file__).resolve().parents[2] / "data" / "faq"
+FAQ = Path(FAQ_DIR)
 CFG = {"configurable": {"thread_id": "t1"}}
 
 

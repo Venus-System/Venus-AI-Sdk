@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 #           0,35 -> hit@3 77% (perde acertos sem ganhar nos "não sei")
 #           0,40 -> "não sei" 100%, mas hit@3 cai para 64%
 #   local   0,25 a 0,35 -> hit@3 77%, MRR 0,62, "não sei" 83%
-# Reavaliar quando os documentos de data/faq/ mudarem.
+# Reavaliar quando os documentos de venus_sdk/data/faq/ mudarem.
 _SCORE_MINIMO = 0.3
 _CASAS_DECIMAIS_SCORE = 3
 

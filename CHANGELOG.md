@@ -34,6 +34,11 @@ Correções da revisão técnica e check-up da rotina. Tudo desde `v0.1.0`
 - **Rotina:** horário de cada produto decidido também pela fórmula
   (ingredientes), não só pelo nome (`58264f9`).
 - `venus_sdk.__version__`, lida dos metadados do pacote.
+- **FAQ empacotado:** os documentos saem de `data/faq/` e vão para
+  `src/venus_sdk/data/faq/`, incluídos no wheel (`package-data`).
+  `FAQ_DIR` passa a apontar por padrão para essa pasta (via
+  `importlib.resources`), então quem instala por pip (a API) não precisa
+  mais manter uma cópia.
 
 ### Refatorações e manutenção
 - `create_agent` do LangChain no lugar do `create_react_agent` (descontinuado);

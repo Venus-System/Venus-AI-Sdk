@@ -25,7 +25,7 @@ guardrail entrada → carregar memória → roteador ─┬→ produto ───
 | Orquestrador / Memória | — |
 
 - **Sessões**: `thread_id` (checkpointer, histórico da conversa) + `usuario_id` (memória de longo prazo, `memory/store.py`).
-- **RAG**: `data/faq/*.md` → Qdrant (`python -m venus_sdk.rag.faq_ingest`, extra `rag`) quando há `QDRANT_URL`; sem ela, índice local em memória (`rag/indice.py`). A resposta cita as fontes em `fontes_usadas`.
+- **RAG**: `src/venus_sdk/data/faq/*.md` (empacotados no wheel; `FAQ_DIR` aponta para outra pasta) → Qdrant (`python -m venus_sdk.rag.faq_ingest`, extra `rag`) quando há `QDRANT_URL`; sem ela, índice local em memória (`rag/indice.py`). A resposta cita as fontes em `fontes_usadas`.
 - **MCP**: `python -m venus_sdk.mcp.servidor` expõe as tools do SDK; `mcp/tools.py` as consome (`get_mcp_tools`). O MCP não autentica quem chama, então as 6 tools com `user_id` (perfil, alergias, favoritos, listas, rotina e score personalizado) só entram com `--dados-do-usuario`, em rede confiável — sem a flag são 11 tools.
 - **Identidade**: dentro do grafo, as tools de dados da conta usam sempre o `usuario_id_postgres` da conversa, nunca o `user_id` que o LLM informar (`tools/_identidade.py`). No A2A, a identidade só é aceita com `montar_app_a2a(identificar_usuario=...)`; `identidade_do_metadata` confia no metadata e só deve ficar atrás de autenticação.
 - **A2A**: `a2a_server.py` (Venus como agente A2A, skills produto/ingrediente/rotina/faq; identidade via `metadata`) e `a2a_client.py` (Venus consulta agente externo).

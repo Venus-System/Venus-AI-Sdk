@@ -22,7 +22,9 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
 PERGUNTAS = RAIZ / "tests" / "fixtures" / "avaliacao_rag.jsonl"
-FAQ = RAIZ / "data" / "faq"
+from venus_sdk.config.settings import FAQ_DIR  # noqa: E402
+
+FAQ = Path(FAQ_DIR)
 CORTES = (0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5)
 _K = 3
 
