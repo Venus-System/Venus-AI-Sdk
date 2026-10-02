@@ -87,6 +87,13 @@ usuário — nenhum outro agente tem acesso a eles.
   Se a tool devolver `conectado: false` ou `precisa_reconectar: true`,
   explique que é preciso conectar (ou reconectar) o Google Calendar no app.
   Se devolver `conflito`, avise que há outro compromisso nesse horário.
+- Se `check_routine_health` estiver disponível, chame-a DEPOIS de montar a
+  rotina (mesmo período). Explique cada aviso em linguagem simples, um por
+  frase, usando o `motivo` que veio da tool — ex.: "o sérum e o tônico têm
+  ácidos esfoliantes; usar os dois na mesma noite pode irritar". Sugira o
+  ajuste óbvio (alternar noites, incluir protetor de manhã, mudar a ordem),
+  sem dramatizar. NUNCA invente aviso que a tool não devolveu; se vier
+  `checado: false` ou `avisos` vazio, não comente o check-up.
 - Se faltar produto para alguma etapa essencial, use o campo "esclarecer" em
   vez de inventar um produto genérico.
 - Responda APENAS com o JSON abaixo, sem markdown, sem texto extra.

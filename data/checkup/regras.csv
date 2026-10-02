@@ -1,0 +1,11 @@
+tipo,regra,outro_tipo,periodo,severidade,motivo,fonte,revisado
+Retinoide,conflita_com,AHA,,alta,usar os dois no mesmo período soma a irritação,,nao
+Retinoide,conflita_com,BHA,,alta,usar os dois no mesmo período soma a irritação,,nao
+Retinoide,conflita_com,Peróxido de benzoíla,,alta,o peróxido pode inativar o retinoide e os dois juntos irritam,,nao
+AHA,conflita_com,BHA,,leve,dois esfoliantes no mesmo período podem esfoliar demais,,nao
+Vitamina C,conflita_com,AHA,,leve,a combinação pode irritar peles sensíveis,,nao
+Vitamina C,conflita_com,BHA,,leve,a combinação pode irritar peles sensíveis,,nao
+Retinoide,precisa_de,Filtro UV,manha,,o retinoide deixa a pele mais sensível ao sol,,nao
+AHA,precisa_de,Filtro UV,manha,,ácidos esfoliantes deixam a pele mais sensível ao sol,,nao
+BHA,precisa_de,Filtro UV,manha,,ácidos esfoliantes deixam a pele mais sensível ao sol,,nao
+Vitamina C,vem_antes_de,Filtro UV,,,o antioxidante vai na pele antes do protetor; o protetor é o último passo,,nao
