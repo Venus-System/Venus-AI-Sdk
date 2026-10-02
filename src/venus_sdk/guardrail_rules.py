@@ -138,6 +138,29 @@ _INJECAO_EVASAO_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Inglês e verbos/objetos em português, comparados contra o texto já
+# normalizado (sem acento, minúsculo, sem leetspeak e com letras espaçadas
+# juntadas). Os objetos são específicos ("suas regras", "regras anteriores",
+# "diretrizes", "prompt"...) para não pegar pergunta comum como "quais as
+# regras para usar retinol?" ou "posso ignorar o protetor em casa?".
+_INJECAO_AMPLIADA_RE = re.compile(
+    r"\b(ignore|disregard|forget)\s+(all\s+|any\s+|the\s+|your\s+)*(previous|prior|above|earlier)?\s*"
+    r"(instructions|rules|directives|prompts?)\b|"
+    r"\bsystem\s*prompt\b|"
+    r"\byou\s+are\s+now\b|"
+    r"\bdeveloper\s+mode\b|"
+    r"\b(desconsider\w*|ignor\w*|esquec\w*|descart\w*|abandon\w*)\s+(?:\w+\s+){0,3}?"
+    r"(diretrizes|(suas|tuas)\s+regras|regras\s+(anteriores|do\s+sistema)|instrucoes|"
+    r"o\s+que\s+te\s+(disseram|falaram|pediram|ensinaram)|(o\s+|seu\s+|teu\s+)?prompt)\b|"
+    r"\bprompt\s+(de|do)\s+sistema\b|"
+    r"\b(seu|teu)\s+prompt\b"
+)
+# "DAN" ("Do Anything Now") só em maiúsculas: "Dan" é nome de gente.
+_DAN_RE = re.compile(r"\bDAN\b")
+# Letras isoladas separadas por espaço/pontuação ("i g n o r e", "i.g.n.o.r.e")
+# viram uma palavra só antes da checagem.
+_LETRAS_ESPACADAS_RE = re.compile(r"\b(?:[a-z][\s.\-_*]+){2,}[a-z]\b")
+
 _LEETSPEAK = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "$": "s", "@": "a"})
 
 
@@ -146,7 +169,8 @@ def _normalizar_para_deteccao(texto: str) -> str:
     para rodar `_INJECAO_EVASAO_RE` contra uma forma mais difícil de
     escapar digitando — nunca usado para exibir, logar ou gravar."""
     sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
-    return sem_acento.lower().translate(_LEETSPEAK)
+    normalizado = sem_acento.lower().translate(_LEETSPEAK)
+    return _LETRAS_ESPACADAS_RE.sub(lambda m: re.sub(r"[\s.\-_*]", "", m.group()), normalizado)
 
 
 # --- spam / flood (mensagem inundando o mesmo caractere ou palavra) ---
@@ -187,7 +211,13 @@ def contem_tentativa_de_injecao(texto: str) -> bool:
 
 
 def _eh_tentativa_de_injecao(texto: str) -> bool:
-    return bool(_INJECAO_RE.search(texto) or _INJECAO_EVASAO_RE.search(_normalizar_para_deteccao(texto)))
+    normalizado = _normalizar_para_deteccao(texto)
+    return bool(
+        _INJECAO_RE.search(texto)
+        or _DAN_RE.search(texto)
+        or _INJECAO_EVASAO_RE.search(normalizado)
+        or _INJECAO_AMPLIADA_RE.search(normalizado)
+    )
 
 
 def _eh_flood(texto: str) -> bool:

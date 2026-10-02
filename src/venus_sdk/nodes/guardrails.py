@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Literal
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -15,6 +16,8 @@ from venus_sdk.guardrail_rules import (
     guardrail_saida,
     remover_emojis,
 )
+from venus_sdk.llm.models import extrair_texto_resposta, get_llm_rapido
+from venus_sdk.prompts.guardrail import GUARDRAIL_LLM_PROMPT
 from venus_sdk.state import EstadoVenus
 
 logger = logging.getLogger(__name__)
@@ -28,6 +31,8 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
     e sem isso `tentativas_juiz` vinha do turno anterior pelo checkpointer."""
     mensagem = estado.get("mensagem_usuario", "") or ""
     bloqueado, motivo = guardrail_entrada(mensagem)
+    if not bloqueado and os.getenv("VENUS_GUARDRAIL_LLM") == "1" and _classificador_llm_ve_injecao(mensagem):
+        bloqueado, motivo = True, "tentativa de manipulação do sistema (classificador LLM)"
     mensagem_anonimizada = anonimizar_entrada(mensagem)
 
     atualizacao: EstadoVenus = {
@@ -45,6 +50,20 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
         # O "sim" de um agendamento só vale na mensagem logo seguinte à proposta.
         atualizacao["agendamento_pendente"] = None
     return atualizacao
+
+
+def _classificador_llm_ve_injecao(mensagem: str) -> bool:
+    """Segunda camada, opcional (`VENUS_GUARDRAIL_LLM=1`): um LLM barato
+    responde SEGURO/INJECAO para o que a regex deixou passar. Se o LLM
+    falhar, a mensagem passa (fail-open) — o classificador nunca derruba a
+    conversa; os prompts dos agentes continuam recusando manipulação."""
+    try:
+        resposta = get_llm_rapido().invoke([("system", GUARDRAIL_LLM_PROMPT), ("human", mensagem)])
+    except Exception:
+        logger.warning("Classificador LLM do guardrail indisponível; mensagem liberada", exc_info=True)
+        return False
+    veredito = extrair_texto_resposta(resposta).strip().upper()
+    return "INJECAO" in veredito or "INJEÇÃO" in veredito
 
 
 def decidir_pos_guardrail_entrada(estado: EstadoVenus) -> DecisaoGuardrailEntrada:

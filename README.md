@@ -32,6 +32,7 @@ guardrail entrada → carregar memória → roteador ─┬→ produto ───
 - **Google Calendar** (opcional, extra `google_calendar`): o agente de rotina consulta se o usuário tem compromisso num horário (`check_availability`) e agenda a rotina na agenda dele em duas etapas: prepara uma proposta (`prepare_routine_schedule`/`prepare_routine_removal`, que não gravam) e só grava depois que o usuário responde "sim" — quem grava é o código (`nodes/agendamento.py`), nunca o LLM. A recorrência é escolhida pelo usuário; um novo agendamento do mesmo período atualiza o evento existente. O consentimento precisa dos escopos `calendar.freebusy` e `calendar.events` (`ESCOPOS_VENUS`), e o grafo precisa de `checkpointer` (a proposta espera o "sim" no estado da conversa). O login no Google é feito pelo backend do app; o SDK só guarda o `refresh_token` cifrado em `venus.google_oauth_tokens` e o usa (`integrations/google_calendar.py`). Para testar localmente: `python scripts/conectar_google_calendar.py --user-id 1` e `VENUS_USE_GOOGLE_CALENDAR=1`.
 - **Check-up da rotina** (opcional, extra `neo4j`): depois de montar a rotina, a Venus aponta conflitos entre ativos do mesmo período, ativos que exigem algo que falta (ex.: retinoide sem protetor de manhã), ordem a ajustar e produtos repetidos (`check_routine_health`). As consultas rodam num Neo4j que é cópia, só de leitura, do Postgres + regras de `data/checkup/` (`python scripts/sincronizar_neo4j.py`). Sem Neo4j, a rotina sai normal, sem os avisos. Ver [`docs/neo4j.md`](docs/neo4j.md).
 - Detalhes em [`docs/architecture.md`](docs/architecture.md).
+- Visão do sistema inteiro (app, API, bancos, LLMs, integrações), em Mermaid: [`docs/arquitetura-sistema.md` no repositório da API](https://github.com/Venus-System/Venus-AI-api/blob/develop/docs/arquitetura-sistema.md).
 
 ## Como rodar
 
@@ -68,6 +69,26 @@ from venus_sdk.a2a_server import montar_app_a2a
 app = montar_app_a2a(grafo=grafo, base_url="http://localhost:9000")   # uvicorn app:app
 # identidade por request: metadata={"usuario_id": "u1", "usuario_id_postgres": 1}
 ```
+
+## Versões e release
+
+A API instala o SDK por **tag** (`venus-ai-sdk[...] @ git+https://github.com/Venus-System/Venus-AI-Sdk.git@v0.1.0`),
+nunca por branch: assim cada deploy pega exatamente o mesmo código.
+
+Para lançar uma versão nova:
+
+1. Com tudo mergeado na `develop` e o CI verde, suba a versão em `pyproject.toml`
+   (`0.1.0` -> `0.2.0` para funcionalidade nova ou mudança de comportamento;
+   `0.1.0` -> `0.1.1` só para correção).
+2. Crie e envie a tag no commit da `develop`:
+   ```bash
+   git tag -a v0.2.0 -m "v0.2.0: <resumo>"
+   git push origin v0.2.0
+   ```
+3. No repositório da API, troque o `@v...` em `venus_api/requirements.txt` pela
+   tag nova, rode a suíte da API e abra a PR.
+
+Tags existentes: `v0.1.0` — commit `e91d4f1` da develop (revisão técnica).
 
 ## Estado do projeto
 

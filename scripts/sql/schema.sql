@@ -41,8 +41,15 @@ CREATE TABLE IF NOT EXISTS venus.product_scores (
 
 CREATE TABLE IF NOT EXISTS venus.users (
     user_id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    -- uid do Firebase Auth: é por ele que a API descobre o user_id de quem
+    -- está no chat (nunca pelo que o app manda no corpo da requisição).
+    firebase_uid TEXT UNIQUE
 );
+-- Bancos criados antes da coluna existir (no QA e em produção ela já existe).
+-- TODO(app): o cadastro precisa gravar o firebase_uid de todo usuário novo;
+-- sem ele, a Venus conversa normalmente, mas sem acesso aos dados da conta.
+ALTER TABLE venus.users ADD COLUMN IF NOT EXISTS firebase_uid TEXT UNIQUE;
 
 CREATE TABLE IF NOT EXISTS venus.personalized_scores (
     personalized_score_id SERIAL PRIMARY KEY,

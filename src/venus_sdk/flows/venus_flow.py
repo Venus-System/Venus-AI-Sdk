@@ -27,6 +27,7 @@ Rodam sempre no fluxo, mas são no-ops sem `store`/`usuario_id` (ver
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from langgraph.graph import END, StateGraph
@@ -47,6 +48,8 @@ from venus_sdk.nodes.memoria import no_atualizar_memoria, no_carregar_memoria
 from venus_sdk.nodes.orquestrador import no_orquestrador
 from venus_sdk.nodes.roteador import decidir_especialista, no_roteador
 from venus_sdk.state import EstadoVenus
+
+logger = logging.getLogger(__name__)
 
 
 def montar_grafo_venus(
@@ -184,6 +187,13 @@ def compilar_grafo_venus(
     o grafo precisa de `checkpointer`: a proposta de agendamento fica no
     estado da conversa até o "sim" da mensagem seguinte.
     """
+    if indice_rag is None:
+        # Avisa já na subida, não só na primeira pergunta de FAQ: sem índice, o
+        # agente FAQ responde sempre com a mensagem de erro técnico.
+        logger.warning(
+            "compilar_grafo_venus sem indice_rag: o agente FAQ ficará indisponível. "
+            "Passe indice_rag=venus_sdk.rag.criar_indice_faq(<pasta do FAQ>)."
+        )
     return montar_grafo_venus(
         pool=pool,
         indice_rag=indice_rag,

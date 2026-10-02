@@ -1,0 +1,28 @@
+{"pergunta": "Quais dados o Venus coleta sobre mim?", "fontes": ["dados_e_privacidade_lgpd.md", "privacidade_e_dados.md"]}
+{"pergunta": "Como faço para apagar minha conta?", "fontes": ["dados_e_privacidade_lgpd.md"]}
+{"pergunta": "Como edito as informações do meu perfil?", "fontes": ["dados_e_privacidade_lgpd.md"]}
+{"pergunta": "Vocês compartilham meus dados com anunciantes?", "fontes": ["privacidade_e_dados.md", "dados_e_privacidade_lgpd.md"]}
+{"pergunta": "Se eu digitar meu CPF no chat, ele fica salvo?", "fontes": ["privacidade_e_dados.md"]}
+{"pergunta": "Como meus dados são usados para gerar as recomendações?", "fontes": ["dados_e_privacidade_lgpd.md", "privacidade_e_dados.md"]}
+{"pergunta": "O Venus substitui um dermatologista?", "fontes": ["limites_da_ia.md"]}
+{"pergunta": "Quando devo procurar um médico em vez de seguir a IA?", "fontes": ["limites_da_ia.md"]}
+{"pergunta": "O que faço se a resposta da IA parecer errada?", "fontes": ["limites_da_ia.md"]}
+{"pergunta": "A IA pode inventar informações sobre os produtos?", "fontes": ["limites_da_ia.md"]}
+{"pergunta": "Como cadastro minhas alergias?", "fontes": ["alergias_e_limites.md"]}
+{"pergunta": "O Venus recomenda produto com ingrediente que me dá alergia?", "fontes": ["alergias_e_limites.md", "sobre_o_venus.md"]}
+{"pergunta": "Como funciona o score dos produtos?", "fontes": ["como_funciona_o_score.md", "sobre_o_venus.md", "api_de_classificacao.md"]}
+{"pergunta": "Qual a diferença entre o score geral e o personalizado?", "fontes": ["como_funciona_o_score.md", "sobre_o_venus.md"]}
+{"pergunta": "Como a nota de 0 a 100 é dividida?", "fontes": ["api_de_classificacao.md"]}
+{"pergunta": "O que é o baseScore?", "fontes": ["api_de_classificacao.md"]}
+{"pergunta": "Como a embalagem entra na nota ambiental?", "fontes": ["api_de_classificacao.md"]}
+{"pergunta": "O que significam os selos do app?", "fontes": ["sobre_o_venus.md"]}
+{"pergunta": "Como funciona o scan de um produto?", "fontes": ["sobre_o_venus.md"]}
+{"pergunta": "O que é o filtro duro na recomendação?", "fontes": ["sobre_o_venus.md"]}
+{"pergunta": "O que acontece com a nota quando a fórmula de um produto muda?", "fontes": ["como_funciona_o_score.md"]}
+{"pergunta": "O que é o Venus e o que ele faz?", "fontes": ["sobre_o_venus.md"]}
+{"pergunta": "Qual é a capital da França?", "fontes": []}
+{"pergunta": "Me passa uma receita de bolo de chocolate", "fontes": []}
+{"pergunta": "Quanto custa o frete para o Nordeste?", "fontes": []}
+{"pergunta": "Quem ganhou o jogo de futebol ontem?", "fontes": []}
+{"pergunta": "Como troco a senha do meu Wi-Fi?", "fontes": []}
+{"pergunta": "Qual a melhor linguagem de programação para iniciantes?", "fontes": []}

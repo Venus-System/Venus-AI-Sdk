@@ -14,6 +14,7 @@ essas dependências sozinho).
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -24,7 +25,7 @@ from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.routes import create_agent_card_routes, create_jsonrpc_routes
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCapabilities, AgentCard, AgentInterface, AgentSkill, Role
-from a2a.utils.errors import UnsupportedOperationError
+from a2a.utils.errors import InvalidParamsError, UnsupportedOperationError
 from starlette.applications import Starlette
 from starlette.routing import Route
 
@@ -33,6 +34,12 @@ logger = logging.getLogger(__name__)
 _MODOS_TEXTO = ["text/plain"]
 _RESPOSTA_VAZIA = "Não consegui gerar uma resposta agora."
 _RESPOSTA_FALHA = "Não consegui processar sua mensagem agora — tente novamente em instantes."
+
+# O checkpointer é o mesmo do /v1/chat da API (thread_id "<uid>:<conversa>").
+# Sem um namespace próprio, um chamador A2A que mandasse context_id
+# "<uid>:<uid>" continuaria (e leria) a conversa de um usuário do app.
+_PREFIXO_THREAD_A2A = "a2a:"
+_CONTEXT_ID_VALIDO_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 # Skills anunciadas no Agent Card — as quatro rotas do roteador (produto,
 # ingrediente, rotina e FAQ/RAG).
@@ -173,8 +180,13 @@ class VenusAgentExecutor(AgentExecutor):
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         texto = context.get_user_input()
-        # `context_id` do A2A = `thread_id` do checkpointer (mesma conversa).
-        config = {"configurable": {"thread_id": context.context_id}}
+        context_id = context.context_id or ""
+        if not _CONTEXT_ID_VALIDO_RE.match(context_id):
+            raise InvalidParamsError(
+                message="context_id inválido: até 128 caracteres, só letras, números e . _ : -"
+            )
+        # Mesmo `context_id` = mesma conversa, mas sempre no namespace do A2A.
+        config = {"configurable": {"thread_id": f"{_PREFIXO_THREAD_A2A}{context_id}"}}
         entrada = _entrada_do_grafo(texto, self._identidade(context))
 
         try:

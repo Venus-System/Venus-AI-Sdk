@@ -112,7 +112,7 @@ async def test_a2a_repassa_identidade_do_usuario_via_metadata() -> None:
     enviado = grafo.entradas[0]
     assert enviado["entrada"]["usuario_id"] == "u-42"
     assert enviado["entrada"]["usuario_id_postgres"] == 7
-    assert enviado["config"]["configurable"]["thread_id"] == "ctx-1"
+    assert enviado["config"]["configurable"]["thread_id"] == "a2a:ctx-1"
     assert get_message_text(ev.message) == "eco: oi"
 
 
