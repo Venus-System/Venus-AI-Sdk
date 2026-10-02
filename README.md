@@ -77,16 +77,20 @@ nunca por branch: assim cada deploy pega exatamente o mesmo código.
 
 Para lançar uma versão nova:
 
-1. Com tudo mergeado na `develop` e o CI verde, suba a versão em `pyproject.toml`
+1. Na PR que muda o código, suba a versão em `pyproject.toml`
    (`0.1.0` -> `0.2.0` para funcionalidade nova ou mudança de comportamento;
-   `0.1.0` -> `0.1.1` só para correção).
-2. Crie e envie a tag no commit da `develop`:
+   `0.2.0` -> `0.2.1` só para correção) e descreva as mudanças no
+   [`CHANGELOG.md`](CHANGELOG.md). Código diferente nunca fica com o mesmo
+   número: `tests/pacote/test_versao.py` confere `venus_sdk.__version__`
+   contra o `pyproject.toml`.
+2. Depois do merge na `develop`, com o CI verde, crie e envie a tag no commit
+   do merge:
    ```bash
-   git tag -a v0.2.0 -m "v0.2.0: <resumo>"
+   git tag -a v0.2.0 -m "v0.2.0: <resumo>" <sha do merge>
    git push origin v0.2.0
    ```
 3. No repositório da API, troque o `@v...` em `venus_api/requirements.txt` pela
-   tag nova, rode a suíte da API e abra a PR.
+   tag nova, rode a suíte da API e abra a PR (só depois da tag existir).
 
 Tags existentes: `v0.1.0` — commit `e91d4f1` da develop (revisão técnica).
 

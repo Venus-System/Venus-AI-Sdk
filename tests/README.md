@@ -15,6 +15,7 @@ pytest -m integration     # exige Postgres com schema+seed (scripts/init_db.py)
 | `llm/` | Cadeias de fallback entre provedores de LLM |
 | `integracoes/` | MCP e A2A (servidor e cliente) |
 | `regressao/` | Um teste por bug corrigido na revisão (cenário que falhava → comportamento certo) |
+| `pacote/` | Empacotamento: versão (`__version__` x `pyproject.toml`) e arquivos que vão no wheel |
 | `manual/` | Scripts rodados à mão contra serviços reais (o `pytest` não os executa) |
 | `fixtures/` | Dados de apoio dos testes |
 
