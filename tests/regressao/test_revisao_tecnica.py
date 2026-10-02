@@ -96,3 +96,15 @@ def _sem_qdrant(monkeypatch):
     from venus_sdk.rag import faq
 
     monkeypatch.setattr(faq, "QDRANT_URL", None)
+
+
+# --- Item 2: o id do Postgres vem do uid do Firebase, nunca do cliente -------
+
+
+def test_schema_tem_firebase_uid_unico_para_resolver_o_usuario():
+    from pathlib import Path
+
+    schema = (Path(__file__).resolve().parents[2] / "scripts" / "sql" / "schema.sql").read_text(encoding="utf-8")
+    assert "firebase_uid TEXT UNIQUE" in schema
+    # Bancos já criados recebem a coluna sem precisar recriar a tabela.
+    assert "ADD COLUMN IF NOT EXISTS firebase_uid TEXT UNIQUE" in schema
