@@ -19,9 +19,14 @@ from venus_sdk.rag.vector_build import get_embed_model, get_qdrant_client, get_v
 
 logger = logging.getLogger(__name__)
 
-# Similaridade mínima (cosseno) para um trecho contar como relevante.
-# Calibrado com o FAQ real e o modelo de `vector_build`: perguntas do FAQ
-# ficam entre 0,34 e 0,66; perguntas sem relação, abaixo de 0,3.
+# Similaridade mínima (cosseno) para um trecho contar como relevante, no
+# Qdrant e no índice local semântico (mesmo modelo). Escolhido com
+# `tests/manual/avaliar_rag.py` (28 perguntas, 6 sem resposta no FAQ):
+#   Qdrant  0,30 -> hit@3 86%, MRR 0,80, "não sei" certo 83%
+#           0,35 -> hit@3 77% (perde acertos sem ganhar nos "não sei")
+#           0,40 -> "não sei" 100%, mas hit@3 cai para 64%
+#   local   0,25 a 0,35 -> hit@3 77%, MRR 0,62, "não sei" 83%
+# Reavaliar quando os documentos de data/faq/ mudarem.
 _SCORE_MINIMO = 0.3
 _CASAS_DECIMAIS_SCORE = 3
 
