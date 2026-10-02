@@ -30,6 +30,11 @@ FAQ_DIR = os.getenv("FAQ_DIR") or str(
 # local sobre FAQ_DIR. Aceita QDRANT_API (nome antigo) para a chave.
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY") or os.getenv("QDRANT_API")
+# Check-up da rotina no Neo4j (extra `neo4j`) — opcional; sem NEO4J_URI a
+# rotina sai normal, só sem os avisos.
+NEO4J_URI = os.getenv("NEO4J_URI")
+NEO4J_USER = os.getenv("NEO4J_USER") or "neo4j"
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
 # Lidas direto do ambiente por quem usa (ver `.env.example`), todas opcionais:
 # LLM_PROVIDER e LLM_CADEIA_* (llm/models.py), TAVILY_API_KEY (rag/web.py),

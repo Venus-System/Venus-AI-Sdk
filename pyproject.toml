@@ -36,6 +36,8 @@ pdf = ["pypdf"]
 mongo = ["langgraph-checkpoint-mongodb", "pymongo"]
 a2a = ["a2a-sdk[http-server]", "uvicorn"]
 google_calendar = ["cryptography"]
+# Check-up da rotina no Neo4j (integrations/grafo_neo4j.py, checkup/).
+neo4j = ["neo4j"]
 # FAQ no Qdrant (rag/faq.py, rag/faq_ingest.py).
 rag = ["qdrant-client", "llama-index-core", "llama-index-vector-stores-qdrant", "llama-index-embeddings-fastembed", "fastembed"]
 
