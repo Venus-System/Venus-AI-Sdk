@@ -70,23 +70,27 @@ _GRAVAR_TIPOS = "UNWIND $linhas AS nome MERGE (t:TipoAtivo {nome: nome}) SET t.r
 _GRAVAR_USUARIOS = "UNWIND $linhas AS id MERGE (u:Usuario {id: id}) SET u.rodada = $rodada"
 _GRAVAR_COMPOSICAO = """
 UNWIND $linhas AS l
-MATCH (p:Produto {id: l.produto}), (i:Ingrediente {id: l.ingrediente})
+MATCH (p:Produto {id: l.produto})
+MATCH (i:Ingrediente {id: l.ingrediente})
 MERGE (p)-[c:CONTEM]->(i) SET c.posicao = l.posicao, c.rodada = $rodada
 """
 _GRAVAR_FAVORITOS = """
 UNWIND $linhas AS l
-MATCH (u:Usuario {id: l.usuario}), (p:Produto {id: l.produto})
+MATCH (u:Usuario {id: l.usuario})
+MATCH (p:Produto {id: l.produto})
 MERGE (u)-[f:FAVORITOU]->(p) SET f.rodada = $rodada
 """
 _GRAVAR_TIPOS_DOS_INGREDIENTES = """
 UNWIND $linhas AS l
-MATCH (i:Ingrediente {id: l.ingrediente}), (t:TipoAtivo {nome: l.tipo})
+MATCH (i:Ingrediente {id: l.ingrediente})
+MATCH (t:TipoAtivo {nome: l.tipo})
 MERGE (i)-[e:E_DO_TIPO]->(t) SET e.rodada = $rodada
 """
 # O tipo da relação não pode ser parâmetro no Cypher: uma consulta por regra.
 _GRAVAR_REGRA = """
 UNWIND $linhas AS l
-MATCH (a:TipoAtivo {nome: l.tipo}), (b:TipoAtivo {nome: l.outro_tipo})
+MATCH (a:TipoAtivo {nome: l.tipo})
+MATCH (b:TipoAtivo {nome: l.outro_tipo})
 MERGE (a)-[r:%s]->(b)
 SET r.periodo = l.periodo, r.severidade = l.severidade, r.motivo = l.motivo, r.fonte = l.fonte,
     r.revisado = l.revisado, r.rodada = $rodada

@@ -64,7 +64,8 @@ UNWIND $produtos AS a
 UNWIND $produtos AS b
 WITH a, b
 WHERE a.id < b.id AND a.periodo = b.periodo
-MATCH (pa:Produto {id: a.id}), (pb:Produto {id: b.id})
+MATCH (pa:Produto {id: a.id})
+MATCH (pb:Produto {id: b.id})
 WHERE pa.categoria = pb.categoria
 WITH a, pa, pb,
      [(pa)-[:CONTEM]->(i:Ingrediente) | i.id] AS ia,
