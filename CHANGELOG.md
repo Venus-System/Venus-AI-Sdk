@@ -46,6 +46,11 @@ Correções da revisão técnica e check-up da rotina. Tudo desde `v0.1.0`
   (`f5441ad`).
 - Avaliação manual do RAG (`tests/manual/avaliar_rag.py`) e corte de
   relevância documentado (`2e9bcc7`).
+- **RAG local:** os `.md` do FAQ são divididos por seção do markdown, e cada
+  trecho começa com o caminho de títulos. No índice local com FastEmbed, o
+  hit@3 foi de 0,79 para 0,88. A avaliação aceita `--faq-dir` e
+  `--embeddings fastembed|hash`, e os resultados estão em
+  `docs/avaliacao-rag.md`.
 - Processo de release por tag e link para os diagramas de arquitetura
   (`7a95a49`, `fb150c5`).
 

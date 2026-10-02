@@ -29,5 +29,5 @@ Usam LLMs e banco de verdade — gastam cota e dependem do `.env`:
 ```bash
 python tests/manual/verificar_tools.py    # chama CADA tool (Postgres, RAG, web, MCP, A2A)
 python tests/manual/testar_conversas.py   # conversas reais pelo grafo, só leitura
-python tests/manual/avaliar_rag.py        # hit rate@3, MRR e "não sei" do RAG do FAQ (--indice qdrant)
+python tests/manual/avaliar_rag.py        # hit rate@3, MRR e "não sei" do RAG do FAQ (--indice qdrant, --embeddings hash; resultados em docs/avaliacao-rag.md)
 ```

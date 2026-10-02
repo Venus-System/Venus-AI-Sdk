@@ -20,7 +20,7 @@ import numpy as np
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
-from venus_sdk.rag.carregador import EXTENSOES, carregar_documentos
+from venus_sdk.rag.carregador import EXTENSOES, VERSAO_DA_DIVISAO, carregar_documentos
 from venus_sdk.texto import remover_acentos
 
 _PALAVRAS_VAZIAS = {"a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em", "um", "uma", "que", "para",
@@ -110,8 +110,9 @@ class IndiceRAG:
 
 
 def _assinatura(pasta: Path) -> str:
-    """Hash dos arquivos indexáveis (caminho, tamanho, data): muda quando algum muda."""
-    itens = [
+    """Hash dos arquivos indexáveis (caminho, tamanho, data) e da versão da
+    divisão em chunks: muda quando algum deles muda."""
+    itens: list = [VERSAO_DA_DIVISAO] + [
         (str(caminho.relative_to(pasta)), caminho.stat().st_size, int(caminho.stat().st_mtime))
         for caminho in sorted(pasta.rglob("*"))
         if caminho.is_file() and caminho.suffix.lower() in EXTENSOES

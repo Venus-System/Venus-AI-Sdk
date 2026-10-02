@@ -26,3 +26,6 @@
 {"pergunta": "Quem ganhou o jogo de futebol ontem?", "fontes": []}
 {"pergunta": "Como troco a senha do meu Wi-Fi?", "fontes": []}
 {"pergunta": "Qual a melhor linguagem de programação para iniciantes?", "fontes": []}
+{"pergunta": "vocês vendem meus dados?", "fontes": ["privacidade_e_dados.md", "dados_e_privacidade_lgpd.md"]}
+{"pergunta": "posso confiar na IA se tenho alergia?", "fontes": ["alergias_e_limites.md", "limites_da_ia.md"]}
+{"pergunta": "quem criou o aplicativo?", "fontes": []}

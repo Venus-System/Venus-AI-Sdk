@@ -21,11 +21,12 @@ logger = logging.getLogger(__name__)
 
 # Similaridade mínima (cosseno) para um trecho contar como relevante, no
 # Qdrant e no índice local semântico (mesmo modelo). Escolhido com
-# `tests/manual/avaliar_rag.py` (28 perguntas, 6 sem resposta no FAQ):
-#   Qdrant  0,30 -> hit@3 86%, MRR 0,80, "não sei" certo 83%
-#           0,35 -> hit@3 77% (perde acertos sem ganhar nos "não sei")
-#           0,40 -> "não sei" 100%, mas hit@3 cai para 64%
-#   local   0,25 a 0,35 -> hit@3 77%, MRR 0,62, "não sei" 83%
+# `tests/manual/avaliar_rag.py` (31 perguntas, 7 sem resposta no FAQ; tabela
+# completa em docs/avaliacao-rag.md):
+#   local   0,30 -> hit@3 88%, MRR 0,74, "não sei" certo 86%
+#           0,40 -> "não sei" 100%, mas hit@3 cai para 75%
+#   Qdrant  0,30 -> hit@3 83%, MRR 0,77, "não sei" certo 71%
+#           0,35 -> hit@3 58% (perde acertos sem ganhar nos "não sei")
 # Reavaliar quando os documentos de venus_sdk/data/faq/ mudarem.
 _SCORE_MINIMO = 0.3
 _CASAS_DECIMAIS_SCORE = 3
