@@ -68,6 +68,26 @@ app = montar_app_a2a(grafo=grafo, base_url="http://localhost:9000")   # uvicorn 
 # identidade por request: metadata={"usuario_id": "u1", "usuario_id_postgres": 1}
 ```
 
+## Versões e release
+
+A API instala o SDK por **tag** (`venus-ai-sdk[...] @ git+https://github.com/Venus-System/Venus-AI-Sdk.git@v0.1.0`),
+nunca por branch: assim cada deploy pega exatamente o mesmo código.
+
+Para lançar uma versão nova:
+
+1. Com tudo mergeado na `develop` e o CI verde, suba a versão em `pyproject.toml`
+   (`0.1.0` -> `0.2.0` para funcionalidade nova ou mudança de comportamento;
+   `0.1.0` -> `0.1.1` só para correção).
+2. Crie e envie a tag no commit da `develop`:
+   ```bash
+   git tag -a v0.2.0 -m "v0.2.0: <resumo>"
+   git push origin v0.2.0
+   ```
+3. No repositório da API, troque o `@v...` em `venus_api/requirements.txt` pela
+   tag nova, rode a suíte da API e abra a PR.
+
+Tags existentes: `v0.1.0` — commit `e91d4f1` da develop (revisão técnica).
+
 ## Estado do projeto
 
 Implementado: multiagente, LangChain/LangGraph, sessões, memória de longo prazo, RAG (local + web),
