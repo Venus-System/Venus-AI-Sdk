@@ -49,6 +49,13 @@ python tests/manual/verificar_tools.py           # chama CADA tool (Postgres, RA
 python examples/conversar_com_venus.py      # conversa no terminal (VENUS_USER_ID=1 para personalização)
 ```
 
+### Variáveis opcionais
+
+| Variável | Padrão | O que faz |
+|---|---|---|
+| `VENUS_GUARDRAIL_LLM` | ligado | Segunda camada do guardrail de entrada: um LLM rápido classifica como SEGURO/INJECAO o que a regex deixou passar. **Custo: uma chamada extra de LLM rápido por mensagem.** `0` desliga; se o LLM falhar, a mensagem passa (fail-open). A suíte de testes roda com `0`. |
+| `VENUS_EMBEDDINGS_LOCAIS` | FastEmbed | `hash` força o `EmbeddingsHash` (busca por palavras, não semântica) no índice local do FAQ; usado na suíte para não baixar o modelo. |
+
 ### Testes
 
 ```bash

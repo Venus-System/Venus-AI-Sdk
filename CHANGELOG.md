@@ -17,6 +17,11 @@ Correções da revisão técnica e check-up da rotina. Tudo desde `v0.1.0`
   resolver o usuário pelo token (`5e7df9e`).
 - **Guardrail:** bloqueia injeção em inglês, verbos/objetos em português,
   "DAN" e letras espaçadas; classificador LLM opcional (`057074a`).
+- **Guardrail (revisão 2):** injeção detectada por verbo de comando + alvo
+  sensível a até 6 palavras (pt e en), em vez de frases inteiras; "DAN" só em
+  contexto de modo/persona ("o shampoo DAN" passa). O classificador LLM fica
+  **ligado por padrão** (`VENUS_GUARDRAIL_LLM=0` desliga) e recebe a mensagem
+  delimitada, como dado a classificar.
 - **A2A:** conversas no namespace `a2a:` do checkpointer e `context_id`
   validado (`InvalidParamsError`) (`fffd612`).
 - **Check-up:** gravações e consulta de repetidos no Neo4j sem produto
