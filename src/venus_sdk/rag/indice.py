@@ -30,6 +30,9 @@ _PALAVRA_RE = re.compile(r"[a-z0-9]+")
 # Radical grosseiro (5 primeiras letras): "calcula"/"calculo"/"calcular",
 # "cadastro"/"cadastrar" caem no mesmo token sem precisar de stemmer.
 _TAMANHO_RADICAL = 5
+# Corte de relevância do EmbeddingsHash (bag-of-words): as notas dele são
+# outra escala, bem mais baixa que a dos embeddings semânticos.
+SCORE_MINIMO_HASH = 0.1
 _CASAS_DECIMAIS_SCORE = 3
 
 
@@ -65,8 +68,9 @@ class IndiceRAG:
     """Índice vetorial em memória sobre uma lista de `Document`."""
 
     def __init__(self, documentos: list[Document], embeddings: Embeddings | None = None,
-                 matriz: np.ndarray | None = None) -> None:
+                 matriz: np.ndarray | None = None, *, score_minimo: float = SCORE_MINIMO_HASH) -> None:
         self.embeddings = embeddings or EmbeddingsHash()
+        self.score_minimo = score_minimo
         self.documentos = documentos
         self.matriz = matriz if matriz is not None else self._calcular_matriz()
 
@@ -76,12 +80,13 @@ class IndiceRAG:
         vetores = self.embeddings.embed_documents([documento.page_content for documento in self.documentos])
         return np.array(vetores, dtype=np.float32)
 
-    def buscar(self, consulta: str, k: int = 3, score_minimo: float = 0.1) -> list[dict[str, Any]]:
+    def buscar(self, consulta: str, k: int = 3, score_minimo: float | None = None) -> list[dict[str, Any]]:
         """Top-k chunks por cosseno. Devolve `[{trecho, fonte, score, ...}]`
-        (vazio se nada passar de `score_minimo` — o agente deve então dizer
-        que não sabe, nunca inventar)."""
+        (vazio se nada passar de `score_minimo` — padrão: o do índice — e o
+        agente deve então dizer que não sabe, nunca inventar)."""
         if not self.documentos or k <= 0:
             return []
+        score_minimo = self.score_minimo if score_minimo is None else score_minimo
         vetor_consulta = np.array(self.embeddings.embed_query(consulta), dtype=np.float32)
         norma_consulta = float(np.linalg.norm(vetor_consulta))
         if not norma_consulta:
@@ -115,14 +120,14 @@ def _assinatura(pasta: Path) -> str:
 
 
 def criar_indice_local(pasta: str | Path, embeddings: Embeddings | None = None, *,
-                       cache: str | Path | None = None) -> IndiceRAG:
+                       cache: str | Path | None = None, score_minimo: float = SCORE_MINIMO_HASH) -> IndiceRAG:
     """Constrói o índice a partir de `pasta`. Com `cache` (arquivo .npz) e
     embeddings padrão, reaproveita a matriz enquanto os arquivos não mudarem."""
     pasta = Path(pasta)
     documentos = carregar_documentos(pasta)
     usa_cache = bool(cache) and embeddings is None
     if not usa_cache:
-        return IndiceRAG(documentos, embeddings)
+        return IndiceRAG(documentos, embeddings, score_minimo=score_minimo)
 
     arquivo_cache = Path(cache)
     assinatura = _assinatura(pasta)

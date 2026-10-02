@@ -264,7 +264,19 @@ def _montar_no_especialista(
 
     async def no_especialista(estado: EstadoVenus) -> EstadoVenus:
         """Roda o agente e grava o JSON em `resposta_especialista`."""
-        return await _executar_especialista(estado, nome, _agente())
+        try:
+            agente_pronto = _agente()
+        except Exception:
+            # Ex.: FAQ sem índice ou rotina sem pool. Antes, o ValueError saía do
+            # nó e derrubava o grafo inteiro (502 na API para toda pergunta de
+            # FAQ). Agora vira erro técnico, como uma falha de LLM; como o
+            # agente não foi guardado, a próxima mensagem tenta montar de novo.
+            logger.exception("Não consegui montar o agente %s", nome)
+            return {
+                "resposta_especialista": _resposta_de_falha(nome, "erro_tecnico", _RESPOSTA_ESPECIALISTA_FALLBACK),
+                "evidencias_tools": None,
+            }
+        return await _executar_especialista(estado, nome, agente_pronto)
 
     return no_especialista
 

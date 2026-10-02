@@ -131,14 +131,14 @@ def test_executar_especialista_excecao_no_llm_cai_no_erro_tecnico_sem_derrubar_o
 # --- montar_no_agente_faq / montar_no_agente_rotina ---
 
 
-def test_no_agente_faq_sem_indice_levanta_so_no_uso() -> None:
-    """Igual a produto/ingrediente sem `pool`: montar o nó com `indice=None`
-    não levanta (o grafo monta normalmente); o `ValueError` só sai quando o
-    nó é de fato invocado."""
+def test_no_agente_faq_sem_indice_vira_erro_tecnico_no_uso() -> None:
+    """Montar o nó com `indice=None` não levanta (o grafo monta normalmente);
+    no uso, a falta do índice vira erro técnico em vez de derrubar o grafo
+    (antes o ValueError escapava e a API devolvia 502)."""
     no = montar_no_agente_faq(None)  # não levanta
 
-    with pytest.raises(ValueError, match="índice"):
-        _rodar(no({"rota": "faq", "pergunta_original": "como funciona o score?"}))
+    saida = _rodar(no({"rota": "faq", "pergunta_original": "como funciona o score?"}))
+    assert saida["resposta_especialista"]["intencao"] == "erro_tecnico"
 
 
 def test_no_agente_faq_devolve_json_com_fontes_e_evidencias() -> None:
@@ -164,11 +164,11 @@ def test_no_agente_faq_devolve_json_com_fontes_e_evidencias() -> None:
     assert [getattr(t, "name", t) for t in tools] == ["faq_retriever", "buscar_na_web", "tool-extra-mcp"]
 
 
-def test_no_agente_rotina_sem_pool_levanta_so_no_uso() -> None:
+def test_no_agente_rotina_sem_pool_vira_erro_tecnico_no_uso() -> None:
     no = montar_no_agente_rotina(None)  # montar não levanta
 
-    with pytest.raises(ValueError, match="pool"):
-        _rodar(no({"rota": "rotina", "pergunta_original": "monta uma rotina"}))
+    saida = _rodar(no({"rota": "rotina", "pergunta_original": "monta uma rotina"}))
+    assert saida["resposta_especialista"]["intencao"] == "erro_tecnico"
 
 
 def test_no_agente_faq_usa_fallback_quando_llm_falha() -> None:
