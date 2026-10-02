@@ -15,6 +15,7 @@ pytest -m integration     # exige Postgres com schema+seed (scripts/init_db.py)
 | `llm/` | Cadeias de fallback entre provedores de LLM |
 | `integracoes/` | MCP e A2A (servidor e cliente) |
 | `regressao/` | Um teste por bug corrigido na revisão (cenário que falhava → comportamento certo) |
+| `pacote/` | Empacotamento: versão (`__version__` x `pyproject.toml`) e arquivos que vão no wheel |
 | `manual/` | Scripts rodados à mão contra serviços reais (o `pytest` não os executa) |
 | `fixtures/` | Dados de apoio dos testes |
 
@@ -28,5 +29,5 @@ Usam LLMs e banco de verdade — gastam cota e dependem do `.env`:
 ```bash
 python tests/manual/verificar_tools.py    # chama CADA tool (Postgres, RAG, web, MCP, A2A)
 python tests/manual/testar_conversas.py   # conversas reais pelo grafo, só leitura
-python tests/manual/avaliar_rag.py        # hit rate@3, MRR e "não sei" do RAG do FAQ (--indice qdrant)
+python tests/manual/avaliar_rag.py        # hit rate@3, MRR e "não sei" do RAG do FAQ (--indice qdrant, --embeddings hash; resultados em docs/avaliacao-rag.md)
 ```

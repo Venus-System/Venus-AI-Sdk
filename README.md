@@ -25,7 +25,7 @@ guardrail entrada → carregar memória → roteador ─┬→ produto ───
 | Orquestrador / Memória | — |
 
 - **Sessões**: `thread_id` (checkpointer, histórico da conversa) + `usuario_id` (memória de longo prazo, `memory/store.py`).
-- **RAG**: `data/faq/*.md` → Qdrant (`python -m venus_sdk.rag.faq_ingest`, extra `rag`) quando há `QDRANT_URL`; sem ela, índice local em memória (`rag/indice.py`). A resposta cita as fontes em `fontes_usadas`.
+- **RAG**: `src/venus_sdk/data/faq/*.md` (empacotados no wheel; `FAQ_DIR` aponta para outra pasta) → Qdrant (`python -m venus_sdk.rag.faq_ingest`, extra `rag`) quando há `QDRANT_URL`; sem ela, índice local em memória (`rag/indice.py`). A resposta cita as fontes em `fontes_usadas`.
 - **MCP**: `python -m venus_sdk.mcp.servidor` expõe as tools do SDK; `mcp/tools.py` as consome (`get_mcp_tools`). O MCP não autentica quem chama, então as 6 tools com `user_id` (perfil, alergias, favoritos, listas, rotina e score personalizado) só entram com `--dados-do-usuario`, em rede confiável — sem a flag são 11 tools.
 - **Identidade**: dentro do grafo, as tools de dados da conta usam sempre o `usuario_id_postgres` da conversa, nunca o `user_id` que o LLM informar (`tools/_identidade.py`). No A2A, a identidade só é aceita com `montar_app_a2a(identificar_usuario=...)`; `identidade_do_metadata` confia no metadata e só deve ficar atrás de autenticação.
 - **A2A**: `a2a_server.py` (Venus como agente A2A, skills produto/ingrediente/rotina/faq; identidade via `metadata`) e `a2a_client.py` (Venus consulta agente externo).
@@ -48,6 +48,13 @@ python tests/manual/verificar_tools.py           # chama CADA tool (Postgres, RA
 
 python examples/conversar_com_venus.py      # conversa no terminal (VENUS_USER_ID=1 para personalização)
 ```
+
+### Variáveis opcionais
+
+| Variável | Padrão | O que faz |
+|---|---|---|
+| `VENUS_GUARDRAIL_LLM` | ligado | Segunda camada do guardrail de entrada: um LLM rápido classifica como SEGURO/INJECAO o que a regex deixou passar. **Custo: uma chamada extra de LLM rápido por mensagem.** `0` desliga; se o LLM falhar, a mensagem passa (fail-open). A suíte de testes roda com `0`. |
+| `VENUS_EMBEDDINGS_LOCAIS` | FastEmbed | `hash` força o `EmbeddingsHash` (busca por palavras, não semântica) no índice local do FAQ; usado na suíte para não baixar o modelo. |
 
 ### Testes
 
@@ -77,16 +84,20 @@ nunca por branch: assim cada deploy pega exatamente o mesmo código.
 
 Para lançar uma versão nova:
 
-1. Com tudo mergeado na `develop` e o CI verde, suba a versão em `pyproject.toml`
+1. Na PR que muda o código, suba a versão em `pyproject.toml`
    (`0.1.0` -> `0.2.0` para funcionalidade nova ou mudança de comportamento;
-   `0.1.0` -> `0.1.1` só para correção).
-2. Crie e envie a tag no commit da `develop`:
+   `0.2.0` -> `0.2.1` só para correção) e descreva as mudanças no
+   [`CHANGELOG.md`](CHANGELOG.md). Código diferente nunca fica com o mesmo
+   número: `tests/pacote/test_versao.py` confere `venus_sdk.__version__`
+   contra o `pyproject.toml`.
+2. Depois do merge na `develop`, com o CI verde, crie e envie a tag no commit
+   do merge:
    ```bash
-   git tag -a v0.2.0 -m "v0.2.0: <resumo>"
+   git tag -a v0.2.0 -m "v0.2.0: <resumo>" <sha do merge>
    git push origin v0.2.0
    ```
 3. No repositório da API, troque o `@v...` em `venus_api/requirements.txt` pela
-   tag nova, rode a suíte da API e abra a PR.
+   tag nova, rode a suíte da API e abra a PR (só depois da tag existir).
 
 Tags existentes: `v0.1.0` — commit `e91d4f1` da develop (revisão técnica).
 

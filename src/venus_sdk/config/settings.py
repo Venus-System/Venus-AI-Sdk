@@ -4,6 +4,7 @@
 constantes daqui."""
 
 import os
+from importlib import resources
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -22,10 +23,10 @@ MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 # Aceita MONGODB_URI (nome do atributo) e MONGODB_URL (legado) — opcional.
 MONGODB_URI = os.getenv("MONGODB_URI") or os.getenv("MONGODB_URL")
-_FAQ_DO_REPOSITORIO = BASE_DIR / "data" / "faq"
-FAQ_DIR = os.getenv("FAQ_DIR") or str(
-    _FAQ_DO_REPOSITORIO if _FAQ_DO_REPOSITORIO.is_dir() else Path.cwd() / "data" / "faq"
-)
+# Documentos do FAQ: empacotados com o SDK (`venus_sdk/data/faq`, ver
+# `package-data` no pyproject), então valem igual no checkout e instalado via
+# pip. `FAQ_DIR` aponta para outra pasta.
+FAQ_DIR = os.getenv("FAQ_DIR") or str(resources.files("venus_sdk").joinpath("data", "faq"))
 # FAQ no Qdrant (extra `rag`) — opcional; sem QDRANT_URL o FAQ usa o índice
 # local sobre FAQ_DIR. Aceita QDRANT_API (nome antigo) para a chave.
 QDRANT_URL = os.getenv("QDRANT_URL")

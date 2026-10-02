@@ -13,6 +13,7 @@ pytest.importorskip("llama_index.vector_stores.qdrant")
 from llama_index.core.embeddings import BaseEmbedding  # noqa: E402
 from qdrant_client import QdrantClient  # noqa: E402
 
+from venus_sdk.config.settings import FAQ_DIR  # noqa: E402
 from venus_sdk.rag import EmbeddingsHash, IndiceQdrant, IndiceRAG, criar_indice_faq  # noqa: E402
 from venus_sdk.rag import faq as modulo_faq  # noqa: E402
 from venus_sdk.rag import vector_build  # noqa: E402
@@ -20,7 +21,7 @@ from venus_sdk.rag.faq_ingest import ingerir_faq  # noqa: E402
 from venus_sdk.rag.vector_build import COLLECTION  # noqa: E402
 from venus_sdk.tools.faq import montar_tools_faq  # noqa: E402
 
-FAQ = Path(__file__).resolve().parents[2] / "data" / "faq"
+FAQ = Path(FAQ_DIR)
 _SEM_CORTE = 0.0
 
 

@@ -12,13 +12,14 @@ import pytest
 from _fakes import LLMScript, chamada_tool
 from langchain_core.messages import AIMessage
 
+from venus_sdk.config.settings import FAQ_DIR
 from venus_sdk.flows.agente_mcp import montar_agente_mcp
 from venus_sdk.mcp.servidor import criar_servidor_mcp
 from venus_sdk.mcp.tools import carregar_config_mcp, get_mcp_tools
 from venus_sdk.rag import criar_indice_local
 
 RAIZ = Path(__file__).resolve().parents[2]
-FAQ = RAIZ / "data" / "faq"
+FAQ = Path(FAQ_DIR)
 
 
 def _cfg_stdio() -> dict:

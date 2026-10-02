@@ -31,7 +31,7 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
     e sem isso `tentativas_juiz` vinha do turno anterior pelo checkpointer."""
     mensagem = estado.get("mensagem_usuario", "") or ""
     bloqueado, motivo = guardrail_entrada(mensagem)
-    if not bloqueado and os.getenv("VENUS_GUARDRAIL_LLM") == "1" and _classificador_llm_ve_injecao(mensagem):
+    if not bloqueado and _classificador_llm_ligado() and _classificador_llm_ve_injecao(mensagem):
         bloqueado, motivo = True, "tentativa de manipulação do sistema (classificador LLM)"
     mensagem_anonimizada = anonimizar_entrada(mensagem)
 
@@ -52,13 +52,21 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
     return atualizacao
 
 
+def _classificador_llm_ligado() -> bool:
+    """Ligado por padrão; `VENUS_GUARDRAIL_LLM=0` desliga. Custa uma chamada
+    de LLM rápido por mensagem que a regex não bloqueou."""
+    return os.getenv("VENUS_GUARDRAIL_LLM", "1").strip() != "0"
+
+
 def _classificador_llm_ve_injecao(mensagem: str) -> bool:
-    """Segunda camada, opcional (`VENUS_GUARDRAIL_LLM=1`): um LLM barato
-    responde SEGURO/INJECAO para o que a regex deixou passar. Se o LLM
-    falhar, a mensagem passa (fail-open) — o classificador nunca derruba a
-    conversa; os prompts dos agentes continuam recusando manipulação."""
+    """Segunda camada: um LLM barato responde SEGURO/INJECAO para o que a
+    regex deixou passar. Se o LLM falhar, a mensagem passa (fail-open) — o
+    classificador nunca derruba a conversa; os prompts dos agentes continuam
+    recusando manipulação. A mensagem vai delimitada, como dado a classificar."""
     try:
-        resposta = get_llm_rapido().invoke([("system", GUARDRAIL_LLM_PROMPT), ("human", mensagem)])
+        resposta = get_llm_rapido().invoke(
+            [("system", GUARDRAIL_LLM_PROMPT), ("human", f"<mensagem>\n{mensagem}\n</mensagem>")]
+        )
     except Exception:
         logger.warning("Classificador LLM do guardrail indisponível; mensagem liberada", exc_info=True)
         return False

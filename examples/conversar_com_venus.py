@@ -13,7 +13,7 @@ Requisitos:
       e `DATABASE_URL` no `.env` (produto/ingrediente/rotina).
     - RAG do FAQ: com `QDRANT_URL`, busca na coleção do Qdrant (alimentada por
       `python -m venus_sdk.rag.faq_ingest`); sem ela, índice local sobre
-      `data/faq/` (já incluído). A busca na web usa Tavily (`TAVILY_API_KEY`)
+      `venus_sdk/data/faq/` (empacotado no SDK). A busca na web usa Tavily (`TAVILY_API_KEY`)
       ou DuckDuckGo.
     - Opcionais: `VENUS_USE_MCP=1` (FAQ passa a também usar as tools do
       servidor MCP do Venus, em subprocesso), `A2A_AGENTES_EXTERNOS`
@@ -224,7 +224,7 @@ async def main() -> None:
     elif DEBUG:
         print("DATABASE_URL não configurada — produto/ingrediente vão falhar até isso ser corrigido.\n")
 
-    # RAG: FAQ no Qdrant ou índice local sobre data/faq (fonte externa 1) + web (fonte 2);
+    # RAG: FAQ no Qdrant ou índice local sobre o FAQ empacotado (fonte externa 1) + web (fonte 2);
     # tools extras: MCP e/ou A2A (fontes 3 e 4), entregues ao agente FAQ.
     indice = criar_indice_faq(FAQ_DIR, cache=".venus_cache/faq_index.npz")
     extras = list(montar_tool_a2a())

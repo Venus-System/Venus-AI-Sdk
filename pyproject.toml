@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "venus-ai-sdk"
-version = "0.1.0"
+version = "0.2.0"
 description = "SDK que armazena os agentes e fluxo do sistema de IA"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -44,6 +44,11 @@ rag = ["qdrant-client", "llama-index-core", "llama-index-vector-stores-qdrant", 
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# Documentos do FAQ dentro do pacote: a API (que instala por pip) usa a mesma
+# fonte da verdade do SDK, sem manter uma cópia da pasta.
+[tool.setuptools.package-data]
+venus_sdk = ["data/faq/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

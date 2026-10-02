@@ -5,8 +5,8 @@ cliente MCP (o próprio Venus via `mcp/tools.py`, Claude Desktop, etc.).
     python -m venus_sdk.mcp.servidor --transport http --porta 8765
 
 Variáveis: `DATABASE_URL` (Postgres, opcional — sem ela só as tools de FAQ
-sobem), `QDRANT_URL` (FAQ no Qdrant) e `FAQ_DIR` (índice local; padrão
-`data/faq`).
+sobem), `QDRANT_URL` (FAQ no Qdrant) e `FAQ_DIR` (índice local; padrão: o
+FAQ empacotado no SDK, `venus_sdk/data/faq`).
 
 O servidor não autentica quem chama: as tools que leem dados de um usuário
 (`user_id`) ficam de fora, a não ser com `--dados-do-usuario` (só em rede
@@ -36,7 +36,6 @@ _FABRICAS_COM_POOL = (
     montar_tools_compartilhadas,
     montar_tools_rotina,
 )
-_PASTA_FAQ_PADRAO = "data/faq"
 _PORTA_HTTP_PADRAO = 8765
 
 
@@ -88,7 +87,7 @@ def _assinatura(campos: dict[str, Any]) -> inspect.Signature:
 
 
 async def _montar_do_ambiente(incluir_dados_do_usuario: bool) -> tuple[FastMCP, Any]:
-    from venus_sdk.config.settings import QDRANT_URL
+    from venus_sdk.config.settings import FAQ_DIR, QDRANT_URL
     from venus_sdk.rag import criar_indice_faq
 
     pool = None
@@ -97,7 +96,7 @@ async def _montar_do_ambiente(incluir_dados_do_usuario: bool) -> tuple[FastMCP, 
         import asyncpg
 
         pool = await asyncpg.create_pool(url)
-    faq_dir = Path(os.getenv("FAQ_DIR", _PASTA_FAQ_PADRAO))
+    faq_dir = Path(FAQ_DIR)
     indice = criar_indice_faq(faq_dir) if QDRANT_URL or faq_dir.is_dir() else None
     return criar_servidor_mcp(pool=pool, indice=indice, incluir_dados_do_usuario=incluir_dados_do_usuario), pool
 

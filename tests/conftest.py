@@ -10,3 +10,7 @@ import os  # noqa: E402
 # baixar o modelo do FastEmbed (vale também para os subprocessos, ex.: o
 # servidor MCP por stdio). Os testes do caminho semântico trocam a função.
 os.environ.setdefault("VENUS_EMBEDDINGS_LOCAIS", "hash")
+# O classificador LLM do guardrail fica ligado por padrão em produção; na
+# suíte ele consumiria as respostas roteirizadas dos LLMs falsos. Os testes
+# dele (tests/guardrails/test_classificador_llm.py) ligam explicitamente.
+os.environ.setdefault("VENUS_GUARDRAIL_LLM", "0")

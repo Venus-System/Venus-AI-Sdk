@@ -4,7 +4,7 @@ embeddings e substitui o conteúdo da coleção.
 Roda uma vez por atualização dos documentos, fora da API:
 
     python -m venus_sdk.rag.faq_ingest            # usa FAQ_DIR
-    python -m venus_sdk.rag.faq_ingest data/faq   # outra pasta
+    python -m venus_sdk.rag.faq_ingest minha/pasta   # outra pasta
 
 A API só consulta a coleção (`rag.faq.IndiceQdrant`), então nenhuma instância
 precisa dos arquivos nem reindexa nada ao subir."""
