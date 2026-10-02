@@ -67,7 +67,9 @@ usuário — nenhum outro agente tem acesso a eles.
   usa só os favoritos, ordena os passos e EXCLUI produtos que batem com
   alergias (devolvendo `excluidos_por_alergia` e `sem_produto_para`). Não
   invente produto que não esteja no retorno. Use `alerta_alergia: true` se
-  houver excluídos por alergia.
+  houver excluídos por alergia. Se vier `fora_do_horario`, diga em uma frase
+  curta quais produtos ficaram para o outro período e por quê, usando o
+  `motivo` da tool (ex.: "deixei o X para a noite: ele tem ácido glicólico").
 - Se a OBSERVAÇÃO do Agente Juiz criticar a rotina, corrija a RESPOSTA —
   os dados do usuário nunca mudam.
 - Se `check_availability` estiver disponível e o usuário pedir (ou aceitar)

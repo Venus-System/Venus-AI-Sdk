@@ -4,6 +4,7 @@ schema `venus`), mais uma sugestão de rotina montada SÓ com dado real."""
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from langchain_core.tools import BaseTool, tool
@@ -30,6 +31,17 @@ _SO_NOITE = (
     "acido glicolico", "acido salicilico", "acido lactico", "acido mandelico", "aha", "bha",
 )
 _SO_MANHA = ("protetor", "solar", "fps", "spf", "dia ", "day")
+
+# Ativos que deixam a pele mais sensível ao sol: produto com um deles na
+# FÓRMULA fica fora da manhã mesmo sem citar no nome (no catálogo, quase nenhum
+# cita: "CeraVe Acne Control" tem ácido glicólico, salicílico e lático). INCI e
+# nome comum, como vêm em `inci_names` (minúsculas, sem acento). O "(?<![a-z])"
+# evita casar "thioglycolic acid" (redutor de alisante, não esfoliante).
+_ATIVOS_DA_NOITE_RE = re.compile(
+    r"(?<![a-z])(glycolic acid|lactic acid|mandelic acid|salicylic acid|retinol|retinal|retinaldehyde|"
+    r"tretinoin|adapalene|hydroxypinacolone retinoate|acido glicolico|acido latico|acido lactico|"
+    r"acido mandelico|acido salicilico|tretinoina|adapaleno)(?![a-z])"
+)
 
 # Alergias no catálogo vêm em português/inglês; os ingredientes vêm como INCI.
 _SINONIMOS_ALERGIA = {
@@ -107,13 +119,27 @@ def _separar_por_alergia(favoritos: list[dict], termos: list[str]) -> tuple[list
     return excluidos, candidatos
 
 
-def _serve_no_horario(produto: dict, horario: str) -> bool:
+def _motivo_fora_do_horario(produto: dict, horario: str) -> str | None:
+    """Por que o produto não serve nesse horário (`None` = serve). A fórmula
+    vem primeiro; o nome/categoria é a reserva para produto sem ingredientes."""
     rotulo = _rotulo(produto)
-    if horario == "manha" and any(palavra in rotulo for palavra in _SO_NOITE):
-        return False
-    if horario == "noite" and any(palavra in rotulo for palavra in _SO_MANHA):
-        return False
-    return True
+    if horario == "manha":
+        for ingrediente in produto.get("inci_names") or []:
+            ativo = _ATIVOS_DA_NOITE_RE.search(_minusculo_sem_acento(ingrediente))
+            if ativo:
+                return f"contém {ativo.group(1)}, que deixa a pele sensível ao sol"
+        palavra = next((palavra for palavra in _SO_NOITE if palavra in rotulo), None)
+        if palavra:
+            return f"o nome/categoria indica uso à noite ({palavra.strip()})"
+    if horario == "noite":
+        palavra = next((palavra for palavra in _SO_MANHA if palavra in rotulo), None)
+        if palavra:
+            return f"é de uso diurno ({palavra.strip()})"
+    return None
+
+
+def _serve_no_horario(produto: dict, horario: str) -> bool:
+    return _motivo_fora_do_horario(produto, horario) is None
 
 
 def _categorias_sem_produto(passos: list[dict], horario: str) -> list[str]:
@@ -130,6 +156,11 @@ def _categorias_sem_produto(passos: list[dict], horario: str) -> list[str]:
 def _montar_rotina(favoritos: list[dict], termos_alergia: list[str], horario: str) -> dict:
     excluidos, candidatos = _separar_por_alergia(favoritos, termos_alergia)
     passos = [produto for produto in candidatos if _serve_no_horario(produto, horario)]
+    fora_do_horario = [
+        {"product_id": produto["product_id"], "nome": produto["name"],
+         "motivo": _motivo_fora_do_horario(produto, horario)}
+        for produto in candidatos if not _serve_no_horario(produto, horario)
+    ]
     passos.sort(key=lambda produto: _ordem_categoria(produto["category_name"]))
     return {
         "horario": horario,
@@ -143,6 +174,7 @@ def _montar_rotina(favoritos: list[dict], termos_alergia: list[str], horario: st
              "ingredientes_em_conflito": produto["motivo"]}
             for produto in excluidos
         ],
+        "fora_do_horario": fora_do_horario,
         "sem_produto_para": _categorias_sem_produto(passos, horario),
     }
 
