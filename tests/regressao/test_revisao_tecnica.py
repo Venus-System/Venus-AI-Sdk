@@ -234,3 +234,52 @@ def test_context_id_invalido_e_recusado(context_id):
     with pytest.raises(InvalidParamsError):
         run(a2a_server.VenusAgentExecutor(grafo).execute(_Contexto(context_id), _Fila()))
     assert grafo.configs == []
+
+
+# --- Item 7: agente sem a API descontinuada do LangGraph ------------------------
+
+
+def _tool_eco():
+    from langchain_core.tools import tool
+
+    @tool
+    def eco(texto: str) -> str:
+        """Devolve o texto."""
+        return texto
+
+    return eco
+
+
+def test_montar_agente_nao_usa_api_descontinuada():
+    import warnings
+
+    from langchain_core.messages import AIMessage
+
+    from _fakes import LLMScript
+    from venus_sdk.flows.agente_mcp import montar_agente_mcp
+
+    with warnings.catch_warnings(record=True) as avisos:
+        warnings.simplefilter("always")
+        montar_agente_mcp(LLMScript(script=[AIMessage(content="ok")]), prompt="p", tools=[_tool_eco()])
+    assert not [a for a in avisos if "Deprecated" in type(a.message).__name__ or "deprecat" in str(a.message).lower()]
+
+
+def test_prompt_dinamico_e_avaliado_a_cada_execucao():
+    from langchain_core.messages import AIMessage
+
+    from _fakes import LLMScript
+    from venus_sdk.flows.agente_mcp import montar_agente_mcp
+
+    llm = LLMScript(script=[AIMessage(content="ok")])
+    llm.chamadas = []
+    contador = {"n": 0}
+
+    def prompt() -> str:
+        contador["n"] += 1
+        return f"prompt número {contador['n']}"
+
+    agente = montar_agente_mcp(llm, prompt=prompt, tools=[_tool_eco()])
+    run(agente.ainvoke({"messages": [("human", "oi")]}))
+    run(agente.ainvoke({"messages": [("human", "oi de novo")]}))
+    sistemas = [mensagens[0].content for mensagens in llm.chamadas]
+    assert sistemas == ["prompt número 1", "prompt número 2"]

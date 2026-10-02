@@ -9,7 +9,7 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from langchain_core.messages import SystemMessage, ToolMessage
+from langchain_core.messages import ToolMessage
 
 from venus_sdk.flows.agente_mcp import montar_agente_mcp
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_especialista
@@ -235,13 +235,13 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
 # --- fábricas dos nós ---
 
 
-def _prompt_com_data_atual(prompt: str) -> Callable[[dict[str, Any]], list[Any]]:
+def _prompt_com_data_atual(prompt: str) -> Callable[[], str]:
     """Prompt do agente ReAct com a data de cada chamada (o agente fica em cache)."""
 
-    def _mensagens(estado_agente: dict[str, Any]) -> list[Any]:
-        return [SystemMessage(content=com_data_atual(prompt)), *estado_agente["messages"]]
+    def _prompt() -> str:
+        return com_data_atual(prompt)
 
-    return _mensagens
+    return _prompt
 
 
 def _montar_no_especialista(
