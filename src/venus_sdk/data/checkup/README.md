@@ -1,6 +1,6 @@
 # Regras do check-up da rotina
 
-Estes arquivos alimentam o grafo do Neo4j (`scripts/sincronizar_neo4j.py`)
+Estes arquivos alimentam o grafo do Neo4j (`python -m venus_sdk.checkup.sincronizar`)
 e definem os avisos que a Venus dá sobre a rotina do usuário.
 
 ## `tipos_de_ativo.csv`

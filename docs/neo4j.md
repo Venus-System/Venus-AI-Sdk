@@ -8,15 +8,15 @@ repetidos**. O check-up é opcional: sem Neo4j, a rotina sai como sempre.
 ## Fluxo
 
 ```
-data/checkup/*.csv  ─┐
-(tipos e regras)      ├──► scripts/sincronizar_neo4j.py ──► Neo4j ◄── check_routine_health
-Postgres            ─┘     (só LÊ o Postgres)              (cópia)     (agente de rotina)
+venus_sdk/data/checkup/*.csv ─┐
+(tipos e regras)              ├──► venus_sdk.checkup.sincronizar ──► Neo4j ◄── check_routine_health
+Postgres                     ─┘    (só LÊ o Postgres)                (cópia)    (agente de rotina)
 ```
 
-1. **Regras** — `data/checkup/tipos_de_ativo.csv` (ingrediente -> tipo de
-   ativo) e `data/checkup/regras.csv` (conflita com / precisa de / vem antes
-   de). Mudança de regra = PR. Ver `data/checkup/README.md`.
-2. **Cópia** — `python scripts/sincronizar_neo4j.py` lê produtos,
+1. **Regras** — `src/venus_sdk/data/checkup/tipos_de_ativo.csv` (ingrediente -> tipo de
+   ativo) e `src/venus_sdk/data/checkup/regras.csv` (conflita com / precisa de / vem antes
+   de). Mudança de regra = PR. Ver `src/venus_sdk/data/checkup/README.md`.
+2. **Cópia** — `python -m venus_sdk.checkup.sincronizar` lê produtos,
    ingredientes, composição e favoritos do Postgres e as regras dos CSVs, e
    refaz o grafo. Roda toda noite e quando os CSVs mudam. Durante a cópia,
    quem consulta vê os dados anteriores (nada é apagado antes de o novo estar
