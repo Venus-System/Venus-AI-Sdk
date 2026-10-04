@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from venus_sdk.config.settings import FAQ_DIR
+from venus_sdk.rag.carregador import remover_comentarios_html
 from venus_sdk.rag.vector_build import COLLECTION, get_embed_model, get_qdrant_client, get_vector_store
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,9 @@ def ingerir_faq(pasta: str | Path = FAQ_DIR, *, cliente: Any | None = None, embe
         raise FileNotFoundError(f"Pasta de documentos do FAQ não encontrada: {pasta}")
 
     documentos = SimpleDirectoryReader(input_dir=str(pasta), required_exts=[".md"]).load_data()
+    for documento in documentos:
+        # Mesma regra do índice local: comentário HTML é nota de manutenção.
+        documento.set_content(remover_comentarios_html(documento.get_content()))
     if not documentos:
         logger.warning("Nenhum arquivo .md em %s — nada foi indexado.", pasta)
         return 0

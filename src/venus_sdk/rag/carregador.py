@@ -3,6 +3,7 @@ metadados de fonte (arquivo + trecho/página; seção, no markdown)."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from langchain_core.documents import Document
@@ -13,6 +14,14 @@ EXTENSOES = {".md", ".txt", ".pdf"}
 # divisão invalida as matrizes salvas mesmo sem mudar os arquivos.
 VERSAO_DA_DIVISAO = 2
 _TITULOS = [("#", "h1"), ("##", "h2"), ("###", "h3")]
+# Comentário HTML num .md (ex.: `<!-- TODO(produto): ... -->`) é nota para
+# quem mantém o FAQ, não conteúdo: nunca vai para o índice nem para o agente.
+_COMENTARIO_HTML = re.compile(r"<!--.*?-->", re.S)
+
+
+def remover_comentarios_html(texto: str) -> str:
+    """Tira os comentários HTML do markdown antes de indexar."""
+    return _COMENTARIO_HTML.sub("", texto)
 
 
 def _ler_pdf(caminho: Path) -> list[tuple[int, str]]:
@@ -28,7 +37,10 @@ def _ler_partes(caminho: Path) -> list[tuple[int | None, str]]:
     """`[(pagina, texto)]` do arquivo — `pagina` só existe em PDF."""
     if caminho.suffix.lower() == ".pdf":
         return _ler_pdf(caminho)
-    return [(None, caminho.read_text(encoding="utf-8", errors="ignore"))]
+    texto = caminho.read_text(encoding="utf-8", errors="ignore")
+    if caminho.suffix.lower() == ".md":
+        texto = remover_comentarios_html(texto)
+    return [(None, texto)]
 
 
 def _secoes_do_markdown(texto: str) -> list[tuple[str, str]]:

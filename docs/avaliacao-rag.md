@@ -130,3 +130,89 @@ Em negrito, o corte de produção de cada configuração.
 - **Sempre erra:** "quem criou o aplicativo?" traz um trecho do
   `sobre_o_venus.md` com score em torno de 0,36. Nesse caso o agente FAQ
   precisa dizer que o trecho não responde: o prompt manda não inventar.
+
+## Rodada 3: seções em forma de pergunta
+
+Revisão técnica 3, em 2026-10-04, com o mesmo ambiente e as mesmas
+configurações da rodada anterior. O código é o da branch
+`fix/revisao-tecnica-3`, sobre a `v0.2.0` (`4518636`), no commit que mudou
+os documentos.
+
+**O que mudou nos documentos.** Só reorganizei informação que já estava no
+FAQ; nada de conteúdo novo:
+- `privacidade_e_dados.md` ganhou duas seções:
+  - `## O Venus vende meus dados?`
+  - `## O que acontece se eu digitar meu CPF no chat?`
+- `como_funciona_o_score.md` ganhou a seção
+  `## O que acontece com a nota quando a fórmula de um produto muda?`.
+- `alergias_e_limites.md` foi dividido em seções com título em forma de
+  pergunta:
+  - "Como cadastro minhas alergias?"
+  - "E se o Venus não souber quem eu sou?"
+  - "O que o Venus faz e o que ele não faz?"
+  - "De onde vêm as restrições regulatórias?"
+- `sobre_o_venus.md`:
+  - "O que é o app e o que ele faz" virou "O que é o Venus (Vênus) e o que
+    ele faz?";
+  - "Significado dos selos" virou "O que significam os selos (cruelty-free,
+    vegano, marca brasileira)?".
+- "quem criou o aplicativo?" continua **sem resposta**. Nenhuma fonte do
+  projeto (README, `pyproject.toml`, LICENSE) diz quem criou o app, então
+  ficou um `TODO(produto)` num comentário HTML no `sobre_o_venus.md`.
+  Comentários HTML não vão para o índice: desde esta rodada, o índice local e
+  a ingestão no Qdrant descartam esses comentários.
+
+| Corte | Local + FastEmbed: hit@3 | MRR | "não sei" | Local + hash: hit@3 | MRR | "não sei" |
+|---|---|---|---|---|---|---|
+| 0,05 | | | | 92% | 0,83 | 0% |
+| 0,10 | | | | **92%** | **0,83** | **0%** |
+| 0,15 | | | | 92% | 0,83 | 57% |
+| 0,20 | 96% | 0,87 | 43% | 88% | 0,81 | 57% |
+| 0,25 | 96% | 0,87 | 71% | 62% | 0,62 | 71% |
+| 0,30 | **96%** | **0,87** | **100%** | 54% | 0,54 | 100% |
+| 0,35 | 96% | 0,87 | 100% | | | |
+| 0,40 | 96% | 0,87 | 100% | | | |
+
+**Qdrant + FastEmbed:**
+
+| Corte | hit@3 | MRR | "não sei" |
+|---|---|---|---|
+| 0,20 | 92% | 0,81 | 71% |
+| 0,25 | 92% | 0,81 | 71% |
+| 0,30 | **88%** | **0,79** | **71%** |
+| 0,35 | 71% | 0,62 | 86% |
+| 0,40 | 62% | 0,56 | 100% |
+
+**Comparação no corte de produção:**
+
+| Configuração | Rodada 2: hit@3 | MRR | "não sei" | Rodada 3: hit@3 | MRR | "não sei" |
+|---|---|---|---|---|---|---|
+| Local + FastEmbed (0,3) | 88% | 0,74 | 86% | **96%** | **0,87** | **100%** |
+| Qdrant + FastEmbed (0,3) | 83% | 0,77 | 71% | **88%** | **0,79** | 71% |
+| Local + hash (0,1) | 92% | 0,78 | 0% | 92% | **0,83** | 0% |
+
+**Casos da revisão:**
+- **"vocês vendem meus dados?"**: o `privacidade_e_dados.md` agora vem **em
+  primeiro lugar** nas duas configurações com FastEmbed: 0,489 no índice
+  local e 0,425 no Qdrant. Antes, o primeiro trecho era uma tabela do
+  `api_de_classificacao.md`.
+- **"quem criou o aplicativo?"**: o índice local agora não traz nada, que é o
+  "não sei" correto; antes trazia um trecho do `sobre_o_venus.md` com score
+  0,36. No Qdrant ainda vem um trecho do `api_de_classificacao.md` com score
+  0,306, logo acima do corte.
+
+**O que continua fraco:**
+- "O que significam os selos?": o primeiro trecho ainda é do
+  `api_de_classificacao.md`. Testei o título "O que significam os selos do
+  app?". Ele resolvia os selos (hit@3 local de 100%, MRR 0,91), mas fazia
+  "quem criou o aplicativo?" puxar o `sobre_o_venus.md` com score 0,42, e o
+  "não sei" local caía para 86%. Fiquei com a versão que mantém o "não sei"
+  em 100%: nesse caso, errar a fonte de uma pergunta é menos grave que
+  responder algo que o FAQ não diz.
+- No Qdrant, "Como meus dados são usados para gerar as recomendações?" e
+  "posso confiar na IA se tenho alergia?" trazem fontes que não estão entre as
+  esperadas.
+
+**Antes de valer em produção:** com `QDRANT_URL` configurada, é preciso
+**rodar a ingestão de novo** (`python -m venus_sdk.rag.faq_ingest`), senão a
+coleção continua com os documentos antigos.
