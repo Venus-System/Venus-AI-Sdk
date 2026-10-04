@@ -1,0 +1,81 @@
+name: Avaliar RAG
+
+# Avaliação do RAG do FAQ com o modelo de verdade (FastEmbed), reproduzível
+# por qualquer pessoa: roda à mão (Actions > Avaliar RAG > Run workflow) e em
+# toda PR que mexe nos documentos, no código do RAG ou nas perguntas. Falha
+# se o hit@3 com FastEmbed no corte de produção cair abaixo de 0,8.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/venus_sdk/data/faq/**"
+      - "src/venus_sdk/rag/**"
+      - "tests/fixtures/avaliacao_rag.jsonl"
+      - "tests/manual/avaliar_rag.py"
+      - ".github/workflows/avaliar-rag.yaml"
+
+permissions:
+  contents: read
+
+env:
+  # Mesmo modelo de rag/vector_build.py::EMBEDDING_MODEL_NAME.
+  MODELO_FASTEMBED: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.cache/fastembed
+  # O download do modelo (~220 MB) pode passar dos 15 s padrão num runner.
+  VENUS_FASTEMBED_TIMEOUT_SEGUNDOS: "300"
+
+jobs:
+  avaliar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar o SDK com o extra rag
+        run: pip install ".[rag]"
+
+      - name: Cache do modelo do FastEmbed
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.FASTEMBED_CACHE_PATH }}
+          key: fastembed-${{ env.MODELO_FASTEMBED }}
+
+      - name: Local + FastEmbed (mínimo de hit@3 0,8)
+        run: |
+          python tests/manual/avaliar_rag.py --detalhes --minimo-hit3 0.8 \
+            --saida-markdown avaliacao-fastembed.md | tee avaliacao-fastembed.txt
+
+      - name: Local + hash (fallback sem o modelo, só informativo)
+        if: always()
+        run: |
+          python tests/manual/avaliar_rag.py --embeddings hash --detalhes \
+            --saida-markdown avaliacao-hash.md | tee avaliacao-hash.txt
+
+      - name: Resumo do job
+        if: always()
+        run: |
+          {
+            echo "## Avaliação do RAG do FAQ"
+            echo
+            echo "Commit \`${GITHUB_SHA::7}\`, modelo \`${MODELO_FASTEMBED}\`."
+            echo
+            cat avaliacao-fastembed.md 2>/dev/null || echo "_Local + FastEmbed não gerou tabela._"
+            echo
+            cat avaliacao-hash.md 2>/dev/null || echo "_Local + hash não gerou tabela._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: avaliacao-rag
+          path: |
+            avaliacao-*.md
+            avaliacao-*.txt

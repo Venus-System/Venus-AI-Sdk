@@ -1,0 +1,43 @@
+name: Avaliar guardrail
+
+# Mede as duas camadas do guardrail de entrada (regex e regex + classificador
+# LLM) com as frases de tests/guardrails/fixtures/. Só manual: cada execução
+# gasta cerca de 80 chamadas de LLM rápido. Sem os segredos, mede só a regex.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  avaliar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar o SDK
+        run: pip install .
+
+      - name: Avaliar
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python tests/manual/avaliar_guardrail.py --saida-markdown avaliacao-guardrail.md
+
+      - name: Resumo do job
+        if: always()
+        run: |
+          {
+            echo "## Avaliação do guardrail (commit \`${GITHUB_SHA::7}\`)"
+            echo
+            cat avaliacao-guardrail.md 2>/dev/null || echo "_Sem resultado._"
+          } >> "$GITHUB_STEP_SUMMARY"
