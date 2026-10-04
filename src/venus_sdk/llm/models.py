@@ -223,6 +223,26 @@ def get_llm_juiz() -> BaseChatModel:
 
 
 @lru_cache(maxsize=1)
+def get_llm_guardrail() -> BaseChatModel:
+    """Classificador do guardrail de entrada: o 1º elo da cadeia rápida e, de
+    reserva, o 1º elo de OUTRO provedor — uma tentativa só em cada.
+
+    Roda antes de toda mensagem, então não pode percorrer a cadeia rápida
+    inteira: quando a cota de um provedor acaba, os elos seguintes do mesmo
+    provedor falham do mesmo jeito, e cada mensagem esperaria vários timeouts
+    antes do fail-open (ver `nodes/guardrails.py`)."""
+    itens = cadeia_rapida()
+    if not itens:
+        raise RuntimeError(
+            "Nenhum LLM utilizável em LLM_CADEIA_RAPIDO: defina MISTRAL_API_KEY, GROQ_API_KEY e/ou GEMINI_API_KEY."
+        )
+    principal = itens[0]
+    reserva = next((item for item in itens[1:] if item[0] != principal[0]), None)
+    modelo = _criar_modelo(*principal, rapido=True)
+    return modelo.with_fallbacks([_criar_modelo(*reserva, rapido=True)]) if reserva else modelo
+
+
+@lru_cache(maxsize=1)
 def get_llm_rapido() -> BaseChatModel:
     """Roteador/memória (classificação curta): cadeia rápida com fallbacks.
 

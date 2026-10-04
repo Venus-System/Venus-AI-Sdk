@@ -14,3 +14,17 @@ os.environ.setdefault("VENUS_EMBEDDINGS_LOCAIS", "hash")
 # suíte ele consumiria as respostas roteirizadas dos LLMs falsos. Os testes
 # dele (tests/guardrails/test_classificador_llm.py) ligam explicitamente.
 os.environ.setdefault("VENUS_GUARDRAIL_LLM", "0")
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _classificador_do_guardrail_zerado():
+    """Contadores e disjuntor do classificador do guardrail são por processo:
+    sem zerar, as falhas de um teste abririam o disjuntor para os seguintes."""
+    from venus_sdk.nodes import guardrails
+
+    guardrails._reiniciar_classificador()
+    yield
+    guardrails._reiniciar_classificador()

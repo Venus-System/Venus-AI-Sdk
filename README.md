@@ -53,7 +53,8 @@ python examples/conversar_com_venus.py      # conversa no terminal (VENUS_USER_I
 
 | Variável | Padrão | O que faz |
 |---|---|---|
-| `VENUS_GUARDRAIL_LLM` | ligado | Segunda camada do guardrail de entrada: um LLM rápido classifica como SEGURO/INJECAO o que a regex deixou passar. **Custo: uma chamada extra de LLM rápido por mensagem.** `0` desliga; se o LLM falhar, a mensagem passa (fail-open). A suíte de testes roda com `0`. |
+| `VENUS_GUARDRAIL_LLM` | ligado | Segunda camada do guardrail de entrada: um LLM rápido classifica como SEGURO/INJECAO o que a regex deixou passar. **Custo: uma chamada extra de LLM rápido por mensagem.** `0` desliga. Tenta o provedor principal e um de outro provedor (`get_llm_guardrail`); se os dois falharem, a mensagem passa (fail-open), com log `warning` (`evento=guardrail_llm_fail_open`) e contagem em `estatisticas_guardrail_llm()`. A suíte de testes roda com `0`. |
+| `VENUS_GUARDRAIL_LLM_FALHAS_PARA_ABRIR`, `VENUS_GUARDRAIL_LLM_PAUSA_SEGUNDOS` | 5 e 60 | Disjuntor do classificador: depois de N falhas seguidas, para de chamar o LLM por S segundos (as mensagens passam sem a camada 2, sem esperar timeout). Log `error` ao abrir e `info` ao fechar. |
 | `VENUS_EMBEDDINGS_LOCAIS` | FastEmbed | `hash` força o `EmbeddingsHash` (busca por palavras, não semântica) no índice local do FAQ; usado na suíte para não baixar o modelo. |
 
 ### Testes
