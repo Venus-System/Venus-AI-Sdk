@@ -14,11 +14,12 @@ from venus_sdk.rag.web import buscar_web
 _TRECHOS_POR_BUSCA = 3
 
 
-def montar_tools_faq(indice: Any) -> list[BaseTool]:
+def montar_tools_faq(indice: Any, busca_web: Any | None = None) -> list[BaseTool]:
     """Monta `faq_retriever` (índice do FAQ) e `buscar_na_web`. `indice` é
     um `IndiceQdrant`/`IndiceRAG` (ou qualquer objeto com `.buscar(consulta,
     k)`); `None` levanta `ValueError` só no primeiro uso do nó, como nas
-    outras tools."""
+    outras tools. `busca_web` (opcional) é uma `rag.web.BuscaWebMcp`: a busca
+    passa pelo servidor MCP da Tavily, com a busca direta de reserva."""
     if indice is None:
         raise ValueError(
             "montar_tools_faq requer um índice RAG — use "
@@ -50,6 +51,8 @@ def montar_tools_faq(indice: Any) -> list[BaseTool]:
         """Busca na internet (Tavily/DuckDuckGo) quando o FAQ local não
         cobrir a dúvida — ex.: informação pública sobre um ingrediente.
         Devolve `titulo`, `trecho` e `url` (a fonte que deve ser citada)."""
+        if busca_web is not None:
+            return await busca_web.buscar(consulta)
         return await asyncio.to_thread(buscar_web, consulta)
 
     return [faq_retriever, buscar_na_web]

@@ -383,13 +383,16 @@ def pede_remocao_de_favorito(pergunta: str) -> bool:
     return bool(_REMOCAO_DE_FAVORITO_RE.search(pergunta or ""))
 
 
-def montar_no_agente_faq(indice: Any, tools_extras: list[Any] | None = None) -> NoEspecialista:
+def montar_no_agente_faq(indice: Any, tools_extras: list[Any] | None = None,
+                         busca_web: Any | None = None) -> NoEspecialista:
     """Fábrica do nó do agente FAQ — o agente com RAG.
 
     `indice` é o índice do FAQ (`rag.criar_indice_faq`: Qdrant ou local); as
     tools são `faq_retriever` (documentos do FAQ) e `buscar_na_web` (internet).
     `tools_extras` recebe tools já carregadas de fontes externas — tools MCP
     (`mcp.tools.get_mcp_tools`) e/ou A2A (`a2a_client.montar_tool_a2a`).
+    `busca_web` (opcional, `rag.web.BuscaWebMcp`) faz o `buscar_na_web`
+    passar pelo servidor MCP da Tavily, com a busca direta de reserva.
 
     Devolve JSON com `fontes_usadas` e passa pelo Juiz, que confere a
     resposta contra os trechos recuperados.
@@ -397,5 +400,5 @@ def montar_no_agente_faq(indice: Any, tools_extras: list[Any] | None = None) -> 
     return _montar_no_especialista(
         "faq",
         FAQ_PROMPT_COMPLETO,
-        lambda: montar_tools_faq(indice) + list(tools_extras or []),
+        lambda: montar_tools_faq(indice, busca_web) + list(tools_extras or []),
     )

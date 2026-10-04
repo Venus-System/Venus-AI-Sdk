@@ -58,6 +58,7 @@ def montar_grafo_venus(
     indice_rag: Any | None = None,
     tools_faq_extras: list[Any] | None = None,
     tools_rotina_extras: list[Any] | None = None,
+    busca_web_faq: Any | None = None,
 ) -> StateGraph:
     """Fábrica do grafo principal do Venus (não compilado — use
     `compilar_grafo_venus()` para obter um grafo executável).
@@ -72,6 +73,8 @@ def montar_grafo_venus(
     tools MCP/A2A já carregadas, entregues ao agente FAQ. `tools_rotina_extras`
     é o mesmo conceito para o agente de Rotina — hoje, `check_availability`
     (`tools/calendario.py`), quando o Google Calendar está configurado.
+    `busca_web_faq` (opcional, `rag.web.BuscaWebMcp`) faz a busca na web do
+    FAQ passar pelo servidor MCP da Tavily, com a busca direta de reserva.
     """
     grafo = StateGraph(EstadoVenus)
 
@@ -81,7 +84,7 @@ def montar_grafo_venus(
     grafo.add_node("agente_produto", montar_no_agente_produto(pool))
     grafo.add_node("agente_ingrediente", montar_no_agente_ingrediente(pool))
     grafo.add_node("agente_rotina", montar_no_agente_rotina(pool, tools_rotina_extras))
-    grafo.add_node("agente_faq", montar_no_agente_faq(indice_rag, tools_faq_extras))
+    grafo.add_node("agente_faq", montar_no_agente_faq(indice_rag, tools_faq_extras, busca_web_faq))
     grafo.add_node("agente_juiz", no_agente_juiz)
     grafo.add_node("orquestrador", no_orquestrador)
     grafo.add_node("guardrail_saida", no_guardrail_saida)
@@ -147,6 +150,7 @@ def compilar_grafo_venus(
     indice_rag: Any | None = None,
     tools_faq_extras: list[Any] | None = None,
     tools_rotina_extras: list[Any] | None = None,
+    busca_web_faq: Any | None = None,
 ) -> Any:
     """Compila o grafo principal do Venus.
 
@@ -199,4 +203,5 @@ def compilar_grafo_venus(
         indice_rag=indice_rag,
         tools_faq_extras=tools_faq_extras,
         tools_rotina_extras=tools_rotina_extras,
+        busca_web_faq=busca_web_faq,
     ).compile(checkpointer=checkpointer, store=store)
