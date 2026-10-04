@@ -55,6 +55,8 @@ python examples/conversar_com_venus.py      # conversa no terminal (VENUS_USER_I
 |---|---|---|
 | `VENUS_GUARDRAIL_LLM` | ligado | Segunda camada do guardrail de entrada: um LLM rápido classifica como SEGURO/INJECAO o que a regex deixou passar. **Custo: uma chamada extra de LLM rápido por mensagem.** `0` desliga. Tenta o provedor principal e um de outro provedor (`get_llm_guardrail`); se os dois falharem, a mensagem passa (fail-open), com log `warning` (`evento=guardrail_llm_fail_open`) e contagem em `estatisticas_guardrail_llm()`. A suíte de testes roda com `0`. |
 | `VENUS_GUARDRAIL_LLM_FALHAS_PARA_ABRIR`, `VENUS_GUARDRAIL_LLM_PAUSA_SEGUNDOS` | 5 e 60 | Disjuntor do classificador: depois de N falhas seguidas, para de chamar o LLM por S segundos (as mensagens passam sem a camada 2, sem esperar timeout). Log `error` ao abrir e `info` ao fechar. |
+| `VENUS_FASTEMBED_DOWNLOAD` | `1` | `0` proíbe baixar o modelo do FastEmbed: usa só o cache (`FASTEMBED_CACHE_PATH`) e, sem ele, o índice local cai no `EmbeddingsHash` na hora. `HF_HUB_OFFLINE=1` tem o mesmo efeito. |
+| `VENUS_FASTEMBED_TIMEOUT_SEGUNDOS` | `15` | Tempo máximo do download do modelo quando ele não está em cache (a biblioteca sozinha tenta 3 vezes, com esperas de 3, 9 e 27 s). Estourou: `EmbeddingsHash`, com aviso no log. |
 | `VENUS_EMBEDDINGS_LOCAIS` | FastEmbed | `hash` força o `EmbeddingsHash` (busca por palavras, não semântica) no índice local do FAQ; usado na suíte para não baixar o modelo. |
 
 ### Testes

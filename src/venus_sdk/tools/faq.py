@@ -25,6 +25,11 @@ def montar_tools_faq(indice: Any) -> list[BaseTool]:
             "venus_sdk.rag.criar_indice_faq() e passe via "
             "compilar_grafo_venus(indice_rag=...)."
         )
+    # Índice construído em segundo plano (ex.: a API sobe antes de o índice
+    # ficar pronto): até lá o nó FAQ responde a mensagem de erro técnico e não
+    # guarda o agente, então a próxima pergunta tenta de novo.
+    if not getattr(indice, "pronto", True):
+        raise ValueError("o índice do FAQ ainda não está pronto")
 
     @tool
     def faq_retriever(pergunta: str) -> list[dict] | dict:

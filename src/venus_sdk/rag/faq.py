@@ -86,7 +86,8 @@ class EmbeddingsFastEmbed(Embeddings):
 
 def _embeddings_semanticos() -> Embeddings | None:
     """FastEmbed se o extra `rag` estiver instalado e o modelo carregar
-    (o primeiro uso baixa ~220 MB); `None` senão. `VENUS_EMBEDDINGS_LOCAIS=hash`
+    (do cache, ou baixando ~220 MB dentro do tempo máximo — ver
+    `vector_build.get_embed_model`); `None` senão. `VENUS_EMBEDDINGS_LOCAIS=hash`
     força o fallback (testes e uso offline)."""
     if os.getenv("VENUS_EMBEDDINGS_LOCAIS", "").lower() == "hash":
         return None
