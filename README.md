@@ -93,6 +93,11 @@ Para lançar uma versão nova:
    [`CHANGELOG.md`](CHANGELOG.md). Código diferente nunca fica com o mesmo
    número: `tests/pacote/test_versao.py` confere `venus_sdk.__version__`
    contra o `pyproject.toml`.
+   **Regra:** toda PR que mude assinatura pública, variável de ambiente ou
+   comportamento padrão precisa de uma entrada em **Mudanças incompatíveis**
+   no CHANGELOG, com o antes e o depois do código que o consumidor precisa
+   alterar (o template de PR tem a caixa para isso). Versão sem mudança
+   incompatível diz "Nenhuma mudança incompatível".
 2. Depois do merge na `develop`, com o CI verde, crie e envie a tag no commit
    do merge:
    ```bash
@@ -102,7 +107,7 @@ Para lançar uma versão nova:
 3. No repositório da API, troque o `@v...` em `venus_api/requirements.txt` pela
    tag nova, rode a suíte da API e abra a PR (só depois da tag existir).
 
-Tags existentes: `v0.1.0` — commit `e91d4f1` da develop (revisão técnica).
+Tags existentes: `v0.1.0` (`e91d4f1`) e `v0.2.0` (`4518636`), ambas na develop.
 
 ## Estado do projeto
 

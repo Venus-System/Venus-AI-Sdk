@@ -32,6 +32,7 @@
 - [ ] Novos agentes seguem o padrão de `src/venus_sdk/nodes/` (fábrica que monta o nó) e são registrados em `src/venus_sdk/flows/venus_flow.py`
 - [ ] Se usei uma variável de ambiente nova, ela foi adicionada em `config/settings.py` (e em `validar_config`, se for obrigatória) e documentada
 - [ ] Dependências novas foram adicionadas em `pyproject.toml`, não instaladas soltas na venv
+- [ ] Esta PR muda a API pública do SDK? Se sim, o CHANGELOG foi atualizado em Mudanças incompatíveis.
 - [ ] Adicionei ou atualizei testes em `tests/` para a lógica nova
 
 ## Notas para o revisor
