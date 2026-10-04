@@ -30,6 +30,7 @@ from venus_sdk.prompts.ingrediente import ESP_INGREDIENTE_PROMPT_COMPLETO
 from venus_sdk.prompts.produto import ESP_PRODUTO_PROMPT_COMPLETO
 from venus_sdk.prompts.rotina import ROTINA_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
+from venus_sdk.tools.calculos import montar_tools_calculo_ingrediente, montar_tools_calculo_rotina
 from venus_sdk.tools.compartilhadas import montar_tools_compartilhadas
 from venus_sdk.tools.faq import montar_tools_faq
 from venus_sdk.tools.ingrediente import montar_tools_ingrediente
@@ -292,13 +293,21 @@ def montar_no_agente_produto(pool: Any) -> NoEspecialista:
     )
 
 
+# Tools de cálculo de cada agente (`tools/calculos.py`): só quem faz essas
+# contas recebe as tools, para não gastar tokens descrevendo tool inútil.
+TOOLS_DE_CALCULO_POR_AGENTE = {
+    "ingrediente": tuple(t.name for t in montar_tools_calculo_ingrediente()),
+    "rotina": tuple(t.name for t in montar_tools_calculo_rotina()),
+}
+
+
 def montar_no_agente_ingrediente(pool: Any) -> NoEspecialista:
     """Idem `montar_no_agente_produto`, para o agente de Ingrediente (ver
     `tools/ingrediente.py`)."""
     return _montar_no_especialista(
         "ingrediente",
         ESP_INGREDIENTE_PROMPT_COMPLETO,
-        lambda: montar_tools_ingrediente(pool) + montar_tools_compartilhadas(pool),
+        lambda: montar_tools_ingrediente(pool) + montar_tools_compartilhadas(pool) + montar_tools_calculo_ingrediente(),
     )
 
 
@@ -315,7 +324,8 @@ def montar_no_agente_rotina(pool: Any, tools_extras: list[Any] | None = None) ->
     agente = _montar_no_especialista(
         "rotina",
         ROTINA_PROMPT_COMPLETO,
-        lambda: montar_tools_rotina(pool) + montar_tools_compartilhadas(pool) + list(tools_extras or []),
+        lambda: (montar_tools_rotina(pool) + montar_tools_compartilhadas(pool) + montar_tools_calculo_rotina()
+                 + list(tools_extras or [])),
     )
 
     async def no_agente_rotina(estado: EstadoVenus) -> EstadoVenus:

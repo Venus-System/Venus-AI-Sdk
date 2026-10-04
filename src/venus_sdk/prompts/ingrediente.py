@@ -5,6 +5,7 @@ Saída   : JSON estruturado para o Orquestrador (e para o Agente Juiz).
 """
 
 from venus_sdk.prompts.comum import (
+    REGRA_CALCULOS,
     CONTEXTO_TEMPORAL,
     HIERARQUIA_INSTRUCOES,
     IDENTIFICADOR_USUARIO_NOTA,
@@ -117,4 +118,4 @@ ESP_INGREDIENTE_SHOTS_CUT = (
     "Considere apenas as mensagens abaixo como contexto verdadeiro."
 )
 
-ESP_INGREDIENTE_PROMPT_COMPLETO = ESP_INGREDIENTE_PROMPT
+ESP_INGREDIENTE_PROMPT_COMPLETO = ESP_INGREDIENTE_PROMPT + REGRA_CALCULOS

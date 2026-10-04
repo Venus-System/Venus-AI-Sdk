@@ -8,9 +8,11 @@ import re
 from typing import Literal
 
 from venus_sdk.llm.models import get_llm_juiz
+from venus_sdk.nodes._evidencias import dados_da_evidencia
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
+from venus_sdk.tools.calculos import TOOLS_COM_NUMERO_A_CITAR, formatar_numero
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,45 @@ def _resposta_honesta_sem_dado(estado: EstadoVenus) -> bool:
         return False
     texto = " ".join(str(especialista.get(campo) or "") for campo in ("resposta", "recomendacao", "esclarecer"))
     return bool(texto.strip()) and not _RE_AFIRMA_DADO.search(texto)
+
+
+_NUMERO_NO_TEXTO = re.compile(r"\d[\d.,]*\d|\d")
+_TOLERANCIA = 1e-6
+
+
+def _leituras(numero: str) -> set[float]:
+    """Os valores que um número escrito pode ter: "20,0" e "20.000" são
+    ambíguos entre os formatos brasileiro e americano, então vale qualquer
+    leitura (a checagem só reprova quando NENHUM número do texto bate)."""
+    leituras = set()
+    for decimal, milhar in ((",", "."), (".", ",")):
+        try:
+            leituras.add(float(numero.replace(milhar, "").replace(decimal, ".")))
+        except ValueError:
+            pass
+    return leituras
+
+
+def _numero_calculado_ausente(estado: EstadoVenus) -> str | None:
+    """Feedback de reprovação quando uma tool de cálculo rodou e a resposta
+    não traz o número que ela devolveu (ou seja, o LLM fez outra conta). A
+    checagem é determinística: não depende do LLM do Juiz achar o erro."""
+    especialista = estado.get("resposta_especialista")
+    if not isinstance(especialista, dict):
+        return None
+    texto = " ".join(str(especialista.get(campo) or "") for campo in ("resposta", "recomendacao"))
+    numeros_no_texto = set().union(*(_leituras(n) for n in _NUMERO_NO_TEXTO.findall(texto))) or set()
+    evidencias = estado.get("evidencias_tools") or []
+    for nome in {e.get("tool") for e in evidencias if isinstance(e, dict)} & TOOLS_COM_NUMERO_A_CITAR:
+        dados = dados_da_evidencia(evidencias, nome)
+        if not isinstance(dados, dict) or not isinstance(dados.get("resultado"), (int, float)):
+            continue
+        esperado = float(dados["resultado"])
+        if not any(abs(lido - esperado) <= _TOLERANCIA * max(1.0, abs(esperado)) for lido in numeros_no_texto):
+            citar = dados.get("valor_para_citar") or formatar_numero(esperado)
+            return (f"A resposta não usa o número calculado pela tool {nome}: {citar}. "
+                    "Use exatamente o valor devolvido pela tool; nunca calcule de cabeça.")
+    return None
 
 
 def _veredito(aprovado: bool, feedback: str | None, tentativas: int) -> EstadoVenus:
@@ -103,6 +144,10 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         return _veredito(True, None, proxima_tentativa)
     if _resposta_honesta_sem_dado(estado):
         return _veredito(True, None, proxima_tentativa)
+    feedback_do_calculo = _numero_calculado_ausente(estado)
+    if feedback_do_calculo:
+        logger.info("Juiz: número diferente do calculado pela tool; reprovado sem LLM")
+        return _veredito(False, feedback_do_calculo, proxima_tentativa)
 
     mensagens = [("system", com_data_atual(JUIZ_PROMPT_COMPLETO)), ("human", _montar_entrada_juiz(estado))]
     try:

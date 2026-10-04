@@ -18,8 +18,8 @@ guardrail entrada → carregar memória → roteador ─┬→ produto ───
 |---|---|
 | Roteador | — (LLM rápido + rede de segurança contra small talk mal roteado) |
 | Produto | `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`, `get_user_allergies` (Postgres) |
-| Ingrediente | `search_ingredient`, `get_ingredient_summary/properties/effects/regulations`, `get_user_allergies` (Postgres) |
-| Rotina | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `suggest_routine`, `get_user_allergies` (Postgres); `check_availability` (Google Calendar, opcional) |
+| Ingrediente | `search_ingredient`, `get_ingredient_summary/properties/effects/regulations`, `get_user_allergies` (Postgres); `converter_concentracao`, `comparar_concentracao_com_limite` (cálculo, `tools/calculos.py`) |
+| Rotina | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `suggest_routine`, `get_user_allergies` (Postgres); `calcular_tempo_de_uso`, `calcular_datas_de_aplicacao` (cálculo); `check_availability` (Google Calendar, opcional) |
 | FAQ (RAG) | `faq_retriever` (FAQ no Qdrant ou índice local), `buscar_na_web` (Tavily/DuckDuckGo), tools MCP e A2A opcionais |
 | Juiz | — confere resposta × retorno bruto das tools (`evidencias_tools`) |
 | Orquestrador / Memória | — |
