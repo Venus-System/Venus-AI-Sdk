@@ -108,6 +108,27 @@ def test_renovar_access_token_propaga_erro_quando_token_foi_revogado() -> None:
         ))
 
 
+
+def _corpo_da_troca(**kwargs) -> dict:
+    capturado: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        capturado.update(x.split("=") for x in request.content.decode().split("&"))
+        return httpx.Response(200, json={"access_token": "a", "refresh_token": "r", "scope": "s"})
+
+    _rodar(trocar_codigo_por_token("codigo-abc", "com.venus.app:/oauth2redirect", client_id="cid",
+                                   client_secret="csecret", httpx_client=_cliente_mock(handler), **kwargs))
+    return capturado
+
+
+def test_trocar_codigo_com_pkce_envia_o_code_verifier() -> None:
+    # OAuth com PKCE no app: o servidor precisa do code_verifier para trocar o code.
+    assert _corpo_da_troca(code_verifier="verificador-123")["code_verifier"] == "verificador-123"
+
+
+def test_trocar_codigo_sem_pkce_nao_envia_code_verifier() -> None:
+    assert "code_verifier" not in _corpo_da_troca()
+
 def test_trocar_codigo_por_token_sem_credenciais_levanta_erro_claro(monkeypatch) -> None:
     monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
     monkeypatch.delenv("GOOGLE_CLIENT_SECRET", raising=False)

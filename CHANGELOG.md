@@ -69,6 +69,8 @@ Revisão técnica 3. Tudo desde `v0.2.0` (`4518636`).
 - `venus_sdk.checkup.sincronizar` com ponto de entrada de linha de comando,
   e as regras do check-up empacotadas no wheel.
 - `estatisticas_guardrail_llm()` e `llm.models.get_llm_guardrail()`.
+- `trocar_codigo_por_token(..., code_verifier=...)`: troca do `code` de um OAuth
+  feito com PKCE no app (parâmetro opcional; sem ele, nada muda).
 - `vector_build.modelo_em_cache()`, `pasta_do_cache()` e
   `ModeloIndisponivel`.
 - `tools/calculos.py`:
