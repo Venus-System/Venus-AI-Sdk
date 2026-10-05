@@ -43,3 +43,13 @@ def test_faq_vai_no_wheel_e_funciona_instalado_sem_editavel(tmp_path):
     assert Path(resultado["faq_dir"]).is_relative_to(destino)
     esperados = sorted(p.name for p in (RAIZ / "src" / "venus_sdk" / "data" / "faq").glob("*.md"))
     assert esperados and resultado["md"] == esperados
+
+
+def test_regras_do_checkup_vao_no_wheel(tmp_path):
+    import zipfile
+
+    subprocess.run([sys.executable, "-m", "pip", "wheel", str(RAIZ), "--no-deps", "--no-build-isolation",
+                    "-q", "-w", str(tmp_path)], check=True, capture_output=True)
+    [wheel] = tmp_path.glob("venus_ai_sdk-*.whl")
+    nomes = set(zipfile.ZipFile(wheel).namelist())
+    assert {"venus_sdk/data/checkup/regras.csv", "venus_sdk/data/checkup/tipos_de_ativo.csv"} <= nomes

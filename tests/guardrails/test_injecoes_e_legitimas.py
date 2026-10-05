@@ -16,9 +16,15 @@ FIXTURES = Path(__file__).parent / "fixtures"
 META_INJECOES_BLOQUEADAS = 0.9
 
 
+MARCA_CAMADA2 = "# camada2"
+
+
 def _frases(arquivo: str) -> list[str]:
+    """Frases do arquivo, sem comentários e sem as marcadas `# camada2` (que só
+    o classificador LLM pega — medidas em tests/manual/avaliar_guardrail.py)."""
     linhas = (FIXTURES / arquivo).read_text(encoding="utf-8").splitlines()
-    return [linha.strip() for linha in linhas if linha.strip() and not linha.lstrip().startswith("#")]
+    return [linha.strip() for linha in linhas
+            if linha.strip() and not linha.lstrip().startswith("#") and not linha.rstrip().endswith(MARCA_CAMADA2)]
 
 
 INJECOES = _frases("injecoes.txt")

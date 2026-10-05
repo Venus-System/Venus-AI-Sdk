@@ -4,6 +4,8 @@ O Venus atribui a cada produto uma nota geral (overall score) de 0 a 100. A nota
 
 A nota geral é objetiva: é a mesma para qualquer pessoa. Já o score personalizado leva em conta o seu perfil (tipo de pele ou cabelo, queixas e alergias) e indica a compatibilidade em porcentagem, o nível de risco e o nível de recomendação.
 
+## O que acontece com a nota quando a fórmula de um produto muda?
+
 Quando a fórmula de um produto muda, o Venus cria uma nova versão do produto e passa a usar sempre a versão atual para calcular as notas.
 
 Produtos ainda sem fórmula cadastrada não recebem nota. Nesse caso o Venus informa que não há dados, em vez de estimar.

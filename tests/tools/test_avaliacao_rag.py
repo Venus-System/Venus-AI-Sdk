@@ -50,3 +50,34 @@ def test_metricas_com_hash(avaliar_rag):
 def test_hash_so_existe_no_indice_local(avaliar_rag):
     with pytest.raises(SystemExit):
         avaliar_rag.main(["--indice", "qdrant", "--embeddings", "hash"])
+
+
+# --- Revisão técnica 3, item 6: avaliação reproduzível no CI ------------------
+
+
+def test_falha_quando_o_hit3_fica_abaixo_do_minimo(avaliar_rag, capsys):
+    assert avaliar_rag.main(["--embeddings", "hash", "--minimo-hit3", "0.99"]) == 1
+    assert "abaixo do mínimo" in capsys.readouterr().out
+
+
+def test_passa_quando_o_hit3_atinge_o_minimo(avaliar_rag):
+    assert avaliar_rag.main(["--embeddings", "hash", "--minimo-hit3", "0.5"]) == 0
+
+
+def test_grava_a_tabela_em_markdown(avaliar_rag, tmp_path):
+    arquivo = tmp_path / "tabela.md"
+    avaliar_rag.main(["--embeddings", "hash", "--saida-markdown", str(arquivo)])
+    texto = arquivo.read_text(encoding="utf-8")
+    assert "| Corte | hit@3 | MRR |" in texto and "local + hash" in texto
+    # O corte de produção aparece marcado.
+    assert "**0.10**" in texto
+
+
+def test_workflow_de_avaliacao_do_rag():
+    workflow = (RAIZ / ".github/workflows/avaliar-rag.yaml").read_text(encoding="utf-8")
+    assert "workflow_dispatch" in workflow
+    for caminho in ("src/venus_sdk/data/faq/**", "src/venus_sdk/rag/**", "tests/fixtures/avaliacao_rag.jsonl"):
+        assert caminho in workflow
+    assert "actions/cache" in workflow and "FASTEMBED_CACHE_PATH" in workflow
+    assert "--minimo-hit3 0.8" in workflow and "GITHUB_STEP_SUMMARY" in workflow
+    assert "--embeddings hash" in workflow and "upload-artifact" in workflow

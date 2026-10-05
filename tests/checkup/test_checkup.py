@@ -117,7 +117,9 @@ def test_usa_o_usuario_da_conversa_e_valida_o_periodo():
 
 # --- CSVs de regras ---
 
-_PASTA = Path(__file__).resolve().parents[2] / "data" / "checkup"
+from venus_sdk.checkup import sincronizar as sincronizar_modulo  # noqa: E402
+
+_PASTA = sincronizar_modulo.PASTA_REGRAS_PADRAO
 
 
 def test_csvs_do_repositorio_sao_validos():

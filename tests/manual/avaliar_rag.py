@@ -98,26 +98,54 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--faq-dir", type=Path, default=Path(FAQ_DIR))
     parser.add_argument("--detalhes", type=float, nargs="?", const=-1.0, default=None, metavar="CORTE",
                         help="lista o top 3 de cada pergunta (sem valor: o corte de produção)")
+    parser.add_argument("--minimo-hit3", type=float, default=None, metavar="X",
+                        help="sai com código 1 se o hit@3 no corte de produção ficar abaixo de X (barra regressão no CI)")
+    parser.add_argument("--saida-markdown", type=Path, default=None, metavar="ARQUIVO",
+                        help="também grava a tabela em markdown (resumo do job no CI)")
     args = parser.parse_args(argv)
     if args.indice == "qdrant" and args.embeddings == "hash":
         parser.error("o Qdrant sempre usa FastEmbed; --embeddings hash só com --indice local")
 
     perguntas = carregar_perguntas()
     indice = criar_indice(args.indice, args.embeddings, args.faq_dir)
+    producao = _corte_de_producao(args.embeddings)
     print(f"índice: {args.indice} | embeddings: {args.embeddings} | FAQ: {args.faq_dir}")
     print(f"{sum(1 for p in perguntas if p['fontes'])} perguntas com resposta, "
           f"{sum(1 for p in perguntas if not p['fontes'])} sem resposta")
     print(f"{'corte':>6} {'hit@3':>7} {'MRR':>6} {'não sei certo':>14}")
+    linhas = []
     for corte in CORTES[args.embeddings]:
         m = avaliar(indice, perguntas, corte)
+        linhas.append((corte, m))
         print(f"{corte:>6.2f} {m['hit@3']:>7.0%} {m['mrr']:>6.2f} {m['nao_sei_correto']:>14.0%}")
+    if args.saida_markdown:
+        args.saida_markdown.write_text(_tabela_markdown(f"{args.indice} + {args.embeddings}", linhas, producao),
+                                       encoding="utf-8")
     if args.detalhes is not None:
-        from venus_sdk.rag.faq import _SCORE_MINIMO
-        from venus_sdk.rag.indice import SCORE_MINIMO_HASH
-
-        producao = SCORE_MINIMO_HASH if args.embeddings == "hash" else _SCORE_MINIMO
         _imprimir_detalhes(indice, perguntas, producao if args.detalhes < 0 else args.detalhes)
+    if args.minimo_hit3 is not None:
+        hit3 = avaliar(indice, perguntas, producao)["hit@3"]
+        if hit3 < args.minimo_hit3:
+            print(f"\nhit@3 {hit3:.0%} no corte de produção ({producao}) abaixo do mínimo de {args.minimo_hit3:.0%}.")
+            return 1
+        print(f"\nhit@3 {hit3:.0%} no corte de produção ({producao}): dentro do mínimo de {args.minimo_hit3:.0%}.")
     return 0
+
+
+def _corte_de_producao(embeddings: str) -> float:
+    from venus_sdk.rag.faq import _SCORE_MINIMO
+    from venus_sdk.rag.indice import SCORE_MINIMO_HASH
+
+    return SCORE_MINIMO_HASH if embeddings == "hash" else _SCORE_MINIMO
+
+
+def _tabela_markdown(configuracao: str, linhas: list[tuple[float, dict[str, float]]], producao: float) -> str:
+    saida = [f"### RAG do FAQ: {configuracao}", "", "| Corte | hit@3 | MRR | \"não sei\" correto |", "|---|---|---|---|"]
+    for corte, m in linhas:
+        rotulo = f"**{corte:.2f}**" if abs(corte - producao) < 1e-9 else f"{corte:.2f}"
+        saida.append(f"| {rotulo} | {m['hit@3']:.0%} | {m['mrr']:.2f} | {m['nao_sei_correto']:.0%} |")
+    saida += ["", f"Em negrito, o corte de produção ({producao})."]
+    return "\n".join(saida) + "\n"
 
 
 if __name__ == "__main__":

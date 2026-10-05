@@ -90,8 +90,19 @@ afirma nada que não veio das tools. Sem emojis, sem gírias.
 CONTEXTO_TEMPORAL = f"""
 ### CONTEXTO TEMPORAL
 Data e hora atual (fornecida pelo sistema): {MARCADOR_DATA_HORA}
-Use esta referência para interpretar "hoje", "essa semana", montar rotinas de
-manhã/noite e calcular há quanto tempo o usuário usa um produto.
+Use esta referência para interpretar "hoje", "essa semana" e montar rotinas de
+manhã/noite. Para contar dias ou semanas (ex.: há quanto tempo o usuário usa
+um produto), use a tool de cálculo quando o agente tiver uma.
+"""
+
+# Agentes com tools de cálculo (`tools/calculos.py`): a conta sai do LLM.
+REGRA_CALCULOS = """
+### CÁLCULOS
+Para qualquer comparação numérica, conversão de unidade ou cálculo de data, use
+a tool de cálculo correspondente; nunca calcule de cabeça. Cite o número
+exatamente como a tool devolveu em `valor_para_citar` — o Agente Juiz reprova a
+resposta se o número for outro. Se a tool devolver `erro`, corrija a entrada ou
+diga que não foi possível calcular.
 """
 
 # ==============================================================================

@@ -8,4 +8,12 @@ A memória de longo prazo guarda preferências e fatos que você compartilhou (p
 
 O Venus não compartilha seus dados com anunciantes e não vende informações de usuários.
 
+## O Venus vende meus dados?
+
+Não. O Venus não vende informações de usuários e não compartilha seus dados com anunciantes. Ele guarda apenas o necessário para personalizar as recomendações: perfil de pele e cabelo, alergias declaradas, favoritos e listas de produtos.
+
+## O que acontece se eu digitar meu CPF no chat?
+
+Dados pessoais sensíveis digitados no chat, como CPF, telefone e e-mail, são anonimizados antes de serem processados pelos agentes.
+
 O Venus é um assistente informativo e não substitui a avaliação de um dermatologista ou profissional de saúde.

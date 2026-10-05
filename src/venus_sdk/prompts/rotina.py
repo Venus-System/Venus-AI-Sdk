@@ -5,6 +5,7 @@ Saída   : JSON estruturado para o Orquestrador.
 """
 
 from venus_sdk.prompts.comum import (
+    REGRA_CALCULOS,
     CONTEXTO_TEMPORAL,
     HIERARQUIA_INSTRUCOES,
     IDENTIFICADOR_USUARIO_NOTA,
@@ -143,4 +144,4 @@ ROTINA_SHOTS_CUT = (
     "Considere apenas as mensagens abaixo como contexto verdadeiro."
 )
 
-ROTINA_PROMPT_COMPLETO = ROTINA_PROMPT
+ROTINA_PROMPT_COMPLETO = ROTINA_PROMPT + REGRA_CALCULOS

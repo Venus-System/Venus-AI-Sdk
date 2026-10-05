@@ -18,8 +18,8 @@ guardrail entrada → carregar memória → roteador ─┬→ produto ───
 |---|---|
 | Roteador | — (LLM rápido + rede de segurança contra small talk mal roteado) |
 | Produto | `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`, `get_user_allergies` (Postgres) |
-| Ingrediente | `search_ingredient`, `get_ingredient_summary/properties/effects/regulations`, `get_user_allergies` (Postgres) |
-| Rotina | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `suggest_routine`, `get_user_allergies` (Postgres); `check_availability` (Google Calendar, opcional) |
+| Ingrediente | `search_ingredient`, `get_ingredient_summary/properties/effects/regulations`, `get_user_allergies` (Postgres); `converter_concentracao`, `comparar_concentracao_com_limite` (cálculo, `tools/calculos.py`) |
+| Rotina | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `suggest_routine`, `get_user_allergies` (Postgres); `calcular_tempo_de_uso`, `calcular_datas_de_aplicacao` (cálculo); `check_availability` (Google Calendar, opcional) |
 | FAQ (RAG) | `faq_retriever` (FAQ no Qdrant ou índice local), `buscar_na_web` (Tavily/DuckDuckGo), tools MCP e A2A opcionais |
 | Juiz | — confere resposta × retorno bruto das tools (`evidencias_tools`) |
 | Orquestrador / Memória | — |
@@ -30,7 +30,7 @@ guardrail entrada → carregar memória → roteador ─┬→ produto ───
 - **Identidade**: dentro do grafo, as tools de dados da conta usam sempre o `usuario_id_postgres` da conversa, nunca o `user_id` que o LLM informar (`tools/_identidade.py`). No A2A, a identidade só é aceita com `montar_app_a2a(identificar_usuario=...)`; `identidade_do_metadata` confia no metadata e só deve ficar atrás de autenticação.
 - **A2A**: `a2a_server.py` (Venus como agente A2A, skills produto/ingrediente/rotina/faq; identidade via `metadata`) e `a2a_client.py` (Venus consulta agente externo).
 - **Google Calendar** (opcional, extra `google_calendar`): o agente de rotina consulta se o usuário tem compromisso num horário (`check_availability`) e agenda a rotina na agenda dele em duas etapas: prepara uma proposta (`prepare_routine_schedule`/`prepare_routine_removal`, que não gravam) e só grava depois que o usuário responde "sim" — quem grava é o código (`nodes/agendamento.py`), nunca o LLM. A recorrência é escolhida pelo usuário; um novo agendamento do mesmo período atualiza o evento existente. O consentimento precisa dos escopos `calendar.freebusy` e `calendar.events` (`ESCOPOS_VENUS`), e o grafo precisa de `checkpointer` (a proposta espera o "sim" no estado da conversa). O login no Google é feito pelo backend do app; o SDK só guarda o `refresh_token` cifrado em `venus.google_oauth_tokens` e o usa (`integrations/google_calendar.py`). Para testar localmente: `python scripts/conectar_google_calendar.py --user-id 1` e `VENUS_USE_GOOGLE_CALENDAR=1`.
-- **Check-up da rotina** (opcional, extra `neo4j`): depois de montar a rotina, a Venus aponta conflitos entre ativos do mesmo período, ativos que exigem algo que falta (ex.: retinoide sem protetor de manhã), ordem a ajustar e produtos repetidos (`check_routine_health`). As consultas rodam num Neo4j que é cópia, só de leitura, do Postgres + regras de `data/checkup/` (`python scripts/sincronizar_neo4j.py`). Sem Neo4j, a rotina sai normal, sem os avisos. Ver [`docs/neo4j.md`](docs/neo4j.md).
+- **Check-up da rotina** (opcional, extra `neo4j`): depois de montar a rotina, a Venus aponta conflitos entre ativos do mesmo período, ativos que exigem algo que falta (ex.: retinoide sem protetor de manhã), ordem a ajustar e produtos repetidos (`check_routine_health`). As consultas rodam num Neo4j que é cópia, só de leitura, do Postgres + regras de `src/venus_sdk/data/checkup/` (`python -m venus_sdk.checkup.sincronizar`, também a partir do SDK instalado). Sem Neo4j, a rotina sai normal, sem os avisos. Ver [`docs/neo4j.md`](docs/neo4j.md).
 - Detalhes em [`docs/architecture.md`](docs/architecture.md).
 - Visão do sistema inteiro (app, API, bancos, LLMs, integrações), em Mermaid: [`docs/arquitetura-sistema.md` no repositório da API](https://github.com/Venus-System/Venus-AI-api/blob/develop/docs/arquitetura-sistema.md).
 
@@ -53,7 +53,10 @@ python examples/conversar_com_venus.py      # conversa no terminal (VENUS_USER_I
 
 | Variável | Padrão | O que faz |
 |---|---|---|
-| `VENUS_GUARDRAIL_LLM` | ligado | Segunda camada do guardrail de entrada: um LLM rápido classifica como SEGURO/INJECAO o que a regex deixou passar. **Custo: uma chamada extra de LLM rápido por mensagem.** `0` desliga; se o LLM falhar, a mensagem passa (fail-open). A suíte de testes roda com `0`. |
+| `VENUS_GUARDRAIL_LLM` | ligado | Segunda camada do guardrail de entrada: um LLM rápido classifica como SEGURO/INJECAO o que a regex deixou passar. **Custo: uma chamada extra de LLM rápido por mensagem.** `0` desliga. Tenta o provedor principal e um de outro provedor (`get_llm_guardrail`); se os dois falharem, a mensagem passa (fail-open), com log `warning` (`evento=guardrail_llm_fail_open`) e contagem em `estatisticas_guardrail_llm()`. A suíte de testes roda com `0`. |
+| `VENUS_GUARDRAIL_LLM_FALHAS_PARA_ABRIR`, `VENUS_GUARDRAIL_LLM_PAUSA_SEGUNDOS` | 5 e 60 | Disjuntor do classificador: depois de N falhas seguidas, para de chamar o LLM por S segundos (as mensagens passam sem a camada 2, sem esperar timeout). Log `error` ao abrir e `info` ao fechar. |
+| `VENUS_FASTEMBED_DOWNLOAD` | `1` | `0` proíbe baixar o modelo do FastEmbed: usa só o cache (`FASTEMBED_CACHE_PATH`) e, sem ele, o índice local cai no `EmbeddingsHash` na hora. `HF_HUB_OFFLINE=1` tem o mesmo efeito. |
+| `VENUS_FASTEMBED_TIMEOUT_SEGUNDOS` | `15` | Tempo máximo do download do modelo quando ele não está em cache (a biblioteca sozinha tenta 3 vezes, com esperas de 3, 9 e 27 s). Estourou: `EmbeddingsHash`, com aviso no log. |
 | `VENUS_EMBEDDINGS_LOCAIS` | FastEmbed | `hash` força o `EmbeddingsHash` (busca por palavras, não semântica) no índice local do FAQ; usado na suíte para não baixar o modelo. |
 
 ### Testes
@@ -90,6 +93,11 @@ Para lançar uma versão nova:
    [`CHANGELOG.md`](CHANGELOG.md). Código diferente nunca fica com o mesmo
    número: `tests/pacote/test_versao.py` confere `venus_sdk.__version__`
    contra o `pyproject.toml`.
+   **Regra:** toda PR que mude assinatura pública, variável de ambiente ou
+   comportamento padrão precisa de uma entrada em **Mudanças incompatíveis**
+   no CHANGELOG, com o antes e o depois do código que o consumidor precisa
+   alterar (o template de PR tem a caixa para isso). Versão sem mudança
+   incompatível diz "Nenhuma mudança incompatível".
 2. Depois do merge na `develop`, com o CI verde, crie e envie a tag no commit
    do merge:
    ```bash
@@ -99,7 +107,7 @@ Para lançar uma versão nova:
 3. No repositório da API, troque o `@v...` em `venus_api/requirements.txt` pela
    tag nova, rode a suíte da API e abra a PR (só depois da tag existir).
 
-Tags existentes: `v0.1.0` — commit `e91d4f1` da develop (revisão técnica).
+Tags existentes: `v0.1.0` (`e91d4f1`) e `v0.2.0` (`4518636`), ambas na develop.
 
 ## Estado do projeto
 

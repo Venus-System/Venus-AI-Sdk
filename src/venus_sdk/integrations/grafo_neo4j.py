@@ -1,7 +1,7 @@
 """Conexão com o Neo4j do check-up da rotina (extra `neo4j`).
 
 O Neo4j é uma CÓPIA, só de leitura para a Venus, do catálogo e dos favoritos
-do Postgres, mais as regras de `data/checkup/` (ver `checkup/sincronizar.py`).
+do Postgres, mais as regras de `venus_sdk/data/checkup/` (ver `checkup/sincronizar.py`).
 O driver é criado sob demanda, uma vez por processo; nada aqui roda no import.
 
 As consultas recebem um `ExecutarCypher` (função `consulta, parametros ->

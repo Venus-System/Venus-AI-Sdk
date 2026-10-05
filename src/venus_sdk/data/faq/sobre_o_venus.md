@@ -1,6 +1,14 @@
 # Vênus — Análise e Recomendação de Cosméticos
 
-## O que é o app e o que ele faz
+<!--
+TODO(produto): escrever a seção "## Quem criou o Venus?". Hoje nenhuma fonte
+confiável do projeto (README, pyproject, página "sobre") diz quem criou o
+aplicativo, então a pergunta fica sem resposta no FAQ e na avaliação do RAG
+(tests/fixtures/avaliacao_rag.jsonl) em vez de a IA inventar. Este comentário
+não é indexado (ver rag/carregador.py::remover_comentarios_html).
+-->
+
+## O que é o Venus (Vênus) e o que ele faz?
 
 O **Vênus** é um aplicativo de análise e recomendação de produtos de cosméticos e cuidados pessoais. O funcionamento combina três elementos principais:
 
@@ -72,7 +80,7 @@ O motor de match clínico pode alterar os pesos de acordo com o perfil. Portanto
 
 ---
 
-## Significado dos selos
+## O que significam os selos (cruelty-free, vegano, marca brasileira)?
 
 Os selos funcionam como informações adicionais sobre o produto, mas é importante não misturar isso com o score.
 

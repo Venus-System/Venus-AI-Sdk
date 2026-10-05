@@ -22,7 +22,9 @@ pytestmark = [
     pytest.mark.skipif(not os.getenv("NEO4J_URI"), reason="NEO4J_URI não definida"),
 ]
 
-_PASTA = Path(__file__).resolve().parents[2] / "data" / "checkup"
+from venus_sdk.checkup import sincronizar as sincronizar_modulo  # noqa: E402
+
+_PASTA = sincronizar_modulo.PASTA_REGRAS_PADRAO
 # id, nome, categoria, ingredientes (INCI)
 _CATALOGO = [
     (1, "Gel de Limpeza", "Gel de Limpeza", ["AQUA"]),

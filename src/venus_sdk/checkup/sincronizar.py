@@ -1,4 +1,4 @@
-"""Cópia do Postgres + regras de `data/checkup/` para o grafo do Neo4j.
+"""Cópia do Postgres + regras de `venus_sdk/data/checkup/` para o grafo do Neo4j.
 
 O Postgres continua sendo a fonte da verdade (só é LIDO aqui) e o Neo4j é
 uma cópia refeita a cada execução: tudo o que esta rodada grava leva a marca
@@ -6,23 +6,33 @@ uma cópia refeita a cada execução: tudo o que esta rodada grava leva a marca
 removido, regra apagada do CSV) é apagado. Quem consulta durante a cópia vê
 os dados anteriores, nunca um grafo vazio.
 
-Rodar: `python scripts/sincronizar_neo4j.py` (toda noite e quando os CSVs
-mudarem)."""
+Rodar depois de mudar o catálogo, os favoritos ou as regras:
+
+    python -m venus_sdk.checkup.sincronizar              # regras empacotadas no SDK
+    python -m venus_sdk.checkup.sincronizar --pasta X    # outra pasta de regras
+
+Precisa de DATABASE_URL e NEO4J_URI/NEO4J_USER/NEO4J_PASSWORD. Só lê o
+Postgres; o Neo4j é refeito."""
 
 from __future__ import annotations
 
+import argparse
+import asyncio
 import csv
 import logging
+import sys
 import uuid
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from venus_sdk.config.settings import BASE_DIR
 from venus_sdk.integrations.grafo_neo4j import ExecutarCypher
 
 logger = logging.getLogger(__name__)
 
-PASTA_REGRAS_PADRAO = BASE_DIR / "data" / "checkup"
+# Empacotadas com o SDK (`package-data` no pyproject): a sincronização roda
+# igual no checkout e a partir do SDK instalado (ex.: workflow da API).
+PASTA_REGRAS_PADRAO = Path(str(resources.files("venus_sdk").joinpath("data", "checkup")))
 TIPO_FILTRO_UV = "Filtro UV"
 _TAMANHO_DO_LOTE = 1000
 # Tipo de regra no CSV -> tipo de relação no grafo.
@@ -199,3 +209,59 @@ async def sincronizar(pool: Any, executar: ExecutarCypher, pasta: Path = PASTA_R
     }
     logger.info("Neo4j sincronizado: %s", contagem)
     return contagem
+
+
+# --- linha de comando ---------------------------------------------------------
+# As funções abaixo existem separadas para os testes trocarem o Postgres e o
+# Neo4j de verdade por falsos.
+
+
+def _configuracao_ok() -> bool:
+    from venus_sdk.config.settings import DATABASE_URL
+    from venus_sdk.integrations.grafo_neo4j import neo4j_configurado
+
+    return bool(DATABASE_URL) and neo4j_configurado()
+
+
+def _url_do_postgres() -> str:
+    from venus_sdk.config.settings import DATABASE_URL
+
+    return DATABASE_URL or ""
+
+
+async def _criar_pool(url: str) -> Any:
+    import asyncpg
+
+    return await asyncpg.create_pool(url, min_size=1, max_size=1)
+
+
+def _criar_driver() -> Any:
+    from venus_sdk.integrations.grafo_neo4j import get_neo4j_driver
+
+    return get_neo4j_driver()
+
+
+async def main(pasta: Path) -> int:
+    """Sincroniza e imprime o resumo. Código de saída 1 sem configuração."""
+    if not _configuracao_ok():
+        print("Defina DATABASE_URL e NEO4J_URI (+ NEO4J_USER/NEO4J_PASSWORD) no ambiente ou no .env.")
+        return 1
+    from venus_sdk.integrations.grafo_neo4j import executor_neo4j
+
+    pool = await _criar_pool(_url_do_postgres())
+    driver = _criar_driver()
+    try:
+        contagem = await sincronizar(pool, executor_neo4j(driver), pasta)
+    finally:
+        await pool.close()
+        await driver.close()
+    for nome, quantidade in contagem.items():
+        print(f"{nome}: {quantidade}")
+    return 0
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="[neo4j] %(message)s")
+    parser = argparse.ArgumentParser(description="Copia o catálogo, os favoritos e as regras do check-up para o Neo4j.")
+    parser.add_argument("--pasta", type=Path, default=PASTA_REGRAS_PADRAO, help="pasta com tipos_de_ativo.csv e regras.csv")
+    sys.exit(asyncio.run(main(parser.parse_args().pasta)))

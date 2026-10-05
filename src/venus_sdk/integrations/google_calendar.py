@@ -86,16 +86,21 @@ def _credenciais(client_id: str | None, client_secret: str | None) -> tuple[str,
 async def trocar_codigo_por_token(
     code: str, redirect_uri: str, *, client_id: str | None = None,
     client_secret: str | None = None, httpx_client: Any | None = None,
+    code_verifier: str | None = None,
 ) -> dict:
     """Troca o `code` recebido no callback OAuth por `access_token`/
     `refresh_token`/`scope`. Chamado pelo backend do mobile/web logo depois
-    do redirect do Google. Levanta em falha de rede/protocolo (ver docstring
-    do módulo) — o chamador decide como tratar."""
+    do redirect do Google. `code_verifier` é o do PKCE, quando o app fez o
+    OAuth com PKCE (o Google exige o mesmo verificador na troca). Levanta em
+    falha de rede/protocolo (ver docstring do módulo) — o chamador decide
+    como tratar."""
     cid, secret = _credenciais(client_id, client_secret)
     dados = {
         "code": code, "client_id": cid, "client_secret": secret,
         "redirect_uri": redirect_uri, "grant_type": "authorization_code",
     }
+    if code_verifier:
+        dados["code_verifier"] = code_verifier
     return await _post_token(dados, httpx_client)
 
 

@@ -21,7 +21,7 @@ class _LLMFalso:
 @pytest.fixture
 def llm(monkeypatch):
     falso = _LLMFalso("INJECAO")
-    monkeypatch.setattr(guardrails, "get_llm_rapido", lambda: falso)
+    monkeypatch.setattr(guardrails, "get_llm_guardrail", lambda: falso)
     return falso
 
 
