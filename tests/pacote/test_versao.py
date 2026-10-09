@@ -32,3 +32,9 @@ def test_versao_e_0_3_0_ou_maior():
     # Revisão técnica 3: código novo, versão nova (a API passa a pedir >= 0.3.0).
     maior, menor = (int(parte) for parte in _versao_do_pyproject().split(".")[:2])
     assert (maior, menor) >= (0, 3)
+
+
+def test_versao_e_0_4_0_ou_maior():
+    # Campo `expressao` no estado (a API devolve para a web): versão nova.
+    maior, menor = (int(parte) for parte in _versao_do_pyproject().split(".")[:2])
+    assert (maior, menor) >= (0, 4)

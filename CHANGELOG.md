@@ -9,6 +9,43 @@ release" no README); cada tag tem a sua seção aqui, dividida em:
 - **Novidades:** o que passou a existir, sem quebrar quem já usava.
 - **Correções:** bugs corrigidos.
 
+## 0.4.0
+
+Expressão da Venus para a web. Tudo desde `v0.3.0`.
+
+### Mudanças incompatíveis
+- Nenhuma mudança incompatível. O campo novo no estado é opcional para quem
+  lê, e a `resposta_final` continua sem nenhuma marca.
+
+### Novidades
+- **Campo `expressao` no estado** (`EstadoVenus`), do tipo `Expressao`
+  (`venus_sdk.state`): `"neutra"` ou `"magoada"`. É a cara da Venus que
+  acompanha a resposta, para a web mostrar a Veninha "chorando" quando alguém
+  a ofende. Quem escolhe o valor é o código, numa lista fechada:
+  - na reação a ofensa, o roteador começa a resposta com a linha
+    `REACAO=magoada` (protocolo novo em `prompts/router.py`). O nó tira a
+    linha do texto, com qualquer valor, e só `magoada` numa resposta direta
+    mantida como veio vira `"magoada"`;
+  - todo o resto é `"neutra"`: rota de especialista, confirmação de
+    agendamento, valor desconhecido na marca, texto trocado pelas redes de
+    segurança do roteador ou pelo guardrail de saída;
+  - o guardrail de entrada zera o campo a cada turno, então uma `magoada`
+    não volta pelo checkpointer no turno seguinte.
+
+  **Como usar:** `estado.get("expressao", "neutra")` depois do `ainvoke`.
+
+### Correções
+- **Reclamação tratada como ofensa.** Com o LLM real, "essa resposta foi
+  péssima" e "não gostei da sua resposta" recebiam a reação a xingamento
+  ("Desculpa se fiz algo que te incomodou.."). O prompt do roteador agora diz
+  que apontar erro ou reclamar da resposta não é ofensa, e ganhou um exemplo
+  de reclamação (`ROUTER_SHOT_7C`). Conferido com o LLM real em 18 mensagens:
+  ofensas viram `magoada`; reclamação, saudação e elogio ficam `neutra`.
+- **`[nome]` na resposta direta do roteador.** O LLM às vezes deixava o
+  marcador no lugar do nome ("desculpa mesmo, [nome]!!"), e a resposta direta
+  não passa pelo orquestrador, que já barrava isso. Agora o marcador sai do
+  texto, com a vírgula de antes; link markdown (`[FAQ](https://...)`) fica.
+
 ## 0.3.0
 
 Revisão técnica 3. Tudo desde `v0.2.0` (`4518636`).

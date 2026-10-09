@@ -23,6 +23,17 @@ _PERGUNTA_RE = re.compile(r"PERGUNTA_ORIGINAL=(.*)", re.IGNORECASE | re.DOTALL)
 
 _ROTAS_VALIDAS: frozenset[str] = frozenset({"produto", "ingrediente", "rotina", "faq"})
 
+# Na reação a ofensa (ver `prompts/router.py`), o roteador começa a resposta
+# com a linha `REACAO=magoada`. A linha sai sempre do texto, com qualquer
+# valor, e quem escolhe a expressão é o código: só `magoada` numa resposta
+# direta mantida como veio vira `magoada`; o resto é `neutra`.
+_REACAO_RE = re.compile(r"^[ \t]*REACAO[ \t]*=[ \t]*(\w*)[ \t]*(?:\n|$)", re.IGNORECASE | re.MULTILINE)
+
+# Marcador que o LLM deixa no lugar do nome ("desculpa mesmo, [nome]!!"): sai
+# junto com a vírgula de antes. A resposta direta não passa pelo orquestrador,
+# que barra o mesmo caso. `[FAQ](https://...)` é link e fica.
+_MARCADOR_RE = re.compile(r",?[ \t]*\[[^\]\n]{2,40}\](?!\()")
+
 DecisaoRoteador = Literal["produto", "ingrediente", "rotina", "faq", "direto"]
 
 # Fallback para quando o roteador não emite ROUTE= (small talk/fora de
@@ -190,6 +201,14 @@ def _mensagens_para_o_roteador(estado: EstadoVenus) -> list:
     return [("system", com_data_atual(ROUTER_PROMPT_COMPLETO)), *historico, ("human", mensagem)]
 
 
+def _extrair_reacao(texto: str) -> tuple[str | None, str]:
+    """`(valor da marca REACAO= em minúsculas ou None, texto sem a linha)`."""
+    match = _REACAO_RE.search(texto)
+    if not match:
+        return None, texto
+    return match.group(1).lower(), _REACAO_RE.sub("", texto).strip()
+
+
 def _rota_do_texto(texto: str) -> str | None:
     match_rota = _ROUTE_RE.search(texto)
     return match_rota.group(1).strip().lower() if match_rota else None
@@ -251,7 +270,7 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     pendente = estado.get("agendamento_pendente")
     if pendente and (eh_confirmacao(mensagem_usuario) or eh_negacao(mensagem_usuario)):
         # Resposta a uma proposta de agendamento: quem decide é o código.
-        return {"rota": "rotina", "pergunta_original": mensagem_usuario}
+        return {"rota": "rotina", "pergunta_original": mensagem_usuario, "expressao": "neutra"}
     mensagens = _mensagens_para_o_roteador(estado)
 
     texto = _invocar_roteador(mensagens)
@@ -261,19 +280,28 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
         # se ele vier com uma rota válida isso não vira texto cru pro usuário.
         texto = _invocar_roteador(mensagens)
 
+    reacao, texto = _extrair_reacao(texto)
+    texto_do_llm = texto
     rota, texto = _aplicar_redes_de_seguranca(_rota_do_texto(texto), texto, mensagem_usuario)
 
     if rota not in _ROTAS_VALIDAS:
         # Small talk ou fora de escopo: o próprio roteador já formulou a
         # resposta final ao usuário — segue direto para o guardrail de saída.
-        # Uma proposta de agendamento sem resposta expira aqui.
-        return {"rota": None, "resposta_final": texto or _RESPOSTA_DIRETA_FALLBACK, "agendamento_pendente": None}
+        # Uma proposta de agendamento sem resposta expira aqui. A cara só é
+        # `magoada` se o usuário vai ver a reação que o roteador escreveu.
+        magoada = reacao == "magoada" and bool(texto) and texto == texto_do_llm
+        texto = _MARCADOR_RE.sub("", texto).strip()
+        return {
+            "rota": None, "resposta_final": texto or _RESPOSTA_DIRETA_FALLBACK, "agendamento_pendente": None,
+            "expressao": "magoada" if magoada else "neutra",
+        }
 
     match_pergunta = _PERGUNTA_RE.search(texto)
     pergunta_original = match_pergunta.group(1).strip() if match_pergunta else mensagem_usuario
 
     return {  # type: ignore[typeddict-item]
         "rota": rota, "pergunta_original": pergunta_original, "agendamento_pendente": None,
+        "expressao": "neutra",
     }
 
 
