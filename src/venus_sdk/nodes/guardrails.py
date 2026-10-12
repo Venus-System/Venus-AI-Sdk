@@ -45,6 +45,9 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
         "tentativas_juiz": 0,
         "aprovado_juiz": None,
         "feedback_juiz": None,
+        # Sem isso, a `magoada` de um turno voltava pelo checkpointer no
+        # seguinte (a entrada bloqueada nem passa pelo roteador).
+        "expressao": "neutra",
     }
     if bloqueado:
         logger.info("Entrada bloqueada: %s", motivo)
@@ -192,11 +195,13 @@ def no_guardrail_saida(estado: EstadoVenus) -> EstadoVenus:
     bloqueado, motivo = guardrail_saida(resposta)
     resposta_final = MENSAGEM_SAIDA_BLOQUEADA if bloqueado else resposta
 
-    if bloqueado:
-        logger.warning("Saída bloqueada: %s", motivo)
-
-    return {
+    atualizacao: EstadoVenus = {
         "saida_bloqueada": bloqueado,
         "resposta_final": resposta_final,
         "historico": [AIMessage(content=resposta_final)],
     }
+    if bloqueado:
+        logger.warning("Saída bloqueada: %s", motivo)
+        # A cara acompanha o texto que o usuário vê, e esse texto foi trocado.
+        atualizacao["expressao"] = "neutra"
+    return atualizacao

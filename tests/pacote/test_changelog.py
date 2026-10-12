@@ -16,13 +16,13 @@ def _secao(versao: str) -> str:
 
 
 def test_versoes_com_as_tres_subsecoes():
-    for versao in ("0.2.0", "0.3.0"):
+    for versao in ("0.2.0", "0.3.0", "0.4.0"):
         secao = _secao(versao)
         assert all(subsecao in secao for subsecao in SUBSECOES), versao
 
 
 def test_mudancas_incompativeis_tem_antes_e_depois():
-    for versao in ("0.2.0", "0.3.0"):
+    for versao in ("0.2.0", "0.3.0", "0.4.0"):
         secao = _secao(versao)
         incompativeis = secao.split("### Mudanças incompatíveis", 1)[1].split("### Novidades", 1)[0]
         itens = [linha for linha in incompativeis.splitlines() if linha.startswith("- ")]
@@ -47,3 +47,9 @@ def test_template_de_pr_tem_a_caixa_da_api_publica():
     template = (RAIZ / ".github/pull_request_template.md").read_text(encoding="utf-8")
     assert "- [ ] Esta PR muda a API pública do SDK? Se sim, o CHANGELOG foi atualizado em Mudanças incompatíveis." in template
 
+
+
+def test_0_4_0_documenta_a_expressao():
+    secao = _secao("0.4.0")
+    for termo in ("expressao", "REACAO=magoada", "Expressao"):
+        assert termo in secao, termo

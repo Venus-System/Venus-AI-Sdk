@@ -8,6 +8,11 @@ from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
 Rota = Literal["produto", "ingrediente", "rotina", "faq"]
+# Cara da Venus que acompanha a resposta (a web mostra a Veninha com ela).
+# Lista fechada, escolhida só pelo código: `magoada` é a reação a ofensa (o
+# roteador marca com `REACAO=magoada`, ver `nodes/roteador.py`); o resto é
+# `neutra`.
+Expressao = Literal["neutra", "magoada"]
 
 
 class EstadoVenus(TypedDict, total=False):
@@ -42,6 +47,9 @@ class EstadoVenus(TypedDict, total=False):
     # --- roteador ---
     rota: Rota | None
     pergunta_original: str
+    # Zerada para `neutra` no guardrail de entrada a cada turno; só o roteador
+    # põe `magoada`, e o guardrail de saída volta para `neutra` se trocar o texto.
+    expressao: Expressao
 
     # --- especialista (produto | ingrediente | rotina | faq) ---
     resposta_especialista: dict[str, Any] | None
