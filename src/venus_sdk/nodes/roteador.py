@@ -11,7 +11,7 @@ from venus_sdk.llm.models import get_llm_rapido
 from venus_sdk.nodes.agendamento import eh_confirmacao, eh_negacao
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.router import ROUTER_PROMPT_COMPLETO
-from venus_sdk.state import EstadoVenus
+from venus_sdk.nodes.state import EstadoVenus
 
 logger = logging.getLogger(__name__)
 

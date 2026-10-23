@@ -13,7 +13,7 @@ from venus_sdk.nodes._evidencias import dados_da_evidencia
 from venus_sdk.nodes._historico import historico_recente
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
-from venus_sdk.state import EstadoVenus
+from venus_sdk.nodes.state import EstadoVenus
 from venus_sdk.texto import remover_acentos
 from venus_sdk.tools.calculos import TOOLS_COM_NUMERO_A_CITAR, formatar_numero
 

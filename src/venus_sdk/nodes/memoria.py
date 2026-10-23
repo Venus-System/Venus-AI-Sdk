@@ -19,11 +19,11 @@ from typing import Any
 
 from langgraph.store.base import BaseStore
 
-from venus_sdk.guardrail_rules import contem_tentativa_de_injecao
+from venus_sdk.prompts.guardrail_rules import contem_tentativa_de_injecao
 from venus_sdk.llm.models import get_llm_rapido
 from venus_sdk.nodes._json import extrair_objeto_json
 from venus_sdk.prompts.memoria import MEMORIA_PROMPT_COMPLETO
-from venus_sdk.state import EstadoVenus
+from venus_sdk.nodes.state import EstadoVenus
 
 logger = logging.getLogger(__name__)
 

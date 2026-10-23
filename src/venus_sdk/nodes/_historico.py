@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from venus_sdk.state import EstadoVenus
+from venus_sdk.nodes.state import EstadoVenus
 
 # Últimas mensagens (usuário + Venus) incluídas, sem contar a deste turno.
 MAX_MENSAGENS_HISTORICO = 6

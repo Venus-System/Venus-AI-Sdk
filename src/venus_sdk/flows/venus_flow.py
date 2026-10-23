@@ -47,7 +47,7 @@ from venus_sdk.nodes.juiz import decidir_pos_juiz, no_agente_juiz
 from venus_sdk.nodes.memoria import no_atualizar_memoria, no_carregar_memoria
 from venus_sdk.nodes.orquestrador import no_orquestrador
 from venus_sdk.nodes.roteador import decidir_especialista, no_roteador
-from venus_sdk.state import EstadoVenus
+from venus_sdk.nodes.state import EstadoVenus
 
 logger = logging.getLogger(__name__)
 

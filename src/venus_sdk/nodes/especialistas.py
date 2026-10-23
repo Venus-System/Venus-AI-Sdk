@@ -30,7 +30,7 @@ from venus_sdk.prompts.faq import FAQ_PROMPT_COMPLETO
 from venus_sdk.prompts.ingrediente import ESP_INGREDIENTE_PROMPT_COMPLETO
 from venus_sdk.prompts.produto import ESP_PRODUTO_PROMPT_COMPLETO
 from venus_sdk.prompts.rotina import ROTINA_PROMPT_COMPLETO
-from venus_sdk.state import EstadoVenus
+from venus_sdk.nodes.state import EstadoVenus
 from venus_sdk.tools.calculos import montar_tools_calculo_ingrediente, montar_tools_calculo_rotina
 from venus_sdk.tools.compartilhadas import montar_tools_compartilhadas
 from venus_sdk.tools.faq import montar_tools_faq

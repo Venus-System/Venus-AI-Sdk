@@ -13,7 +13,7 @@ from venus_sdk.nodes._amarracao_produtos import mesmo_nome, nomes_por_id
 from venus_sdk.nodes._evidencias import argumentos_da_evidencia, dados_da_evidencia
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO
-from venus_sdk.state import EstadoVenus
+from venus_sdk.nodes.state import EstadoVenus
 from venus_sdk.texto import remover_acentos
 
 logger = logging.getLogger(__name__)

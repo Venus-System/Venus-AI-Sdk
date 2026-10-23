@@ -64,7 +64,7 @@ def test_sem_chave_de_llm_pula_a_camada_2_e_diz_isso(avaliar_guardrail, monkeypa
 
 
 def test_com_llm_falso_reporta_as_duas_camadas(avaliar_guardrail, monkeypatch, capsys):
-    from venus_sdk.guardrail_rules import guardrail_entrada
+    from venus_sdk.prompts.guardrail_rules import guardrail_entrada
 
     monkeypatch.setattr(avaliar_guardrail, "_tem_llm", lambda: True)
     # LLM falso que "pega" exatamente as frases marcadas como camada 2.

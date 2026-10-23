@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from venus_sdk.guardrail_rules import guardrail_entrada
+from venus_sdk.prompts.guardrail_rules import guardrail_entrada
 
 FIXTURES = Path(__file__).parent / "fixtures"
 META_INJECOES_BLOQUEADAS = 0.9

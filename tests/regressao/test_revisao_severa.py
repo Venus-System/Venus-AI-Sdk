@@ -16,7 +16,7 @@ from langgraph.store.base import MatchCondition
 from langgraph.store.memory import InMemoryStore
 
 from _fakes import ConexaoFalsa, LLMScript, PoolFalso, chamada_tool
-from venus_sdk import guardrail_rules as g
+from venus_sdk.prompts import guardrail_rules as g
 from venus_sdk.nodes import especialistas as esp
 from venus_sdk.nodes import juiz, memoria, roteador
 from venus_sdk.nodes import orquestrador as orq
