@@ -157,6 +157,8 @@ def _problemas_do_item(
     reais = _notas_reais(evidencias, product_id)
     notas = item.get("notas") if isinstance(item.get("notas"), dict) else {}
     for campo, valor in notas.items():
+        if campo not in reais and _veio_de_um_homonimo(evidencias, nomes, product_id, campo, valor):
+            continue
         if campo not in reais:
             problemas.append(
                 f"{campo}={valor} do product_id {product_id} não veio de get_product_score/get_personalized_score "
@@ -165,6 +167,21 @@ def _problemas_do_item(
         elif not _mesmo_valor(valor, reais[campo]):
             problemas.append(f"{campo} do product_id {product_id} é {reais[campo]} na tool, não {valor}")
     return problemas
+
+
+def _veio_de_um_homonimo(
+    evidencias: list[dict] | None, nomes: dict[str, str], product_id: str, campo: str, valor: Any
+) -> bool:
+    """O catálogo tem cópias do mesmo produto com outro id (ex.: "CeraVe Creme
+    Hidratante", ids 17 e 59). Para o usuário é o mesmo produto: a nota que a tool
+    devolveu para a cópia vale (chatbot real, 2026-10-23: o especialista achou o
+    59 na busca e citou a nota personalizada do 17, e a resposta foi reprovada)."""
+    nome = nomes.get(product_id) or ""
+    return any(
+        outro_id != product_id and mesmo_nome(outro_nome, nome)
+        and _mesmo_valor(valor, _notas_reais(evidencias, outro_id).get(campo, object()))
+        for outro_id, outro_nome in nomes.items()
+    )
 
 
 def _problemas_do_texto(texto: str, produtos: list[dict]) -> list[str]:

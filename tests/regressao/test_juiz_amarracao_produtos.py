@@ -534,3 +534,19 @@ def test_reserva_usa_o_resultado_da_agenda_quando_ela_foi_consultada(agenda: dic
              "resultado": json.dumps(_ROTINA)}]})
     assert esperado in texto
     assert "Não tenho acesso à sua agenda" not in texto
+
+
+
+def test_nota_de_copia_homonima_do_produto_e_aceita_mas_de_outro_produto_nao() -> None:
+    """Chatbot real: a busca trouxe o id 59 e a nota personalizada era do 17 —
+    as duas cópias são o "CeraVe Creme Hidratante"."""
+    evidencias = [*EVIDENCIAS, {"tool": "search_product", "argumentos": {"termo": "creme"},
+                                "resultado": json.dumps([{"product_id": 59, "name": "CeraVe Creme Hidratante"}])}]
+    item = {"product_id": 59, "nome": "CeraVe Creme Hidratante", "notas": {"final_score": 63}}
+    problemas, _ = conferir_amarracao(_especialista("O CeraVe Creme Hidratante tem nota 63/100 pra você.", [item]),
+                                      evidencias)
+    assert problemas == []
+    item_errado = {"product_id": 59, "nome": "CeraVe Creme Hidratante", "notas": {"overall_score": 76}}
+    problemas, _ = conferir_amarracao(_especialista("O CeraVe Creme Hidratante tem nota 76/100.", [item_errado]),
+                                      evidencias)
+    assert problemas
