@@ -7,6 +7,7 @@ import logging
 import re
 from typing import Any
 
+from venus_sdk.alergias import termo_bate, termos_da_alergia
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_orquestrador
 from venus_sdk.nodes._evidencias import argumentos_da_evidencia, dados_da_evidencia
 from venus_sdk.prompts.comum import com_data_atual
@@ -112,12 +113,29 @@ def _texto_final_valido(texto: str, dados: dict) -> bool:
 
 
 def _parte_rotina(evidencias: list[dict] | None) -> str | None:
+    """Rotina montada por `suggest_routine` — inclusive quando ela NÃO saiu: sem
+    isso, uma rotina vazia (todos os favoritos excluídos por alergia) virava
+    "Seus produtos favoritos: X", como se X pudesse ser usado (conversa real de
+    2026-10-20)."""
     dados = dados_da_evidencia(evidencias, "suggest_routine")
-    passos = dados.get("passos") if isinstance(dados, dict) else None
-    if not passos:
+    if not isinstance(dados, dict):
         return None
-    lista = "; ".join(f"{passo['ordem']}) {passo['nome']}" for passo in passos)
-    return f"Montei sua rotina com o que você já tem salvo: {lista}."
+    passos = dados.get("passos") or []
+    excluidos = dados.get("excluidos_por_alergia") or []
+    faltando = dados.get("sem_produto_para") or []
+    if not passos and not excluidos and not faltando:
+        return None
+    if passos:
+        lista = "; ".join(f"{passo['ordem']}) {passo['nome']}" for passo in passos)
+        frases = [f"Montei sua rotina com o que você já tem salvo: {lista}."]
+    else:
+        frases = ["Ainda não consegui montar essa rotina só com os seus favoritos."]
+    if excluidos:
+        nomes = ", ".join(str(item.get("nome")) for item in excluidos if isinstance(item, dict))
+        frases.append(f"Deixei de fora {nomes} por ter ingrediente que bate com as alergias que você declarou.")
+    if faltando:
+        frases.append(f"Falta um produto salvo para: {', '.join(map(str, faltando))}.")
+    return " ".join(frases)
 
 
 def _produto_consultado(evidencias: list[dict] | None) -> Any:
@@ -173,21 +191,56 @@ def _detalhe_do_produto(evidencias: list[dict] | None, pergunta: str = "") -> st
     return "\n".join(linhas)
 
 
-def _parte_produtos(evidencias: list[dict] | None, pergunta: str = "") -> tuple[str | None, bool]:
+def _parte_produtos(
+    evidencias: list[dict] | None, pergunta: str = "", *, sugestao: bool = False, excluir: str | None = None
+) -> tuple[str | None, bool]:
     """`(texto, sem_dado)` — `sem_dado` indica que nenhum produto listado tem
-    nota nem ingredientes cadastrados."""
-    detalhe = _detalhe_do_produto(evidencias, pergunta)
-    if detalhe:
-        return detalhe, False
-    produtos = dados_da_evidencia(evidencias, "search_product")
+    nota nem ingredientes cadastrados.
+
+    Num pedido de sugestão (`sugestao=True`) lista os candidatos de TODAS as
+    buscas, com a nota quando consultada, e deixa de fora `excluir` (o produto
+    aberto na tela): antes, "sim, sugira" depois de um alerta sobre o CeraVe
+    Creme Hidratante devolvia a ficha do próprio CeraVe Creme Hidratante."""
+    if not sugestao:
+        detalhe = _detalhe_do_produto(evidencias, pergunta)
+        if detalhe:
+            return detalhe, False
+    produtos = _resultados_de_todas_as_buscas(evidencias) if sugestao else dados_da_evidencia(evidencias, "search_product")
     if not isinstance(produtos, list) or not produtos:
         return None, False
-    itens = [p for p in produtos[:_MAX_PRODUTOS_LISTADOS] if isinstance(p, dict) and "name" in p]
+    excluido = (excluir or "").strip().lower()
+    itens = [
+        p for p in produtos
+        if isinstance(p, dict) and "name" in p and str(p["name"]).strip().lower() != excluido
+    ][:_MAX_PRODUTOS_LISTADOS]
     if not itens:
         return None, False
-    linhas = "\n".join(f"- {p['name']} ({p['brand_name']})" for p in itens)
+    linhas = "\n".join(f"- {p['name']} ({p['brand_name']}){_nota_listada(evidencias, p)}" for p in itens)
     sem_dado = not any(p.get("tem_score") or p.get("tem_ingredientes") for p in itens)
     return f"Olha o que encontrei no nosso catálogo:\n\n{linhas}", sem_dado
+
+
+def _resultados_de_todas_as_buscas(evidencias: list[dict] | None) -> list[dict]:
+    """Produtos de todas as chamadas de `search_product`, sem repetir `product_id`."""
+    vistos: set[str] = set()
+    produtos = []
+    for evidencia in evidencias or []:
+        if evidencia.get("tool") != "search_product":
+            continue
+        resultado = dados_da_evidencia([evidencia], "search_product")
+        for produto in resultado if isinstance(resultado, list) else []:
+            chave = str(produto.get("product_id")) if isinstance(produto, dict) else ""
+            if chave and chave not in vistos:
+                vistos.add(chave)
+                produtos.append(produto)
+    return produtos
+
+
+def _nota_listada(evidencias: list[dict] | None, produto: dict) -> str:
+    score = dados_da_evidencia(evidencias, "get_product_score", product_id=produto.get("product_id"))
+    if isinstance(score, dict) and score.get("overall_score") is not None:
+        return f" — nota geral {score['overall_score']}/100"
+    return ""
 
 
 def _propriedades_legiveis(propriedades: list) -> list[str]:
@@ -308,14 +361,53 @@ def _parte_perfil(evidencias: list[dict] | None) -> str | None:
     return f"No seu perfil: {'; '.join(campos)}." if campos else None
 
 
-def _parte_alergias(evidencias: list[dict] | None) -> str | None:
+def _parte_alergias(evidencias: list[dict] | None, *, cruzar_com_produto: bool = True) -> str | None:
+    """Alergias declaradas — cruzadas com os ingredientes do produto consultado,
+    quando houver (mesma regra de `suggest_routine`, ver `venus_sdk/alergias.py`).
+    Só listar as alergias, sem dizer se o produto bate com elas, não respondia
+    nada (conversa real de 2026-10-20)."""
     alergias = dados_da_evidencia(evidencias, "get_user_allergies")
     if isinstance(alergias, dict) and alergias.get("encontrado") is False and "alergias" in alergias:
         return "Você não declarou nenhuma alergia no seu cadastro."
     if not isinstance(alergias, list) or not alergias:
         return None
-    nomes = ", ".join(str(a.get("allergy_name")) for a in alergias if isinstance(a, dict))
-    return f"Você declarou alergia a: {nomes}." if nomes else None
+    nomes = [str(a.get("allergy_name")) for a in alergias if isinstance(a, dict) and a.get("allergy_name")]
+    if not nomes:
+        return None
+    ingredientes = _ingredientes_com_nomes(evidencias) if cruzar_com_produto else []
+    if not ingredientes:
+        return f"Você declarou alergia a: {', '.join(nomes)}."
+    conflitos = []
+    for alergia in nomes:
+        termos = termos_da_alergia(alergia)
+        achado = next(
+            (exibicao for exibicao, variantes in ingredientes
+             if any(termo_bate(termo, variante) for termo in termos for variante in variantes)),
+            None,
+        )
+        if achado:
+            conflitos.append(f"{achado} (alergia a {alergia})")
+    if conflitos:
+        return f"Atenção: ele tem ingrediente que bate com o que você declarou: {'; '.join(conflitos)}."
+    return f"Nenhum ingrediente cadastrado dele bate com as alergias que você declarou ({', '.join(nomes)})."
+
+
+def _ingredientes_com_nomes(evidencias: list[dict] | None) -> list[tuple[str, list[str]]]:
+    """`(nome para exibir, [INCI, nome comum])` de cada ingrediente do produto consultado."""
+    product_id = _produto_consultado(evidencias)
+    if product_id is None:
+        return []
+    ingredientes = dados_da_evidencia(evidencias, "get_product_ingredients", product_id=product_id)
+    if not isinstance(ingredientes, list):
+        return []
+    saida = []
+    for ingrediente in ingredientes:
+        if not isinstance(ingrediente, dict):
+            continue
+        variantes = [str(nome) for nome in (ingrediente.get("inci_name"), ingrediente.get("common_name")) if nome]
+        if variantes:
+            saida.append((str(ingrediente.get("common_name") or ingrediente.get("inci_name")), variantes))
+    return saida
 
 
 def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
@@ -340,12 +432,16 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     ]
     # Numa pergunta sobre a conta, a busca de produto foi só um meio (achar o
     # id): listar o catálogo ali confunde mais do que ajuda.
-    texto_produtos, sem_dado = (None, False) if dados_da_conta else _parte_produtos(evidencias, pergunta)
+    especialista = estado.get("resposta_especialista")
+    sugestao = isinstance(especialista, dict) and especialista.get("intencao") == "sugerir"
+    texto_produtos, sem_dado = (None, False) if dados_da_conta else _parte_produtos(
+        evidencias, pergunta, sugestao=sugestao, excluir=estado.get("produto_em_contexto")
+    )
     candidatas = [
         *dados_da_conta,
         texto_produtos,
         _parte_ingredientes(evidencias),
-        _parte_alergias(evidencias),
+        _parte_alergias(evidencias, cruzar_com_produto=not sugestao),
     ]
     partes = [parte for parte in candidatas if parte]
 

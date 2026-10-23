@@ -48,7 +48,7 @@ _SQL_BUSCAR_PRODUTO = f"""
         OR {sem_acento("COALESCE(p.description, '')")} ILIKE '%' || tok || '%'
     )
     GROUP BY p.product_id, p.name, b.name, pc.name
-    ORDER BY relevancia DESC, tem_score DESC, tem_ingredientes DESC, p.name
+    ORDER BY relevancia DESC, tem_score DESC, tem_ingredientes DESC, p.name, p.product_id
     LIMIT {LIMITE_BUSCA}
 """
 
@@ -106,6 +106,24 @@ def _todas_as_notas_zeradas(resultado: Any) -> bool:
     return bool(notas) and all((nota or 0) == 0 for nota in notas)
 
 
+def _sem_duplicatas(resultado: Any) -> Any:
+    """Mantém só o 1º produto de cada (nome, marca). O catálogo tem cópias
+    importadas do banco legado com o mesmo nome (ex.: "CeraVe Creme Hidratante",
+    ids 17 e 59): o especialista analisava as duas em paralelo, dobrando as
+    chamadas e confundindo o Juiz (conversa real de 2026-10-20). A ordem do SQL
+    já põe na frente quem tem score/ingredientes."""
+    if not isinstance(resultado, list):
+        return resultado
+    vistos: set[tuple[str, str]] = set()
+    unicos = []
+    for produto in resultado:
+        chave = (str(produto.get("name", "")).strip().lower(), str(produto.get("brand_name", "")).strip().lower())
+        if chave not in vistos:
+            vistos.add(chave)
+            unicos.append(produto)
+    return unicos
+
+
 def montar_tools_produto(pool: Any) -> list[BaseTool]:
     """Monta as 5 tools do agente Produto, com o `pool` capturado por closure.
 
@@ -125,11 +143,12 @@ def montar_tools_produto(pool: Any) -> list[BaseTool]:
         palavras = palavras_de_busca(termo)
         if not palavras:
             return {"erro": "informe um nome, marca ou tipo de produto para buscar"}
-        return await consultar(
+        resultado = await consultar(
             pool, "search_product", _SQL_BUSCAR_PRODUTO, palavras,
             vazio="nenhum produto encontrado com esses termos — não invente um product_id; "
                   "peça ao usuário o nome ou a marca",
         )
+        return _sem_duplicatas(resultado)
 
     @tool
     async def get_product(product_id: int) -> dict:

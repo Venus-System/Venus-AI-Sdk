@@ -53,6 +53,14 @@ ROUTER_PROMPT = f"""
   a mensagem ORIGINAL para o especialista.
 - Se o histórico indicar que o usuário está respondendo a uma clarificação
   anterior de um especialista, encaminhe para o mesmo domínio da última rota.
+  EXCEÇÃO: negativa ou encerramento ("não", "não precisa mais nada", "só
+  isso", "não, obrigado") é small talk — responda direto, sem rotear.
+- `PRODUTO_EM_TELA=<nome>` antes da mensagem = produto aberto na tela do app
+  quando o usuário escreveu. É contexto, não a pergunta: decida a rota pelo
+  texto da mensagem. "o que eu falei antes?" com um produto na tela continua
+  sendo pergunta sobre a conversa (resposta direta, item (b)); "e esse
+  produto tem álcool?" é ROUTE=produto. Em PERGUNTA_ORIGINAL, repita só a
+  mensagem, sem a linha PRODUTO_EM_TELA.
 
 
 ### REAÇÃO A OFENSA/XINGAMENTO (exceção deliberada à regra de "nunca fingir sentimento")

@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 # especialista; small talk/fora de escopo respondem em texto livre (ver
 # `prompts/router.py`), daí a ausência de ROUTE= ser o sinal de resposta direta.
 _ROUTE_RE = re.compile(r"ROUTE=(\w+)", re.IGNORECASE)
-_PERGUNTA_RE = re.compile(r"PERGUNTA_ORIGINAL=(.*)", re.IGNORECASE | re.DOTALL)
 
 _ROTAS_VALIDAS: frozenset[str] = frozenset({"produto", "ingrediente", "rotina", "faq"})
 
@@ -60,6 +59,30 @@ _SMALL_TALK_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Encerramento/negativa curta ("não precisa mais nada", "não, obrigado", "só
+# isso"). Conversa real de 2026-10-20: a resposta anterior terminava com "Quer
+# que eu detalhe mais alguma coisa?", o roteador tratou o "não" como resposta a
+# uma clarificação do especialista e reabriu a rotina.
+_ENCERRAMENTO_RE = re.compile(
+    r"^\s*(n[aã]o|nada|s[oó] isso|t[aá] bom|tudo certo|entendi)"
+    r"(\s*,?\s*(precisa|obrigad[oa]|valeu|mais nada|nada|n[aã]o|por enquanto|era s[oó] isso|s[oó] isso))*"
+    r"\s*[!.?]*\s*$",
+    re.IGNORECASE,
+)
+_RESPOSTA_ENCERRAMENTO = (
+    "Tudo bem! Se precisar de algo sobre produto, ingrediente ou rotina, é só me chamar."
+)
+
+# O app manda o produto aberto na tela como prefixo da mensagem: "Sobre CeraVe
+# Creme Hidratante: <pergunta>". Esse prefixo é CONTEXTO, não a pergunta — sem
+# separá-lo, "creme"/"hidratante" faziam `rota_por_palavras` forçar a rota
+# produto em qualquer mensagem enviada daquela tela, inclusive "o que eu acabei
+# de falar?" (conversa real de 2026-10-20, que travou repetindo a mesma ficha
+# do produto).
+_PREFIXO_PRODUTO_RE = re.compile(
+    r"^\s*sobre\s+(?P<produto>[^:\n]{2,120}?)\s*:\s*(?P<pergunta>\S.*)$", re.IGNORECASE | re.DOTALL
+)
+
 
 # Rede de segurança: modelos pequenos às vezes RESPONDEM em vez de rotear um pedido claramente de
 # domínio. Só entra quando o LLM não devolveu ROUTE=; é conservadora de propósito.
@@ -96,6 +119,13 @@ _RE_COMPOSICAO_DE = re.compile(r"\b(ingredientes|composi[cç][aã]o|f[oó]rmula)
 _RE_FATO_DE_PRODUTO = re.compile(
     r"(\d+\s*/\s*100|\bscore\b[^.\n]{0,30}\d|\d+[.,]?\d*\s*%|\bn[ãa]o cont[eé]m\b|\bcont[eé]m\b|"
     r"confirma[cç][ãa]o no sistema)", re.IGNORECASE)
+# "o que eu acabei de falar?", "do que a gente tava falando?", "prompt anterior".
+_RE_PERGUNTA_SOBRE_CONVERSA = re.compile(
+    r"\b(o que|oq|do que|sobre o que)\b.{0,30}\b(eu|a gente|n[oó]s|voc[eê]|vc)\b.{0,30}"
+    r"\b(falei|falar|disse|dizer|falando|conversando|perguntei|respondeu|falou)\b"
+    r"|\b(prompt|mensagem|pergunta|resposta) anterior\b",
+    re.IGNORECASE,
+)
 _RESPOSTA_DIRETA_SEGURA = (
     "Anotei! Posso te ajudar com produtos, ingredientes ou a sua rotina de skincare e haircare "
     "— o que você quer saber?"
@@ -103,8 +133,22 @@ _RESPOSTA_DIRETA_SEGURA = (
 
 
 def e_small_talk(mensagem: str) -> bool:
-    """True se a mensagem é só saudação/agradecimento/despedida."""
-    return bool(_SMALL_TALK_RE.match(mensagem or ""))
+    """True se a mensagem é só saudação/agradecimento/despedida/encerramento."""
+    return bool(_SMALL_TALK_RE.match(mensagem or "")) or e_encerramento(mensagem)
+
+
+def e_encerramento(mensagem: str) -> bool:
+    """True se a mensagem é só uma negativa/encerramento ("não precisa mais nada")."""
+    return bool(_ENCERRAMENTO_RE.match(mensagem or ""))
+
+
+def separar_produto_em_contexto(mensagem: str) -> tuple[str | None, str]:
+    """`(produto, pergunta)` a partir de "Sobre <produto>: <pergunta>"; sem o
+    prefixo, `(None, mensagem)`."""
+    match = _PREFIXO_PRODUTO_RE.match(mensagem or "")
+    if not match:
+        return None, mensagem or ""
+    return match.group("produto").strip(), match.group("pergunta").strip()
 
 
 def _recuperar_de_tool_call_alucinada(erro: Exception) -> str | None:
@@ -189,6 +233,9 @@ def _invocar_roteador(mensagens: list) -> str:
 def _mensagens_para_o_roteador(estado: EstadoVenus) -> list:
     """Prompt do roteador + histórico da conversa + a mensagem deste turno."""
     mensagem = estado.get("mensagem_anonimizada") or estado.get("mensagem_usuario", "")
+    produto, pergunta = separar_produto_em_contexto(mensagem)
+    if produto:
+        mensagem = f"PRODUTO_EM_TELA={produto}\n{pergunta}"
     memorias = estado.get("memorias_usuario")
     if memorias:
         mensagem = f"MEMORIA_USUARIO={json.dumps(memorias, ensure_ascii=False)}\n{mensagem}"
@@ -228,9 +275,22 @@ def _encaminhar(rota: str, mensagem_usuario: str) -> str:
     return f"ROUTE={rota}\nPERGUNTA_ORIGINAL={mensagem_usuario}"
 
 
-def _aplicar_redes_de_seguranca(rota: str | None, texto: str, mensagem_usuario: str) -> tuple[str | None, str]:
+def _fatos_vem_do_historico(texto: str, mensagem_usuario: str, historico: str) -> bool:
+    """Resposta direta a "o que a gente estava falando?" pode repetir fatos já
+    ditos na conversa: aceita se TODOS os números que ela cita aparecem no
+    histórico. Sem isso, a recapitulação virava "Anotei! Posso te ajudar..."
+    (reprodução da conversa de 2026-10-20)."""
+    if not historico or not _RE_PERGUNTA_SOBRE_CONVERSA.search(mensagem_usuario):
+        return False
+    return all(numero in historico for numero in re.findall(r"\d+", texto))
+
+
+def _aplicar_redes_de_seguranca(
+    rota: str | None, texto: str, mensagem_usuario: str, historico: str = ""
+) -> tuple[str | None, str]:
     """Corrige, por regra, os erros conhecidos do LLM roteador. Devolve
-    `(rota, texto)` já corrigidos."""
+    `(rota, texto)` já corrigidos. `historico` é o texto das mensagens
+    anteriores (ver `_fatos_vem_do_historico`)."""
     eh_small_talk = e_small_talk(mensagem_usuario)
 
     obrigatoria = _rota_obrigatoria(rota, mensagem_usuario)
@@ -250,9 +310,14 @@ def _aplicar_redes_de_seguranca(rota: str | None, texto: str, mensagem_usuario: 
         # e responde direto (ver `_SMALL_TALK_RE`).
         logger.warning("Roteador mandou small talk para %s; forçando resposta direta", rota)
         rota = None
-        texto = ""
+        texto = _RESPOSTA_ENCERRAMENTO if e_encerramento(mensagem_usuario) else ""
 
-    if rota not in _ROTAS_VALIDAS and texto and _RE_FATO_DE_PRODUTO.search(texto):
+    if (
+        rota not in _ROTAS_VALIDAS
+        and texto
+        and _RE_FATO_DE_PRODUTO.search(texto)
+        and not _fatos_vem_do_historico(texto, mensagem_usuario, historico)
+    ):
         logger.warning("Resposta direta do roteador afirmava fatos de produto; substituída por resposta segura")
         texto = _RESPOSTA_DIRETA_SEGURA
 
@@ -267,10 +332,16 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     # A mensagem anonimizada é a que segue para os especialistas: CPF, e-mail
     # etc. não podem voltar pelas redes de segurança nem pelo fallback.
     mensagem_usuario = estado.get("mensagem_anonimizada") or estado.get("mensagem_usuario", "")
+    # As redes de segurança por palavra-chave olham só a pergunta, nunca o nome
+    # do produto aberto na tela (ver `_PREFIXO_PRODUTO_RE`).
+    produto_em_contexto, pergunta_do_usuario = separar_produto_em_contexto(mensagem_usuario)
     pendente = estado.get("agendamento_pendente")
-    if pendente and (eh_confirmacao(mensagem_usuario) or eh_negacao(mensagem_usuario)):
+    if pendente and (eh_confirmacao(pergunta_do_usuario) or eh_negacao(pergunta_do_usuario)):
         # Resposta a uma proposta de agendamento: quem decide é o código.
-        return {"rota": "rotina", "pergunta_original": mensagem_usuario, "expressao": "neutra"}
+        return {
+            "rota": "rotina", "pergunta_original": pergunta_do_usuario,
+            "produto_em_contexto": produto_em_contexto, "expressao": "neutra",
+        }
     mensagens = _mensagens_para_o_roteador(estado)
 
     texto = _invocar_roteador(mensagens)
@@ -282,7 +353,8 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
 
     reacao, texto = _extrair_reacao(texto)
     texto_do_llm = texto
-    rota, texto = _aplicar_redes_de_seguranca(_rota_do_texto(texto), texto, mensagem_usuario)
+    historico = " ".join(str(getattr(m, "content", m)) for m in list(estado.get("historico") or [])[:-1])
+    rota, texto = _aplicar_redes_de_seguranca(_rota_do_texto(texto), texto, pergunta_do_usuario, historico)
 
     if rota not in _ROTAS_VALIDAS:
         # Small talk ou fora de escopo: o próprio roteador já formulou a
@@ -292,15 +364,24 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
         magoada = reacao == "magoada" and bool(texto) and texto == texto_do_llm
         texto = _MARCADOR_RE.sub("", texto).strip()
         return {
-            "rota": None, "resposta_final": texto or _RESPOSTA_DIRETA_FALLBACK, "agendamento_pendente": None,
+            "rota": None,
+            "produto_em_contexto": produto_em_contexto,
+            "resposta_final": texto or _RESPOSTA_DIRETA_FALLBACK,
+            "agendamento_pendente": None,
             "expressao": "magoada" if magoada else "neutra",
         }
 
-    match_pergunta = _PERGUNTA_RE.search(texto)
-    pergunta_original = match_pergunta.group(1).strip() if match_pergunta else mensagem_usuario
-
+    # PERGUNTA_ORIGINAL é sempre a mensagem REAL do usuário, nunca o que o LLM
+    # ecoou no protocolo: ele colava colchetes ("[Monta minha rotina...]") e,
+    # pior, trocava a mensagem por uma de turnos anteriores ("cadastrei os
+    # produtos..." virou "qual vc recomendaria?" — reprodução de 2026-10-20). O
+    # contexto que ele tentava embutir chega ao especialista por
+    # HISTORICO_RECENTE/PRODUTO_EM_CONTEXTO.
     return {  # type: ignore[typeddict-item]
-        "rota": rota, "pergunta_original": pergunta_original, "agendamento_pendente": None,
+        "rota": rota,
+        "pergunta_original": pergunta_do_usuario,
+        "produto_em_contexto": produto_em_contexto,
+        "agendamento_pendente": None,
         "expressao": "neutra",
     }
 

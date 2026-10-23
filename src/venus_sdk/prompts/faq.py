@@ -6,6 +6,7 @@ Saída   : JSON estruturado (com `fontes_usadas` = arquivos/URLs consultados)
 """
 
 from venus_sdk.prompts.comum import (
+    CONTEXTO_CONVERSA_NOTA,
     HIERARQUIA_INSTRUCOES,
     MEMORIA_USUARIO_NOTA,
     PERSONA_ESPECIALISTA,
@@ -17,6 +18,9 @@ FAQ_PROMPT = f"""
 
 
 {MEMORIA_USUARIO_NOTA}
+
+
+{CONTEXTO_CONVERSA_NOTA}
 
 
 {HIERARQUIA_INSTRUCOES}

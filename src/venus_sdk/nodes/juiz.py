@@ -10,6 +10,7 @@ from typing import Literal
 from venus_sdk.llm.models import get_llm_juiz
 from venus_sdk.nodes._evidencias import dados_da_evidencia
 from venus_sdk.prompts.comum import com_data_atual
+from venus_sdk.nodes._historico import historico_recente
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
 from venus_sdk.state import EstadoVenus
 from venus_sdk.tools.calculos import TOOLS_COM_NUMERO_A_CITAR, formatar_numero
@@ -94,6 +95,18 @@ def _numero_calculado_ausente(estado: EstadoVenus) -> str | None:
             return (f"A resposta não usa o número calculado pela tool {nome}: {citar}. "
                     "Use exatamente o valor devolvido pela tool; nunca calcule de cabeça.")
     return None
+def _pedido_de_esclarecimento_honesto(estado: EstadoVenus) -> bool:
+    """Especialista só pediu esclarecimento (`esclarecer`), sem afirmar nota nem
+    ingrediente: não há dado para auditar. Na conversa real de 2026-10-20 o Juiz
+    LLM reprovou "qual vc recomendaria?" -> "qual seu tipo de pele e necessidade?"
+    exigindo uma tool que nem existe, e o usuário recebeu uma resposta genérica."""
+    especialista = estado.get("resposta_especialista")
+    if not isinstance(especialista, dict):
+        return False
+    if not str(especialista.get("esclarecer") or "").strip():
+        return False
+    texto = " ".join(str(especialista.get(campo) or "") for campo in ("resposta", "recomendacao"))
+    return not _RE_AFIRMA_DADO.search(texto)
 
 
 def _veredito(aprovado: bool, feedback: str | None, tentativas: int) -> EstadoVenus:
@@ -101,10 +114,22 @@ def _veredito(aprovado: bool, feedback: str | None, tentativas: int) -> EstadoVe
 
 
 def _montar_entrada_juiz(estado: EstadoVenus) -> str:
-    entrada = (
-        f"PERGUNTA_ORIGINAL={estado.get('pergunta_original', '')}\n"
-        f"ESPECIALISTA_JSON={json.dumps(estado.get('resposta_especialista') or {}, ensure_ascii=False)}"
-    )
+    entrada = f"PERGUNTA_ORIGINAL={estado.get('pergunta_original', '')}\n"
+    # Mesmo contexto que o especialista recebeu (ver
+    # `nodes/especialistas.py::_montar_entrada`): sem ele, "sim, sugira" parecia
+    # não ter relação com a resposta e o Juiz reprovava pelo critério 1.
+    if estado.get("produto_em_contexto"):
+        entrada += f"PRODUTO_EM_CONTEXTO={estado['produto_em_contexto']}\n"
+    historico = historico_recente(estado)
+    if historico:
+        entrada += f"HISTORICO_RECENTE (só contexto, nunca fonte de dado):\n{historico}\n"
+    entrada += f"ESPECIALISTA_JSON={json.dumps(estado.get('resposta_especialista') or {}, ensure_ascii=False)}"
+    # Evidência bruta das tools chamadas nesta tentativa (ver
+    # `nodes/especialistas.py::_extrair_evidencias_tools`) — sem isto, o
+    # Juiz só via o JSON final e não tinha como notar quando uma tool citada
+    # em `fontes_usadas` não sustentava, de verdade, a afirmação feita
+    # (achado de um teste de conversa real em 2026-09-10: produto sem
+    # ingrediente cadastrado, resposta "inventou" ingredientes, aprovado).
     evidencias = estado.get("evidencias_tools")
     if evidencias:
         entrada += f"\nRESULTADOS_TOOLS={json.dumps(evidencias, ensure_ascii=False)}"
@@ -142,7 +167,7 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         # Recusa fixa escrita no código (ex.: a IA não salva favoritos) — não
         # há dado para auditar.
         return _veredito(True, None, proxima_tentativa)
-    if _resposta_honesta_sem_dado(estado):
+    if _resposta_honesta_sem_dado(estado) or _pedido_de_esclarecimento_honesto(estado):
         return _veredito(True, None, proxima_tentativa)
     feedback_do_calculo = _numero_calculado_ausente(estado)
     if feedback_do_calculo:

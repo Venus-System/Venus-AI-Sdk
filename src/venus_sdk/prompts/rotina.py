@@ -5,6 +5,8 @@ Saída   : JSON estruturado para o Orquestrador.
 """
 
 from venus_sdk.prompts.comum import (
+    ALERGIA_ALCOOL_NOTA,
+    CONTEXTO_CONVERSA_NOTA,
     REGRA_CALCULOS,
     CONTEXTO_TEMPORAL,
     HIERARQUIA_INSTRUCOES,
@@ -22,6 +24,12 @@ ROTINA_PROMPT = f"""
 
 
 {MEMORIA_USUARIO_NOTA}
+
+
+{CONTEXTO_CONVERSA_NOTA}
+
+
+{ALERGIA_ALCOOL_NOTA}
 
 
 {IDENTIFICADOR_USUARIO_NOTA}

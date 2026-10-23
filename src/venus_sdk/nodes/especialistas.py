@@ -25,6 +25,7 @@ from venus_sdk.nodes.agendamento import (
     propostas_validas,
 )
 from venus_sdk.prompts.comum import com_data_atual
+from venus_sdk.nodes._historico import historico_recente
 from venus_sdk.prompts.faq import FAQ_PROMPT_COMPLETO
 from venus_sdk.prompts.ingrediente import ESP_INGREDIENTE_PROMPT_COMPLETO
 from venus_sdk.prompts.produto import ESP_PRODUTO_PROMPT_COMPLETO
@@ -93,6 +94,9 @@ def _montar_entrada(estado: EstadoVenus) -> str:
         f"ROUTE={estado.get('rota')}",
         f"PERGUNTA_ORIGINAL={estado.get('pergunta_original') or estado.get('mensagem_usuario', '')}",
     ]
+    produto_em_contexto = estado.get("produto_em_contexto")
+    if produto_em_contexto:
+        partes.append(f"PRODUTO_EM_CONTEXTO={produto_em_contexto}")
     memorias = estado.get("memorias_usuario")
     if memorias:
         partes.append(f"MEMORIA_USUARIO={json.dumps(memorias, ensure_ascii=False)}")
@@ -100,6 +104,9 @@ def _montar_entrada(estado: EstadoVenus) -> str:
     usuario_id_postgres = estado.get("usuario_id_postgres")
     if usuario_id_postgres is not None:
         partes.append(f"USER_ID_POSTGRES={usuario_id_postgres}")
+    historico = historico_recente(estado)
+    if historico:
+        partes.append(f"HISTORICO_RECENTE (só contexto, nunca fonte de dado):\n{historico}")
     feedback = estado.get("feedback_juiz")
     if feedback:
         partes.append(

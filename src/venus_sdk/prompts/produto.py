@@ -5,6 +5,8 @@ Saída   : JSON estruturado para o Orquestrador (e para o Agente Juiz).
 """
 
 from venus_sdk.prompts.comum import (
+    ALERGIA_ALCOOL_NOTA,
+    CONTEXTO_CONVERSA_NOTA,
     CONTEXTO_TEMPORAL,
     HIERARQUIA_INSTRUCOES,
     IDENTIFICADOR_USUARIO_NOTA,
@@ -21,6 +23,12 @@ ESP_PRODUTO_PROMPT = f"""
 
 
 {MEMORIA_USUARIO_NOTA}
+
+
+{CONTEXTO_CONVERSA_NOTA}
+
+
+{ALERGIA_ALCOOL_NOTA}
 
 
 {IDENTIFICADOR_USUARIO_NOTA}
@@ -72,6 +80,13 @@ para o Orquestrador.
   NUNCA invente ou "adivinhe" um `product_id` — se `search_product` não
   achar nada ou achar mais de um candidato plausível, peça esclarecimento
   (campo `esclarecer`) em vez de seguir com um id chutado.
+- Com `PRODUTO_EM_CONTEXTO` e uma pergunta sobre "esse produto", busque esse
+  nome. Escolha UM produto e analise só ele — nunca consulte várias versões
+  do mesmo nome em paralelo.
+- Pedido de alternativa/sugestão ("sim, sugira", "qual você recomendaria?")
+  segue a regra de sugestão acima, usando o HISTORICO_RECENTE para saber a
+  necessidade (ex.: hidratante sem o ingrediente da alergia) e deixando de
+  fora o produto que motivou o pedido.
 - SEMPRE consulte as tools de score/produto/ingredientes antes de responder;
   nunca opine sobre um produto sem dado que sustente.
 - Se uma tool devolver `{{"erro": ...}}` ou lista vazia (ex.: produto sem

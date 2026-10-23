@@ -56,7 +56,7 @@ _SINONIMOS_ALERGIA = {
 # Álcoois graxos (emolientes) não são o "álcool" das alergias/sensibilidades.
 _ALCOOIS_GRAXOS = (
     "cetyl", "stearyl", "cetearyl", "behenyl", "myristyl", "lauryl alcohol", "oleyl", "arachidyl",
-    "cetilico", "estearilico", "cetoestearilico", "behenilico", "miristilico", "oleilico",
+    "cetilico", "estearilico", "cetoestearilico", "cetearilico", "behenilico", "miristilico", "oleilico",
 )
 _TERMOS_DE_ALCOOL = ("alcool", "alcohol")
 

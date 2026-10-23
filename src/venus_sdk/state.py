@@ -50,6 +50,10 @@ class EstadoVenus(TypedDict, total=False):
     # Zerada para `neutra` no guardrail de entrada a cada turno; só o roteador
     # põe `magoada`, e o guardrail de saída volta para `neutra` se trocar o texto.
     expressao: Expressao
+    # Produto aberto na tela do app, extraído do prefixo "Sobre <produto>: "
+    # da mensagem (ver `nodes/roteador.py::separar_produto_em_contexto`).
+    # Regravado a cada turno (None sem prefixo) — nunca herda de um turno anterior.
+    produto_em_contexto: str | None
 
     # --- especialista (produto | ingrediente | rotina | faq) ---
     resposta_especialista: dict[str, Any] | None
