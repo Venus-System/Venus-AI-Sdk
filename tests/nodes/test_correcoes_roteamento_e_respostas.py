@@ -83,7 +83,7 @@ def test_juiz_usa_a_cadeia_dos_especialistas() -> None:
 def _tools_entregues_ao_agente_de_rotina(pergunta: str) -> list[str]:
     recebidas: dict[str, list[str]] = {}
 
-    def _montar(llm, *, prompt, tools):
+    def _montar(llm, *, prompt, tools, **_limites):
         recebidas["tools"] = [tool.name for tool in tools]
         return "agente"
 

@@ -9,6 +9,7 @@ from typing import Any
 
 from venus_sdk.alergias import termo_bate, termos_da_alergia
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_orquestrador
+from venus_sdk.nodes._amarracao_produtos import mesmo_nome, nomes_por_id
 from venus_sdk.nodes._evidencias import argumentos_da_evidencia, dados_da_evidencia
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO
@@ -49,6 +50,13 @@ _MAX_PRODUTOS_LISTADOS = 6
 _MAX_INGREDIENTES_LISTADOS = 5
 
 _TIPOS_DE_RESTRICAO = {"prohibited": "proibido", "restricted": "uso restrito"}
+_NIVEIS_DE_RECOMENDACAO = {
+    "contraindicated": "contraindicado",
+    "not_recommended": "não recomendado",
+    "acceptable": "aceitável",
+    "recommended": "recomendado",
+    "highly_recommended": "muito recomendado",
+}
 
 # Texto mais curto que isso não pode ser a tradução de uma resposta de verdade.
 _TAMANHO_MINIMO_TEXTO_FINAL = 12
@@ -64,6 +72,9 @@ _PEDE_INGREDIENTES_RE = re.compile(
     r"\b(ingredientes?|composi[cç][aã]o|f[oó]rmula|inci|o que (ele |ela )?(tem|leva|cont[eé]m))\b", re.IGNORECASE
 )
 _PEDE_FAVORITOS_RE = re.compile(r"favorit", re.IGNORECASE)
+_PEDE_SUGESTAO_RE = re.compile(r"\b(recomend|sugir|sugest|indica)\w*", re.IGNORECASE)
+_PERGUNTA_TARDE_RE = re.compile(r"\b(de|à|a|pela|na)\s+tarde\b", re.IGNORECASE)
+_PERGUNTA_AGENDA_RE = re.compile(r"\b(ocupad[oa]|livre|agenda|compromisso)s?\b", re.IGNORECASE)
 _PEDE_LISTAS_RE = re.compile(r"\blistas?\b", re.IGNORECASE)
 
 # Antes do "sim", nada foi gravado: o texto não pode afirmar o contrário.
@@ -74,6 +85,10 @@ _AFIRMA_AGENDAMENTO_RE = re.compile(
 _RESPOSTA_ANTES_DA_CONFIRMACAO = "Preparei o agendamento da sua rotina — só falta você confirmar."
 # `[nome do produto]` é placeholder; `[FAQ](https://...)` é link markdown.
 _PLACEHOLDER_RE = re.compile(r"\[[^\]\n]{2,40}\](?!\()")
+_ID_INTERNO_RE = re.compile(
+    r"\s*\((?:product|ingredient|user|produto)_id\s*[:=]?\s*\d+\)|\s*\b(?:product|ingredient|user)_id\s*[:=]?\s*\d+",
+    re.IGNORECASE,
+)
 _NOME_DO_PASSO_RE = re.compile(r"\d+\) (.+?) \(")
 _MARCA_PASSOS_DA_ROTINA = "Passos ("
 
@@ -138,9 +153,12 @@ def _parte_rotina(evidencias: list[dict] | None) -> str | None:
     return " ".join(frases)
 
 
+_TOOLS_DE_DETALHE_DO_PRODUTO = ("get_product", "get_product_score", "get_personalized_score", "get_product_ingredients")
+
+
 def _produto_consultado(evidencias: list[dict] | None) -> Any:
     """`product_id` do produto que o agente consultou em detalhe, ou `None`."""
-    for tool in ("get_product", "get_product_score", "get_product_ingredients"):
+    for tool in _TOOLS_DE_DETALHE_DO_PRODUTO:
         product_id = argumentos_da_evidencia(evidencias, tool).get("product_id")
         if product_id is not None:
             return product_id
@@ -160,12 +178,28 @@ def _cabecalho_do_produto(evidencias: list[dict] | None, product_id: Any) -> str
     return f"{achado['name']} ({achado.get('brand_name')})." if achado else None
 
 
-def _detalhe_do_produto(evidencias: list[dict] | None, pergunta: str = "") -> str | None:
+def _consultado_com_nome(evidencias: list[dict] | None, nome: str | None) -> Any:
+    """`product_id` consultado em detalhe cujo nome é `nome` (o produto em tela), ou `None`."""
+    if not nome:
+        return None
+    nomes = nomes_por_id(evidencias)
+    for evidencia in evidencias or []:
+        if evidencia.get("tool") not in _TOOLS_DE_DETALHE_DO_PRODUTO:
+            continue
+        product_id = (evidencia.get("argumentos") or {}).get("product_id")
+        if product_id is not None and mesmo_nome(nomes.get(str(product_id), ""), nome):
+            return product_id
+    return None
+
+
+def _detalhe_do_produto(
+    evidencias: list[dict] | None, pergunta: str = "", preferido: str | None = None
+) -> str | None:
     """Dados de UM produto consultado em detalhe (nome, nota, ingredientes) —
     só retornos de chamadas feitas para ESSE `product_id`. A lista de
     ingredientes só entra (completa) se a pergunta pediu; senão, só a
-    contagem."""
-    product_id = _produto_consultado(evidencias)
+    contagem. Com vários consultados, prefere o `preferido` (produto em tela)."""
+    product_id = _consultado_com_nome(evidencias, preferido) or _produto_consultado(evidencias)
     if product_id is None:
         return None
     cabecalho = _cabecalho_do_produto(evidencias, product_id)
@@ -178,6 +212,16 @@ def _detalhe_do_produto(evidencias: list[dict] | None, pergunta: str = "") -> st
         linhas.append(f"Nota geral: {score['overall_score']}/100.")
     elif isinstance(score, dict) and score.get("encontrado") is False:
         linhas.append("Ele ainda não tem nota calculada aqui.")
+
+    # A nota personalizada é o que diz se o produto é contraindicado para o
+    # usuário — sem ela, "vc acabou de contraindicar esse produto" recebia só a
+    # nota geral (chatbot real, 2026-10-21). O `summary` da tool já vem em português.
+    pessoal = dados_da_evidencia(evidencias, "get_personalized_score", product_id=product_id)
+    if isinstance(pessoal, dict) and pessoal.get("summary"):
+        linhas.append(f"Pra você: {pessoal['summary']}")
+    elif isinstance(pessoal, dict) and pessoal.get("final_score") is not None:
+        nivel = _NIVEIS_DE_RECOMENDACAO.get(str(pessoal.get("recommendation_level")))
+        linhas.append(f"Nota pra você: {pessoal['final_score']}/100" + (f" ({nivel})." if nivel else "."))
 
     ingredientes = dados_da_evidencia(evidencias, "get_product_ingredients", product_id=product_id)
     if isinstance(ingredientes, list) and ingredientes:
@@ -202,7 +246,7 @@ def _parte_produtos(
     aberto na tela): antes, "sim, sugira" depois de um alerta sobre o CeraVe
     Creme Hidratante devolvia a ficha do próprio CeraVe Creme Hidratante."""
     if not sugestao:
-        detalhe = _detalhe_do_produto(evidencias, pergunta)
+        detalhe = _detalhe_do_produto(evidencias, pergunta, preferido=excluir)
         if detalhe:
             return detalhe, False
     produtos = _resultados_de_todas_as_buscas(evidencias) if sugestao else dados_da_evidencia(evidencias, "search_product")
@@ -410,6 +454,39 @@ def _ingredientes_com_nomes(evidencias: list[dict] | None) -> list[tuple[str, li
     return saida
 
 
+def _avisos_de_horario(pergunta: str, evidencias: list[dict] | None = None) -> list[str]:
+    """Respostas para as partes da pergunta que a rotina não cobre. Sem isso,
+    "posso fazer algo às 22h ou estou ocupado? e de tarde?" recebia só a lista
+    da rotina, sem resposta para a tarde nem para a agenda (chatbot real,
+    2026-10-21)."""
+    avisos = []
+    if _PERGUNTA_AGENDA_RE.search(pergunta or ""):
+        avisos.append(_aviso_da_agenda(evidencias))
+    if _PERGUNTA_TARDE_RE.search(pergunta or ""):
+        avisos.append("De tarde não tem rotina: eu monto rotinas só de manhã e de noite.")
+    return avisos
+
+
+def _aviso_da_agenda(evidencias: list[dict] | None) -> str:
+    """O que `check_availability` devolveu nesta conversa — ou, sem a tool (agenda
+    Google não configurada no grafo), que não há acesso à agenda."""
+    consultas = [
+        dados for dados in (
+            dados_da_evidencia([evidencia], "check_availability")
+            for evidencia in evidencias or [] if evidencia.get("tool") == "check_availability"
+        ) if isinstance(dados, dict)
+    ]
+    if not consultas:
+        return "Não tenho acesso à sua agenda, então não consigo dizer se você está livre nesse horário."
+    if any(dados.get("ocupado") for dados in consultas):
+        return "Pela sua agenda Google, você tem compromisso nesse horário."
+    if all(dados.get("conectado") and dados.get("ocupado") is False for dados in consultas):
+        return "Pela sua agenda Google, você está livre nesse horário."
+    if any(dados.get("conectado") is False for dados in consultas):
+        return "Sua agenda Google não está conectada aqui; dá para conectar pelo app para eu checar seus horários."
+    return "Não consegui ver sua agenda agora, então não sei se você está livre nesse horário."
+
+
 def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     """Quando o Juiz esgota as tentativas em produto/ingrediente/rotina, o texto do especialista
     (reprovado por inventar dado) NÃO chega ao usuário. Monta uma resposta só com o que as
@@ -433,7 +510,12 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     # Numa pergunta sobre a conta, a busca de produto foi só um meio (achar o
     # id): listar o catálogo ali confunde mais do que ajuda.
     especialista = estado.get("resposta_especialista")
-    sugestao = isinstance(especialista, dict) and especialista.get("intencao") == "sugerir"
+    # Pela pergunta também: "qual vc recomendaria?" com o especialista declarando
+    # outra intenção recebia a ficha do 1º produto consultado — que, no chatbot
+    # real (2026-10-21), era um produto contraindicado para o usuário.
+    sugestao = (
+        isinstance(especialista, dict) and especialista.get("intencao") == "sugerir"
+    ) or bool(_PEDE_SUGESTAO_RE.search(pergunta))
     texto_produtos, sem_dado = (None, False) if dados_da_conta else _parte_produtos(
         evidencias, pergunta, sugestao=sugestao, excluir=estado.get("produto_em_contexto")
     )
@@ -444,6 +526,8 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
         _parte_alergias(evidencias, cruzar_com_produto=not sugestao),
     ]
     partes = [parte for parte in candidatas if parte]
+    if estado.get("rota") == "rotina" and partes:
+        partes += _avisos_de_horario(pergunta, evidencias)
 
     if not partes:
         return _SEGURA_GENERICA
@@ -526,9 +610,10 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
         texto = _resposta_direta_do_json(especialista_json)
 
     if texto and _omitiu_dados_das_tools(texto, estado):
-        texto = _resposta_segura_sem_aprovacao(estado)
+        texto = _texto_aprovado_completo(especialista_json, estado) if aprovado else None
+        texto = texto or _resposta_segura_sem_aprovacao(estado)
 
-    texto = texto or _RESPOSTA_ORQUESTRADOR_FALLBACK
+    texto = _sem_ids_internos(texto) or _RESPOSTA_ORQUESTRADOR_FALLBACK
     pendentes = estado.get("agendamento_pendente")
     if pendentes and _AFIRMA_AGENDAMENTO_RE.search(texto):
         logger.warning("Orquestrador afirmou um agendamento ainda não confirmado; texto substituído")
@@ -545,6 +630,32 @@ def _pedido_de_confirmacao(propostas: list[dict]) -> str:
 
     itens = "\n".join(f"- {resumo_da_proposta(proposta)}" for proposta in propostas)
     return f"Vou fazer na sua agenda Google:\n{itens}\n\nPosso? Responda **sim** para confirmar ou **não** para cancelar."
+
+
+def _texto_aprovado_completo(especialista_json: Any, estado: EstadoVenus) -> str | None:
+    """Texto do especialista (já aprovado pelo Juiz) quando ELE traz todos os
+    itens que o texto do LLM omitiu, ou `None`. Trocar direto pela resposta
+    montada só das tools jogava fora o resto do conteúdo aprovado: no chatbot
+    real (2026-10-21), "posso fazer algo às 22h? e de tarde?" perdeu a parte da
+    tarde porque o LLM esqueceu um dos 3 produtos da rotina."""
+    if not isinstance(especialista_json, dict):
+        return None
+    acompanhamento = especialista_json.get("esclarecer") or especialista_json.get("acompanhamento")
+    partes = [
+        str(parte).strip()
+        for parte in (especialista_json.get("resposta"), especialista_json.get("recomendacao"), acompanhamento)
+        if parte and str(parte).strip()
+    ]
+    texto = "\n\n".join(partes)
+    if not texto or _omitiu_dados_das_tools(texto, estado):
+        return None
+    return texto
+
+
+def _sem_ids_internos(texto: str) -> str:
+    """Tira "(product_id 3)" e afins: id interno não é para o usuário (chatbot
+    real, 2026-10-21, a resposta saiu com "CeraVe ... (product_id 3)")."""
+    return _ID_INTERNO_RE.sub("", texto or "").strip()
 
 
 def _omitiu_dados_das_tools(texto: str, estado: EstadoVenus) -> bool:
@@ -605,7 +716,17 @@ def _itens_omitidos(texto: str, evidencias: list[dict] | None, pergunta: str = "
     """Itens obrigatórios que não aparecem no texto (comparação sem espaços
     nem maiúsculas: "FPS 50" e "FPS50" contam como o mesmo)."""
     texto_compacto = _compactar(texto)
-    return [nome for nome in _itens_obrigatorios(evidencias, pergunta) if _compactar(nome) not in texto_compacto]
+    return [nome for nome in _itens_obrigatorios(evidencias, pergunta) if not _item_citado(nome, texto_compacto)]
+
+
+def _item_citado(nome: str, texto_compacto: str) -> bool:
+    """Nome completo, ou sem a marca na frente quando sobram 2+ palavras
+    ("Espuma Cremosa de Limpeza Hidratante") — mesma regra do Juiz
+    (`nodes/juiz.py::_passo_citado`)."""
+    if _compactar(nome) in texto_compacto:
+        return True
+    sem_marca = nome.split(" ", 1)[1] if " " in nome.strip() else ""
+    return len(sem_marca.split()) >= 2 and _compactar(sem_marca) in texto_compacto
 
 
 def _compactar(texto: str) -> str:

@@ -80,7 +80,8 @@ característica, status, recomendação) precisa estar escrito no JSON.
 - Se o JSON contiver "esclarecer" ou "acompanhamento", termine com ele
   (reescrito em uma frase curta). Se não contiver, termine sem pergunta ou
   com uma oferta curta de ajuda — nunca invente uma pergunta nova sobre o
-  assunto.
+  assunto. A oferta nunca promete o que o JSON não oferece (ex.: rotina "de
+  tarde" — o Venus só monta rotina de manhã e de noite).
 - Se receber uma nota do sistema avisando que o Agente Juiz não conseguiu
   validar totalmente a resposta, comunique isso ao usuário com transparência,
   sem alarmismo — ex.: "não tenho total certeza sobre este ponto".

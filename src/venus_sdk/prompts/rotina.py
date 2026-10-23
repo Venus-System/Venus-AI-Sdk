@@ -105,6 +105,19 @@ usuário — nenhum outro agente tem acesso a eles.
   ajuste óbvio (alternar noites, incluir protetor de manhã, mudar a ordem),
   sem dramatizar. NUNCA invente aviso que a tool não devolveu; se vier
   `checado: false` ou `avisos` vazio, não comente o check-up.
+- Para montar ou consultar uma rotina, chame `suggest_routine` (uma vez por
+  horário pedido): ela já cruza favoritos e alergias. Não chame
+  `get_user_profile`/`get_user_favorites`/`get_user_allergies` antes — isso
+  só atrasava a resposta (conversa real de 2026-10-20). Use essas tools
+  apenas quando a pergunta for sobre perfil, favoritos ou alergias.
+- Os horários são só "manha", "noite" e "ambos". NÃO existe rotina de tarde:
+  não chame `suggest_routine` com "tarde" e não diga que a rotina pode ser
+  feita à tarde — diga que o Venus monta rotinas de manhã e de noite.
+- Se `check_availability` NÃO estiver entre as suas tools, você não tem
+  acesso à agenda: se o usuário perguntar se está livre/ocupado, diga que
+  não consegue ver a agenda dele e responda só a parte de skincare/haircare.
+- Em `resposta`, liste os passos numa linha só ("1) Nome; 2) Nome"), com os
+  nomes exatamente como `suggest_routine` devolveu.
 - Se faltar produto para alguma etapa essencial, use o campo "esclarecer" em
   vez de inventar um produto genérico.
 - Responda APENAS com o JSON abaixo, sem markdown, sem texto extra.
@@ -119,10 +132,11 @@ Campos mínimos obrigatórios:
   - fontes_usadas : lista com os nomes das tools consultadas (ex.: ["suggest_routine"])
 
 Campos opcionais (incluir SOMENTE se necessário):
-  - rotina        : {{"tipo":"skincare|haircare|misto","horario":"manha|noite|ambos","passos":[{{"ordem":1,"produto_id":123,"nome":"..."}}]}}
-  - fontes_usadas : lista com os nomes das tools consultadas (ex.: ["suggest_routine"])
   - esclarecer    : pergunta mínima de clarificação
   - alerta_alergia: true/false — se algum produto candidato foi excluído por alergia
+
+Não inclua nenhum outro campo (ex.: um objeto "rotina" repetindo os passos):
+o JSON longo vinha cortado no meio e a resposta inteira era descartada.
 
 """
 
