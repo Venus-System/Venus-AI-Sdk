@@ -6,7 +6,7 @@ Saída   : protocolo de validação em texto puro. NUNCA responde ao usuário �
           apenas aprova ou reprova o JSON antes de seguir ao Orquestrador.
 """
 
-from venus_sdk.prompts.comum import CONTEXTO_TEMPORAL
+from venus_sdk.prompts.comum import ALERGIA_ALCOOL_NOTA, CONTEXTO_TEMPORAL
 
 JUIZ_PROMPT = f"""
 {CONTEXTO_TEMPORAL}
@@ -27,6 +27,16 @@ Venus; apenas aprova ou reprova.
   que o especialista chamou nesta tentativa — a fonte da verdade. Use isto
   pra conferir se "resposta"/"recomendacao" batem com o que as tools
   realmente devolveram, não só se o JSON parece coerente por fora.
+- PRODUTO_EM_CONTEXTO / HISTORICO_RECENTE (quando presentes): o produto
+  aberto na tela e as últimas mensagens. Servem para entender a que a
+  PERGUNTA_ORIGINAL se refere ("sim, sugira", "esse produto") ao aplicar o
+  critério 1 — nunca como fonte de dado de produto. Se a pergunta for sobre
+  a própria conversa, "historico_conversa" em `fontes_usadas` é fonte válida
+  para o que foi dito nela.
+- AMARRACAO_VERIFICADA (quando presente, só em produto): o sistema JÁ
+  conferiu, em código, que cada product_id, nome e nota de `produtos` bate
+  com RESULTADOS_TOOLS. Não reconfira nem reprove essas notas/nomes; audite
+  só o resto (composição, alergia, risco, coerência com a pergunta).
 
 
 ### CRITÉRIOS DE REPROVAÇÃO (percorra um a um, nessa ordem, antes de decidir)
@@ -75,6 +85,43 @@ produto ou uma ordem inadequados — só se a resposta mudar, inventar ou omitir
 passos em relação ao retorno da tool. Reprove se a resposta disser que
 adicionou ou removeu algo dos favoritos: a IA nunca altera os dados do
 usuário.
+
+CALIBRAGEM (achados de uma conversa real em que o Juiz reprovou tudo e o
+usuário ficou preso numa resposta genérica):
+- Pedir esclarecimento (`esclarecer`) quando falta contexto para responder
+  com dado é uma resposta VÁLIDA — não reprove por "não ter respondido".
+- Se a PERGUNTA_ORIGINAL é só uma afirmação/aviso do usuário, sem pedido
+  (ex.: "cadastrei os produtos que você falou"), uma confirmação curta com
+  oferta de próximo passo responde a ela — não reprove pelo critério 1.
+- Na rotina, um pedido de período ("só para essa semana", "às 22h") não
+  muda os passos de `suggest_routine`: não reprove por a resposta repetir ou
+  não repetir o período/horário, nem por um produto da tool parecer pouco
+  adequado.
+- São regras do próprio Venus, válidas SEM tool: o Venus monta rotina só de
+  manhã e de noite (não existe rotina de tarde) e, quando `check_availability`
+  não aparece em RESULTADOS_TOOLS, não tem acesso à agenda do usuário. Dizer
+  isso não é afirmação sem fonte.
+- Reprove (critério 8) avaliação de nota sem número ou numa dimensão que a
+  tool não devolveu — ex.: "nota alta em segurança" quando
+  `get_product_score` não tem campo de segurança.
+- Se o usuário contesta algo dito antes ("você contraindicou esse
+  produto"), dizer o que as tools mostram agora (ex.: `recommendation_level`
+  do `get_personalized_score`) responde à contestação — não exija que a
+  resposta explique ou confirme a fala anterior.
+- Uma nota `null` no retorno de `get_product_score` (ex.:
+  `performance_score: null`) é aquela dimensão sem nota, e `"encontrado":
+  false` em `get_personalized_score` é "não há nota personalizada": dizer
+  isso, com essas ou outras palavras, está CORRETO.
+- No FEEDBACK, cite só tools que aparecem em RESULTADOS_TOOLS ou em
+  `fontes_usadas`: você não conhece o catálogo de tools do especialista e
+  não pode pedir uma tool inventada.
+- Não reprove por OMISSÃO de algo que a pergunta não pediu (ex.: não ter
+  dito que um ingrediente está ausente). Reprove o que foi AFIRMADO sem
+  apoio ou que contradiz RESULTADOS_TOOLS.
+- Antes de dizer que um ingrediente "não está" em RESULTADOS_TOOLS, procure
+  pelo nome INCI e pelo nome comum (`common_name`).
+- Alergia a "Álcool" segue a regra abaixo; álcool graxo não é conflito.
+{ALERGIA_ALCOOL_NOTA}
 
 No FAQ/RAG, RESULTADOS_TOOLS traz os trechos recuperados (com `fonte`/`url`): reprove se a
 resposta afirma algo que nenhum trecho sustenta, ou se `fontes_usadas` cita

@@ -112,7 +112,7 @@ def test_schema_tem_firebase_uid_unico_para_resolver_o_usuario():
 
 # --- Item 3: guardrail de entrada ---------------------------------------------
 
-from venus_sdk.guardrail_rules import guardrail_entrada  # noqa: E402
+from venus_sdk.prompts.guardrail_rules import guardrail_entrada  # noqa: E402
 
 
 @pytest.mark.parametrize("mensagem", [

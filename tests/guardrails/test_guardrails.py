@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from venus_sdk.guardrail_rules import MENSAGEM_ENTRADA_BLOQUEADA, MENSAGEM_SAIDA_BLOQUEADA
+from venus_sdk.prompts.guardrail_rules import MENSAGEM_ENTRADA_BLOQUEADA, MENSAGEM_SAIDA_BLOQUEADA
 from venus_sdk.nodes.guardrails import (
     decidir_pos_guardrail_entrada,
     no_guardrail_entrada,

@@ -19,11 +19,11 @@ from typing import Any
 
 from langgraph.store.base import BaseStore
 
-from venus_sdk.guardrail_rules import contem_tentativa_de_injecao
+from venus_sdk.prompts.guardrail_rules import contem_tentativa_de_injecao
 from venus_sdk.llm.models import get_llm_rapido
 from venus_sdk.nodes._json import extrair_objeto_json
 from venus_sdk.prompts.memoria import MEMORIA_PROMPT_COMPLETO
-from venus_sdk.state import EstadoVenus
+from venus_sdk.nodes.state import EstadoVenus
 
 logger = logging.getLogger(__name__)
 
@@ -73,10 +73,8 @@ def no_atualizar_memoria(estado: EstadoVenus, *, store: BaseStore) -> EstadoVenu
         # carregada — mesclar agora apagaria o perfil salvo.
         return {}
 
-    # `pergunta_original` é a reformulação feita pelo LLM roteador (ver
-    # `nodes/roteador.py`), não a mensagem real do usuário — usar
-    # `mensagem_anonimizada` (a entrada de fato, já sem dado sensível) evita
-    # extrair fatos de longo prazo a partir de uma paráfrase.
+    # `mensagem_anonimizada` (a entrada de fato, já sem dado sensível) — não
+    # `pergunta_original`, que só existe quando houve rota de especialista.
     pergunta = estado.get("mensagem_anonimizada") or estado.get("mensagem_usuario", "")
     resposta = estado.get("resposta_final") or ""
     perfil_atual = estado.get("memorias_usuario") or {}

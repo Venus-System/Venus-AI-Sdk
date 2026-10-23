@@ -251,7 +251,7 @@ def test_agente_de_rotina_recebe_tools_extras() -> None:
     for pergunta in ("Monta uma rotina de manhã às 7h", "Quais são meus favoritos?"):
         recebidas: dict = {}
 
-        def _montar(llm, *, prompt, tools):
+        def _montar(llm, *, prompt, tools, **_limites):
             recebidas["tools"] = [t.name for t in tools]
             return "agente"
 

@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from venus_sdk.guardrail_rules import (
+from venus_sdk.prompts.guardrail_rules import (
     MENSAGEM_ENTRADA_BLOQUEADA,
     MENSAGEM_SAIDA_BLOQUEADA,
     anonimizar_entrada,
@@ -20,7 +20,7 @@ from venus_sdk.guardrail_rules import (
 )
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_guardrail
 from venus_sdk.prompts.guardrail import GUARDRAIL_LLM_PROMPT
-from venus_sdk.state import EstadoVenus
+from venus_sdk.nodes.state import EstadoVenus
 
 logger = logging.getLogger(__name__)
 

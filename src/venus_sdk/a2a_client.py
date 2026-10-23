@@ -15,7 +15,7 @@ from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
-from venus_sdk.guardrail_rules import contem_tentativa_de_injecao
+from venus_sdk.prompts.guardrail_rules import contem_tentativa_de_injecao
 
 logger = logging.getLogger(__name__)
 

@@ -26,7 +26,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 FIXTURES = RAIZ / "tests" / "guardrails" / "fixtures"
 MARCA_CAMADA2 = "# camada2"
 
-from venus_sdk.guardrail_rules import guardrail_entrada  # noqa: E402
+from venus_sdk.prompts.guardrail_rules import guardrail_entrada  # noqa: E402
 
 
 def carregar(arquivo: str) -> list[tuple[str, bool]]:

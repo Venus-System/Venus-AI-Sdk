@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from venus_sdk.guardrail_rules import (
+from venus_sdk.prompts.guardrail_rules import (
     anonimizar_entrada,
     guardrail_entrada,
     guardrail_saida,

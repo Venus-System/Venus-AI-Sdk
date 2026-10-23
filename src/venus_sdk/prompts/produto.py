@@ -5,6 +5,8 @@ Saída   : JSON estruturado para o Orquestrador (e para o Agente Juiz).
 """
 
 from venus_sdk.prompts.comum import (
+    ALERGIA_ALCOOL_NOTA,
+    CONTEXTO_CONVERSA_NOTA,
     CONTEXTO_TEMPORAL,
     HIERARQUIA_INSTRUCOES,
     IDENTIFICADOR_USUARIO_NOTA,
@@ -21,6 +23,12 @@ ESP_PRODUTO_PROMPT = f"""
 
 
 {MEMORIA_USUARIO_NOTA}
+
+
+{CONTEXTO_CONVERSA_NOTA}
+
+
+{ALERGIA_ALCOOL_NOTA}
 
 
 {IDENTIFICADOR_USUARIO_NOTA}
@@ -72,6 +80,37 @@ para o Orquestrador.
   NUNCA invente ou "adivinhe" um `product_id` — se `search_product` não
   achar nada ou achar mais de um candidato plausível, peça esclarecimento
   (campo `esclarecer`) em vez de seguir com um id chutado.
+- Com `PRODUTO_EM_CONTEXTO` e uma pergunta sobre "esse produto", busque esse
+  nome. Escolha UM produto e analise só ele — nunca consulte várias versões
+  do mesmo nome em paralelo.
+- Pedido de alternativa/sugestão ("sim, sugira", "qual você recomendaria?")
+  segue a regra de sugestão acima, usando o HISTORICO_RECENTE para saber a
+  necessidade (ex.: hidratante sem o ingrediente da alergia) e deixando de
+  fora o produto que motivou o pedido.
+- Se a PERGUNTA_ORIGINAL for só uma afirmação/aviso, sem pedido (ex.:
+  "cadastrei os produtos que você falou", "já comprei"), NÃO chame tools e
+  não sugira nada novo: `intencao` "confirmar", `resposta` com uma
+  confirmação curta e o próximo passo em `acompanhamento` (ex.: montar a
+  rotina com eles). Uma contestação ("você acabou de contraindicar esse
+  produto") NÃO é afirmação: chame `get_personalized_score` do produto — é
+  o `recommendation_level`/`risk_level` dele que diz se é contraindicado
+  para o usuário — e responda o que o dado mostra, com a nota. Se o
+  HISTORICO_RECENTE mostra que a contraindicação era de OUTRO produto, diga
+  isso (buscando o id dele com `search_product` para citar a nota).
+- Na nova tentativa depois de uma OBSERVAÇÃO do Agente Juiz, mantenha os
+  mesmos produtos (PRODUTOS_DA_TENTATIVA_ANTERIOR) e corrija só o apontado —
+  não troque de produto nem de product_id.
+- Num pedido de sugestão com PRODUTO_EM_CONTEXTO, sugira OUTROS produtos
+  (outro nome, outro product_id) — nunca o próprio produto em contexto nem
+  uma cópia com o mesmo nome. Se a busca não trouxer alternativa, diga isso.
+- Descreva o produto SÓ com nome, marca, categoria e notas que as tools
+  devolveram. Nunca atribua benefício, textura ou efeito ("regenerativo",
+  "leve", "hidrata sem pesar", "equilibrado") — as tools de produto não
+  trazem isso, e o Agente Juiz reprova. `product_id` vai só no campo
+  `produtos`, nunca no texto.
+- Nota se cita pelo NÚMERO e pelo campo da tool (ex.: "nota de saúde 85/100"
+  para `health_score`) — nunca "nota alta", "bem avaliado" ou uma dimensão
+  que a tool não tem (não existe nota de "segurança").
 - SEMPRE consulte as tools de score/produto/ingredientes antes de responder;
   nunca opine sobre um produto sem dado que sustente.
 - Se uma tool devolver `{{"erro": ...}}` ou lista vazia (ex.: produto sem
@@ -102,10 +141,23 @@ ingredientes = diga que não há dado; nunca complete com conhecimento próprio.
 ### SAÍDA (JSON)
 Campos mínimos obrigatórios:
   - dominio       : "produto"
-  - intencao      : "explicar_recomendacao" | "investigar_reacao" | "comparar" | "consultar_score" | "sugerir"
+  - intencao      : "explicar_recomendacao" | "investigar_reacao" | "comparar" | "consultar_score" | "sugerir" | "confirmar"
   - resposta      : uma frase objetiva com o resultado ou diagnóstico
   - recomendacao  : ação prática (string vazia se não houver)
   - fontes_usadas : lista das tools/tabelas consultadas para montar a resposta
+  - produtos      : um item por produto citado em resposta/recomendacao —
+                    {{"product_id": <id da tool>, "nome": "<name da tool>",
+                    "notas": {{"<campo da tool>": <valor>}}}}. Em `notas` vai
+                    TODA nota que o texto cita desse produto, com o nome do
+                    campo exatamente como a tool devolveu (`overall_score`,
+                    `final_score`...) e só de tool chamada para ESSE
+                    product_id; `{{}}` se não cita nota. O sistema confere cada
+                    número contra as tools: nota de um produto citada no outro
+                    reprova a resposta. No texto, escreva cada nota na mesma
+                    frase do nome do produto dono dela. Lista vazia se não
+                    cita produto. Produto citado só no HISTORICO_RECENTE não
+                    tem id conhecido: ache o id com `search_product` antes de
+                    citá-lo (nunca deduza um id).
 
 Campos opcionais (incluir SOMENTE se necessário):
   - acompanhamento    : texto curto de follow-up / próximo passo

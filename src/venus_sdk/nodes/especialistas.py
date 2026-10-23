@@ -11,7 +11,7 @@ from typing import Any
 
 from langchain_core.messages import ToolMessage
 
-from venus_sdk.flows.agente_mcp import montar_agente_mcp
+from venus_sdk.flows.agente_mcp import CHAMADA_RECUSADA, montar_agente_mcp
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_especialista
 from venus_sdk.nodes._evidencias import dados_da_evidencia
 from venus_sdk.nodes._json import extrair_objeto_json
@@ -25,11 +25,12 @@ from venus_sdk.nodes.agendamento import (
     propostas_validas,
 )
 from venus_sdk.prompts.comum import com_data_atual
+from venus_sdk.nodes._historico import historico_recente
 from venus_sdk.prompts.faq import FAQ_PROMPT_COMPLETO
 from venus_sdk.prompts.ingrediente import ESP_INGREDIENTE_PROMPT_COMPLETO
 from venus_sdk.prompts.produto import ESP_PRODUTO_PROMPT_COMPLETO
 from venus_sdk.prompts.rotina import ROTINA_PROMPT_COMPLETO
-from venus_sdk.state import EstadoVenus
+from venus_sdk.nodes.state import EstadoVenus
 from venus_sdk.tools.calculos import montar_tools_calculo_ingrediente, montar_tools_calculo_rotina
 from venus_sdk.tools.compartilhadas import montar_tools_compartilhadas
 from venus_sdk.tools.faq import montar_tools_faq
@@ -53,6 +54,16 @@ _RESPOSTA_ERRO_FORMATO = "Não consegui estruturar uma resposta válida para ess
 # Teto de passos do agente ReAct por pergunta; cada rodada de tool gasta 2
 # (LLM + tool) e o agente de ingrediente chega a consultar as 5 tools.
 _LIMITE_PASSOS_AGENTE = 24
+# Teto de chamadas de tool do especialista de Produto, aplicado no código (ver
+# `flows/agente_mcp.py::_limitar_chamadas`): só no prompt ("no máximo 5"), o
+# agente fazia 8 a 11 (conversa real de 2026-10-20). 6 cobre o caso mais longo
+# (busca + produto + nota + nota personalizada + ingredientes + alergias).
+MAX_CHAMADAS_TOOLS_PRODUTO = 6
+# Rotina: `suggest_routine` já cruza favoritos e alergias; no chatbot real o
+# agente ainda chamava perfil + favoritos + alergias + 3x `suggest_routine`
+# (uma com "tarde", inválido) e o turno passava de 120 s (2026-10-21). 6 cobre
+# montar + check-up + agenda + agendar manhã e noite.
+MAX_CHAMADAS_TOOLS_ROTINA = 6
 _TAMANHO_PREVIA_LOG = 80
 
 # Adição também exige o verbo apontando PARA os favoritos ("coloca X nos
@@ -81,6 +92,32 @@ _RESPOSTA_ALTERAR_FAVORITO = (
     "Posso te mostrar os favoritos que você já tem ou montar uma rotina com eles?"
 )
 
+# Afirmação pura do usuário ("cadastrei os produtos que vc falou"): confirmação
+# curta escrita no código, sem LLM nem tools. Só pelo prompt, o modelo de
+# fallback ainda "varria" get_product(1..6) e afirmava coisas falsas sobre a
+# conta (chatbot real, 2026-10-21). Pedido, pergunta, negação ou relato de
+# problema ("usei e deu coceira") NÃO entram aqui — vão ao especialista.
+_AFIRMACAO_RE = re.compile(
+    r"\b(cadastrei|comprei|adicionei|salvei|anotei|separei|coloquei|j[aá]\s+(tenho|cadastrei|comprei|salvei))\b",
+    re.IGNORECASE,
+)
+_PEDIDO_OU_PROBLEMA_RE = re.compile(
+    r"\?|\b(sugir|sugest|recomend|qual|quais|como|pode|poderia|me\s+(fala|diz|mostra|explica)|mont[ae]|quer|"
+    r"precis|ajud|o\s+que|oq|por\s*que|n[aã]o|nunca|rea[cç]|alerg|ard|coceir|irrit|vermelh|pior|funcion|mancha|"
+    r"espinh|doeu|dor)\w*",
+    re.IGNORECASE,
+)
+INTENCAO_CONFIRMAR = "confirmar"
+_DOMINIOS_COM_CONFIRMACAO = {"produto", "rotina"}
+_RESPOSTA_CONFIRMACAO = "Anotado, que bom!"
+_ACOMPANHAMENTO_CONFIRMACAO = "Quer que eu monte ou ajuste sua rotina com esses produtos?"
+
+
+def e_so_afirmacao(pergunta: str) -> bool:
+    """True se a mensagem só avisa algo feito, sem pedido nem problema."""
+    texto = pergunta or ""
+    return bool(_AFIRMACAO_RE.search(texto)) and not _PEDIDO_OU_PROBLEMA_RE.search(texto)
+
 
 # --- entrada do especialista ---
 
@@ -93,6 +130,9 @@ def _montar_entrada(estado: EstadoVenus) -> str:
         f"ROUTE={estado.get('rota')}",
         f"PERGUNTA_ORIGINAL={estado.get('pergunta_original') or estado.get('mensagem_usuario', '')}",
     ]
+    produto_em_contexto = estado.get("produto_em_contexto")
+    if produto_em_contexto:
+        partes.append(f"PRODUTO_EM_CONTEXTO={produto_em_contexto}")
     memorias = estado.get("memorias_usuario")
     if memorias:
         partes.append(f"MEMORIA_USUARIO={json.dumps(memorias, ensure_ascii=False)}")
@@ -100,13 +140,34 @@ def _montar_entrada(estado: EstadoVenus) -> str:
     usuario_id_postgres = estado.get("usuario_id_postgres")
     if usuario_id_postgres is not None:
         partes.append(f"USER_ID_POSTGRES={usuario_id_postgres}")
+    historico = historico_recente(estado)
+    if historico:
+        partes.append(f"HISTORICO_RECENTE (só contexto, nunca fonte de dado):\n{historico}")
     feedback = estado.get("feedback_juiz")
     if feedback:
+        # Sem isto o retry trocava de produto (conversa real de 2026-10-20: a
+        # nova tentativa de "vc acabou de contraindicar esse produto" foi para
+        # o product_id 1) e o Juiz reprovava de novo.
+        anteriores = _produtos_da_tentativa_anterior(estado.get("resposta_especialista"))
+        if anteriores:
+            partes.append(f"PRODUTOS_DA_TENTATIVA_ANTERIOR={anteriores}")
         partes.append(
             "OBSERVAÇÃO (Agente Juiz reprovou a tentativa anterior — corrija "
             f"antes de responder): {feedback}"
         )
     return "\n".join(partes)
+
+
+def _produtos_da_tentativa_anterior(resposta: Any) -> str | None:
+    """"17 (CeraVe Creme Hidratante); 43 (...)" a partir do campo `produtos` do
+    JSON reprovado, ou `None`."""
+    produtos = resposta.get("produtos") if isinstance(resposta, dict) else None
+    itens = [
+        f"{item.get('product_id')} ({item.get('nome')})"
+        for item in produtos or []
+        if isinstance(item, dict) and item.get("product_id") is not None
+    ] if isinstance(produtos, list) else []
+    return "; ".join(itens) or None
 
 
 # --- execução do agente ReAct ---
@@ -123,7 +184,7 @@ def _extrair_evidencias_tools(mensagens: list) -> list[dict[str, Any]]:
     }
     evidencias = []
     for mensagem in mensagens:
-        if not isinstance(mensagem, ToolMessage):
+        if not isinstance(mensagem, ToolMessage) or str(mensagem.content).startswith(CHAMADA_RECUSADA):
             continue
         evidencia = {"tool": mensagem.name, "resultado": mensagem.content}
         argumentos = argumentos_por_chamada.get(mensagem.tool_call_id)
@@ -195,6 +256,17 @@ def _garantir_passos_da_rotina(resposta: dict, evidencias: list[dict] | None) ->
     return resposta
 
 
+def _somar_evidencias(novas: list[dict] | None, anteriores: list[dict] | None) -> list[dict]:
+    """Evidências desta tentativa primeiro (`dados_da_evidencia` lê a 1ª chamada),
+    depois as da anterior que não repetem a mesma tool com os mesmos argumentos."""
+    vistas = {(e.get("tool"), json.dumps(e.get("argumentos"), sort_keys=True, default=str)) for e in novas or []}
+    extras = [
+        e for e in anteriores or []
+        if (e.get("tool"), json.dumps(e.get("argumentos"), sort_keys=True, default=str)) not in vistas
+    ]
+    return [*(novas or []), *extras]
+
+
 def _resposta_de_falha(nome: str, intencao: str, texto: str) -> dict[str, Any]:
     """JSON no formato do especialista para quando ele não conseguiu responder."""
     return {
@@ -227,6 +299,14 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
         logger.warning("Especialista %s não devolveu JSON válido (%d caracteres)", nome, len(texto or ""))
         resposta_json = _resposta_de_falha(nome, "erro_formato", _RESPOSTA_ERRO_FORMATO)
 
+    # Retry dentro do MESMO turno (`tentativas_juiz` é zerado a cada mensagem em
+    # `no_guardrail_entrada`): a evidência da tentativa reprovada continua
+    # valendo. Sem isso, uma nova tentativa que citava um produto achado na
+    # anterior era reprovada por "id sem tool", e o fallback ficava sem dado
+    # nenhum (chatbot real, 2026-10-21).
+    if estado.get("tentativas_juiz", 0) > 0:
+        evidencias = _somar_evidencias(evidencias, estado.get("evidencias_tools"))
+
     if nome == "rotina":
         resposta_json = _garantir_passos_da_rotina(resposta_json, evidencias)
 
@@ -246,7 +326,7 @@ def _prompt_com_data_atual(prompt: str) -> Callable[[], str]:
 
 
 def _montar_no_especialista(
-    nome: str, prompt: str, montar_tools: Callable[[], list[Any]]
+    nome: str, prompt: str, montar_tools: Callable[[], list[Any]], *, max_chamadas_tools: int | None = None
 ) -> NoEspecialista:
     """Nó de especialista com o agente ReAct montado sob demanda.
 
@@ -260,11 +340,19 @@ def _montar_no_especialista(
         if agente is None:
             # As tools primeiro: sem `pool`/`indice`, o erro que sobe é o delas.
             tools = montar_tools()
-            agente = montar_agente_mcp(get_llm_especialista(), prompt=_prompt_com_data_atual(prompt), tools=tools)
+            limite = {} if max_chamadas_tools is None else {"max_chamadas_tools": max_chamadas_tools}
+            agente = montar_agente_mcp(
+                get_llm_especialista(), prompt=_prompt_com_data_atual(prompt), tools=tools, **limite
+            )
         return agente
 
     async def no_especialista(estado: EstadoVenus) -> EstadoVenus:
         """Roda o agente e grava o JSON em `resposta_especialista`."""
+        pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario", "")
+        if nome in _DOMINIOS_COM_CONFIRMACAO and e_so_afirmacao(pergunta):
+            confirmacao = _resposta_de_falha(nome, INTENCAO_CONFIRMAR, _RESPOSTA_CONFIRMACAO)
+            confirmacao["acompanhamento"] = _ACOMPANHAMENTO_CONFIRMACAO
+            return {"resposta_especialista": confirmacao, "evidencias_tools": None}
         try:
             agente_pronto = _agente()
         except Exception:
@@ -290,6 +378,7 @@ def montar_no_agente_produto(pool: Any) -> NoEspecialista:
         "produto",
         ESP_PRODUTO_PROMPT_COMPLETO,
         lambda: montar_tools_produto(pool) + montar_tools_compartilhadas(pool),
+        max_chamadas_tools=MAX_CHAMADAS_TOOLS_PRODUTO,
     )
 
 
@@ -326,6 +415,7 @@ def montar_no_agente_rotina(pool: Any, tools_extras: list[Any] | None = None) ->
         ROTINA_PROMPT_COMPLETO,
         lambda: (montar_tools_rotina(pool) + montar_tools_compartilhadas(pool) + montar_tools_calculo_rotina()
                  + list(tools_extras or [])),
+        max_chamadas_tools=MAX_CHAMADAS_TOOLS_ROTINA,
     )
 
     async def no_agente_rotina(estado: EstadoVenus) -> EstadoVenus:

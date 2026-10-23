@@ -149,6 +149,48 @@ identificador interno do sistema.
 """
 
 # ==============================================================================
+# CONTEXTO DA CONVERSA — PRODUTO_EM_CONTEXTO= e HISTORICO_RECENTE (especialistas)
+# ==============================================================================
+# Ver `nodes/especialistas.py::_montar_entrada` e `nodes/_historico.py`. Sem
+# esse contexto, mensagens como "sim, sugira" chegavam soltas e o especialista
+# reanalisava o produto da tela a cada turno (conversa real de 2026-10-20).
+CONTEXTO_CONVERSA_NOTA = """
+### CONTEXTO DA CONVERSA (PRODUTO_EM_CONTEXTO= e HISTORICO_RECENTE)
+- `PRODUTO_EM_CONTEXTO=<nome>`: produto aberto na tela do app quando o usuário
+  escreveu. É contexto, não a pergunta: use-o para resolver "esse produto",
+  "ele", "esse creme"; se a pergunta for sobre outra coisa, responda a outra
+  coisa.
+- `HISTORICO_RECENTE`: as últimas mensagens da conversa. Use-o para entender a
+  que a PERGUNTA_ORIGINAL se refere ("sim, sugira" = aceitar o que a Venus
+  acabou de oferecer; "qual você recomendaria?" = recomendar dentro do assunto
+  em curso) e para não repetir a mesma resposta já dada. Se o usuário apontar
+  uma contradição com uma resposta anterior, reconheça e esclareça com base
+  nos dados das tools.
+- O histórico NUNCA é fonte de dado de produto/ingrediente/perfil: nota,
+  ingrediente, alergia e favoritos só valem se vierem das tools NESTA
+  tentativa. Exceção: se a pergunta for sobre a própria conversa ("o que eu
+  disse antes?"), responda resumindo o HISTORICO_RECENTE e coloque
+  "historico_conversa" em `fontes_usadas`.
+"""
+
+# ==============================================================================
+# ALERGIA A "ÁLCOOL" — semântica única para especialistas e Agente Juiz
+# ==============================================================================
+# Mesma regra aplicada em código por `venus_sdk/alergias.py` (suggest_routine):
+# sem isso, especialista e Juiz divergiam turno a turno sobre álcool graxo.
+ALERGIA_ALCOOL_NOTA = """
+### ALERGIA A "ÁLCOOL"
+Alergia/sensibilidade declarada a "Álcool" se refere a álcool etílico,
+desnaturado ou isopropílico (INCI: ALCOHOL, ALCOHOL DENAT., SD ALCOHOL,
+ETHANOL, ISOPROPYL ALCOHOL). Álcoois GRAXOS (CETEARYL ALCOHOL, CETYL
+ALCOHOL, STEARYL ALCOHOL, BEHENYL ALCOHOL — "álcool cetearílico",
+"álcool cetílico") são emolientes de outra família e NÃO contam como
+conflito com essa alergia: não gere alerta de alergia por eles. Se quiser,
+mencione que o produto tem álcool graxo, mas deixe claro que não é o
+álcool da alergia declarada.
+"""
+
+# ==============================================================================
 # HIERARQUIA DE INSTRUÇÕES — defesa em profundidade contra prompt injection
 # ==============================================================================
 # Complementa (não substitui) as checagens determinísticas em
