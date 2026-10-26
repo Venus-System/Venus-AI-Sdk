@@ -19,6 +19,7 @@ from venus_sdk.prompts.guardrail_rules import (
     remover_emojis,
 )
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_guardrail
+from venus_sdk.nodes.roteador import _RE_PERGUNTA_SOBRE_CONVERSA, separar_produto_em_contexto
 from venus_sdk.prompts.guardrail import GUARDRAIL_LLM_PROMPT
 from venus_sdk.nodes.state import EstadoVenus
 
@@ -33,7 +34,12 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
     e sem isso `tentativas_juiz` vinha do turno anterior pelo checkpointer."""
     mensagem = estado.get("mensagem_usuario", "") or ""
     bloqueado, motivo = guardrail_entrada(mensagem)
-    if not bloqueado and _classificador_llm_ligado() and _classificador_llm_ve_injecao(mensagem):
+    if (
+        not bloqueado
+        and _classificador_llm_ligado()
+        and not _pergunta_curta_sobre_a_conversa(mensagem)
+        and _classificador_llm_ve_injecao(mensagem)
+    ):
         bloqueado, motivo = True, "tentativa de manipulação do sistema (classificador LLM)"
     mensagem_anonimizada = anonimizar_entrada(mensagem)
 
@@ -55,6 +61,18 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
         # O "sim" de um agendamento só vale na mensagem logo seguinte à proposta.
         atualizacao["agendamento_pendente"] = None
     return atualizacao
+
+
+# "oq eu acabei de falar no prompt anterior?" era bloqueada pelo classificador
+# LLM como tentativa de ver o prompt de sistema (chatbot real, 2026-10-26). Só
+# pergunta CURTA sobre a conversa pula o classificador; a regex de
+# `guardrail_entrada` (primeira camada) continua valendo para ela.
+_TAMANHO_MAXIMO_PERGUNTA_SOBRE_CONVERSA = 90
+
+
+def _pergunta_curta_sobre_a_conversa(mensagem: str) -> bool:
+    _, pergunta = separar_produto_em_contexto(mensagem)
+    return len(pergunta) <= _TAMANHO_MAXIMO_PERGUNTA_SOBRE_CONVERSA and bool(_RE_PERGUNTA_SOBRE_CONVERSA.search(pergunta))
 
 
 def _classificador_llm_ligado() -> bool:

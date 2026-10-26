@@ -8,7 +8,12 @@ import re
 from typing import Literal
 
 from venus_sdk.llm.models import get_llm_juiz
-from venus_sdk.nodes._amarracao_produtos import conferir_amarracao, mesmo_nome, nomes_por_id
+from venus_sdk.nodes._amarracao_produtos import (
+    conferir_alegacao_de_alergia,
+    conferir_amarracao,
+    mesmo_nome,
+    nomes_por_id,
+)
 from venus_sdk.nodes._evidencias import dados_da_evidencia
 from venus_sdk.nodes._historico import historico_recente
 from venus_sdk.prompts.comum import com_data_atual
@@ -69,7 +74,10 @@ _RE_AFIRMA_ALEM_DA_NOTA = re.compile(
 # trazia reprovação por "não repetiu 'só essa semana'" (chatbot real, 2026-10-21).
 _RE_ROTINA_AFIRMA_SEGURANCA = re.compile(
     r"alerg|rea[cç][aãõ]|irrit|contraindic|dermatolog|sintoma|[áa]lcool|fragr[aâ]ncia|perfume|parabeno|sulfato"
-    r"|risco|seguran[cç]a|\bsegur[oa]\b",
+    r"|risco|seguran[cç]a|\bsegur[oa]\b|[áa]cido"
+    # Produto além dos passos (o agente de rotina não busca no catálogo: no
+    # chatbot real de 2026-10-26 ele "sugeriu" dois produtos que nenhuma tool trouxe).
+    r"|por exemplo|\bsugir|\bsugest|\brecomend|\bexemplo|['\"‘’“”]",
     re.IGNORECASE,
 )
 INTENCAO_CONFIRMAR = "confirmar"
@@ -213,6 +221,14 @@ def _sem_campos_inuteis(dados: object) -> object:
     return dados
 
 
+def _feedback_da_alergia(problemas: list[str]) -> str:
+    return (
+        "A resposta afirma compatibilidade com as alergias do usuário sem conferir: "
+        + "; ".join(problemas)
+        + ". Consulte get_product_ingredients de cada produto sugerido e não sugira o que bate com a alergia."
+    )
+
+
 def _feedback_da_amarracao(problemas: list[str]) -> str:
     return (
         "A amarração das notas aos produtos não bate com RESULTADOS_TOOLS: "
@@ -351,6 +367,13 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
     # tela ainda não responde ao pedido.
     if _sugeriu_so_o_produto_em_contexto(estado):
         return _veredito(False, _FEEDBACK_SUGERIU_O_PROPRIO_PRODUTO, proxima_tentativa)
+    if estado.get("rota") == "produto" or especialista.get("dominio") == "produto":
+        # Segurança antes de qualquer aprovação rápida: "sem ácido salicílico" sem
+        # ter lido os ingredientes do produto (chatbot real, 2026-10-26).
+        problemas_de_alergia = conferir_alegacao_de_alergia(especialista, estado.get("evidencias_tools"))
+        if problemas_de_alergia:
+            logger.info("Juiz reprovou afirmação de compatibilidade com alergia sem LLM: %s", problemas_de_alergia)
+            return _veredito(False, _feedback_da_alergia(problemas_de_alergia), proxima_tentativa)
     if (
         _resposta_honesta_sem_dado(estado)
         or _pedido_de_esclarecimento_honesto(estado)

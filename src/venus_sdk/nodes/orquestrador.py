@@ -85,6 +85,21 @@ _AFIRMA_AGENDAMENTO_RE = re.compile(
 _RESPOSTA_ANTES_DA_CONFIRMACAO = "Preparei o agendamento da sua rotina — só falta você confirmar."
 # `[nome do produto]` é placeholder; `[FAQ](https://...)` é link markdown.
 _PLACEHOLDER_RE = re.compile(r"\[[^\]\n]{2,40}\](?!\()")
+# A IA nunca adiciona aos favoritos/listas (não há tool para isso): a frase que
+# oferece fazer isso ("Quer que eu inclua esses produtos na sua lista?",
+# "Confirma a adição desses dois produtos aos seus favoritos?") vira a orientação
+# de salvar pelo app — no chatbot real (2026-10-26), o "sim" do usuário a essa
+# oferta não tinha o que executar.
+_OFERTA_DE_SALVAR_RE = re.compile(
+    # O verbo de salvar é da própria Venus ("que eu inclua", "posso adicionar",
+    # "confirma a adição") — "quer que eu sugira produtos para você salvar nos
+    # favoritos?" é uma oferta válida e fica.
+    r"[^.!?\n]*(?:\b(?:que eu|posso|devo)\s+(?:\w+\s+){0,2}?(?:adicion|inclu|salv|coloc|guard)\w*"
+    r"|\bconfirma\w*\s+(?:a\s+)?(?:adi[cç][ãa]o|inclus[ãa]o))"
+    r"[^.!?\n]*?\b(?:favorit|lista|rotina)\w*[^.!?\n]*[.!?]?",
+    re.IGNORECASE,
+)
+_ORIENTACAO_SALVAR_NO_APP = "Se quiser usar algum deles na rotina, é só salvar nos favoritos pelo app."
 _ID_INTERNO_RE = re.compile(
     r"\s*\((?:product|ingredient|user|produto)_id\s*[:=]?\s*\d+\)|\s*\b(?:product|ingredient|user)_id\s*[:=]?\s*\d+",
     re.IGNORECASE,
@@ -419,6 +434,11 @@ def _parte_alergias(evidencias: list[dict] | None, *, cruzar_com_produto: bool =
     if not nomes:
         return None
     ingredientes = _ingredientes_com_nomes(evidencias) if cruzar_com_produto else []
+    if not ingredientes and not cruzar_com_produto:
+        # Lista de sugestões sem ingredientes conferidos: no chatbot real
+        # (2026-10-26) a lista trazia um produto com o ácido salicílico da alergia.
+        return (f"Você declarou alergia a: {', '.join(nomes)}. Ainda não conferi os ingredientes desses produtos "
+                "— antes de usar algum, me peça para checar.")
     if not ingredientes:
         return f"Você declarou alergia a: {', '.join(nomes)}."
     conflitos = []
@@ -487,6 +507,63 @@ def _aviso_da_agenda(evidencias: list[dict] | None) -> str:
     return "Não consegui ver sua agenda agora, então não sei se você está livre nesse horário."
 
 
+def _conflito_com_alergias(ingredientes: list, alergias: list[str]) -> str | None:
+    """"Ácido salicílico (alergia a Ácido salicílico)" se algum ingrediente bate."""
+    for alergia in alergias:
+        termos = termos_da_alergia(alergia)
+        for ingrediente in ingredientes:
+            if not isinstance(ingrediente, dict):
+                continue
+            variantes = [str(v) for v in (ingrediente.get("inci_name"), ingrediente.get("common_name")) if v]
+            if any(termo_bate(termo, variante) for termo in termos for variante in variantes):
+                nome = ingrediente.get("common_name") or ingrediente.get("inci_name")
+                return f"{nome} (alergia a {alergia})"
+    return None
+
+
+def _parte_sugestao_com_alergia(evidencias: list[dict] | None, excluir: str | None = None) -> str | None:
+    """Sugestões de reserva para quem declarou alergia: separa os produtos cujos
+    ingredientes foram conferidos (sem conflito / com conflito) dos que não
+    foram. Sem isso, a lista de reserva punha lado a lado um produto conferido e
+    outro com o ácido salicílico da alergia (chatbot real, 2026-10-26)."""
+    alergias_dados = dados_da_evidencia(evidencias, "get_user_allergies")
+    alergias = [
+        str(a.get("allergy_name")) for a in alergias_dados if isinstance(a, dict) and a.get("allergy_name")
+    ] if isinstance(alergias_dados, list) else []
+    if not alergias:
+        return None
+    excluido = (excluir or "").strip().lower()
+    produtos = [
+        p for p in _resultados_de_todas_as_buscas(evidencias)
+        if isinstance(p, dict) and "name" in p and str(p["name"]).strip().lower() != excluido
+    ]
+    if not produtos:
+        return None
+    seguros, com_conflito, nao_conferidos = [], [], []
+    for produto in produtos:
+        ingredientes = dados_da_evidencia(evidencias, "get_product_ingredients", product_id=produto.get("product_id"))
+        rotulo = f"{produto['name']} ({produto.get('brand_name')})"
+        if not isinstance(ingredientes, list) or not ingredientes:
+            nao_conferidos.append(rotulo)
+        elif conflito := _conflito_com_alergias(ingredientes, alergias):
+            com_conflito.append(f"{rotulo}: tem {conflito}")
+        else:
+            seguros.append(f"- {rotulo}{_nota_listada(evidencias, produto)}")
+    linhas = []
+    if seguros:
+        linhas.append(
+            f"Conferi os ingredientes e estes não têm nada das alergias que você declarou ({', '.join(alergias)}):\n"
+            + "\n".join(seguros[:_MAX_PRODUTOS_LISTADOS])
+        )
+    if com_conflito:
+        linhas.append("Deixei de fora " + "; ".join(com_conflito) + ".")
+    if nao_conferidos:
+        restantes = ", ".join(nao_conferidos[: max(2, _MAX_PRODUTOS_LISTADOS - len(seguros))])
+        linhas.append(f"Também achei {restantes}, mas ainda não conferi os ingredientes — me peça para checar "
+                      f"antes de usar (você declarou alergia a {', '.join(alergias)}).")
+    return "\n\n".join(linhas)
+
+
 def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     """Quando o Juiz esgota as tentativas em produto/ingrediente/rotina, o texto do especialista
     (reprovado por inventar dado) NÃO chega ao usuário. Monta uma resposta só com o que as
@@ -516,14 +593,21 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     sugestao = (
         isinstance(especialista, dict) and especialista.get("intencao") == "sugerir"
     ) or bool(_PEDE_SUGESTAO_RE.search(pergunta))
-    texto_produtos, sem_dado = (None, False) if dados_da_conta else _parte_produtos(
-        evidencias, pergunta, sugestao=sugestao, excluir=estado.get("produto_em_contexto")
+    sugestao_com_alergia = (
+        None if dados_da_conta or not sugestao
+        else _parte_sugestao_com_alergia(evidencias, excluir=estado.get("produto_em_contexto"))
     )
+    if sugestao_com_alergia:
+        texto_produtos, sem_dado = sugestao_com_alergia, False
+    else:
+        texto_produtos, sem_dado = (None, False) if dados_da_conta else _parte_produtos(
+            evidencias, pergunta, sugestao=sugestao, excluir=estado.get("produto_em_contexto")
+        )
     candidatas = [
         *dados_da_conta,
         texto_produtos,
         _parte_ingredientes(evidencias),
-        _parte_alergias(evidencias, cruzar_com_produto=not sugestao),
+        None if sugestao_com_alergia else _parte_alergias(evidencias, cruzar_com_produto=not sugestao),
     ]
     partes = [parte for parte in candidatas if parte]
     if estado.get("rota") == "rotina" and partes:
@@ -654,8 +738,14 @@ def _texto_aprovado_completo(especialista_json: Any, estado: EstadoVenus) -> str
 
 def _sem_ids_internos(texto: str) -> str:
     """Tira "(product_id 3)" e afins: id interno não é para o usuário (chatbot
-    real, 2026-10-21, a resposta saiu com "CeraVe ... (product_id 3)")."""
-    return _ID_INTERNO_RE.sub("", texto or "").strip()
+    real, 2026-10-21, a resposta saiu com "CeraVe ... (product_id 3)"). Também
+    troca a oferta de salvar produto nos favoritos/listas, que a IA não faz."""
+    texto = _ID_INTERNO_RE.sub("", texto or "").strip()
+    if _OFERTA_DE_SALVAR_RE.search(texto):
+        logger.warning("Texto oferecia salvar produto nos favoritos/listas; frase trocada")
+        texto = _OFERTA_DE_SALVAR_RE.sub(_ORIENTACAO_SALVAR_NO_APP, texto, count=1)
+        texto = _OFERTA_DE_SALVAR_RE.sub("", texto).strip()
+    return texto
 
 
 def _omitiu_dados_das_tools(texto: str, estado: EstadoVenus) -> bool:

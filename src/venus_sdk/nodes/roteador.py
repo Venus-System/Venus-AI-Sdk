@@ -324,6 +324,51 @@ def _aplicar_redes_de_seguranca(
     return rota, texto
 
 
+_RE_FORA_DE_ESCOPO = re.compile(
+    r"fora d[oe] (que eu|meu|escopo|assunto)|n[ãa]o consigo te ajudar com isso", re.IGNORECASE
+)
+_TAMANHO_MAXIMO_CITACAO = 220
+
+
+_RE_PEDE_PRODUTOS_NOVOS = re.compile(
+    r"\b(escolh|sugir|suger|recomend|indiq|indica)\w*\b[^.?!]{0,40}\bprodutos?\b", re.IGNORECASE
+)
+_RE_ACEITE_CURTO = re.compile(r"^\s*(sim|pode|quero|claro|bora|isso|ok|por favor)\b", re.IGNORECASE)
+_TAMANHO_MAXIMO_ACEITE = 40
+_RE_OFERTA_DE_SUGESTAO = re.compile(
+    r"\b(sugir|suger|indic|recomend)\w*\b[^.?!]{0,80}\b(produtos?|op[çc][õo]es|alternativas?|limpeza|protetor|hidratante)",
+    re.IGNORECASE,
+)
+
+
+def _aceita_oferta_de_sugestao(pergunta: str, estado: EstadoVenus) -> bool:
+    """"sim" (ou parecido, curto) logo depois de a Venus oferecer sugerir produtos."""
+    if len(pergunta) > _TAMANHO_MAXIMO_ACEITE or not _RE_ACEITE_CURTO.match(pergunta):
+        return False
+    anteriores = list(estado.get("historico") or [])[:-1]
+    ultima_da_venus = next((m for m in reversed(anteriores) if getattr(m, "type", "") == "ai"), None)
+    return ultima_da_venus is not None and bool(_RE_OFERTA_DE_SUGESTAO.search(str(ultima_da_venus.content)))
+
+
+def _recapitulacao(estado: EstadoVenus) -> str | None:
+    """A última mensagem do usuário antes desta (sem o prefixo do produto em
+    tela) e o começo da resposta da Venus a ela, ou `None` sem histórico."""
+    mensagens = list(estado.get("historico") or [])[:-1]
+    for indice in range(len(mensagens) - 1, -1, -1):
+        if getattr(mensagens[indice], "type", "") != "human":
+            continue
+        _, anterior = separar_produto_em_contexto(str(mensagens[indice].content))
+        texto = f'Na mensagem anterior, você disse: "{anterior.strip()}".'
+        resposta = next((m for m in mensagens[indice + 1:] if getattr(m, "type", "") == "ai"), None)
+        if resposta is not None:
+            trecho = " ".join(str(resposta.content).split())
+            if len(trecho) > _TAMANHO_MAXIMO_CITACAO:
+                trecho = trecho[:_TAMANHO_MAXIMO_CITACAO].rsplit(" ", 1)[0] + "…"
+            texto += f' E eu respondi: "{trecho}"'
+        return texto
+    return None
+
+
 def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     """Chama o LLM roteador com `ROUTER_PROMPT_COMPLETO` e extrai o
     protocolo `ROUTE=.../PERGUNTA_ORIGINAL=...` (ou responde diretamente em
@@ -355,6 +400,30 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     texto_do_llm = texto
     historico = " ".join(str(getattr(m, "content", m)) for m in list(estado.get("historico") or [])[:-1])
     rota, texto = _aplicar_redes_de_seguranca(_rota_do_texto(texto), texto, pergunta_do_usuario, historico)
+    if (
+        rota not in _ROTAS_VALIDAS
+        and _RE_PERGUNTA_SOBRE_CONVERSA.search(pergunta_do_usuario)
+        and (not texto or _RE_FORA_DE_ESCOPO.search(texto))
+    ):
+        # "oq eu acabei de falar no prompt anterior?" virava "essa pergunta está
+        # fora do que eu consigo te ajudar" em várias rodadas do chatbot
+        # (2026-10-21 a 26): a resposta sai do próprio histórico.
+        texto = _recapitulacao(estado) or texto
+    if (
+        rota != "produto"
+        and _RE_PEDE_PRODUTOS_NOVOS.search(pergunta_do_usuario)
+        and not _RE_DADOS_DA_CONTA.search(pergunta_do_usuario)
+    ):
+        # "escolha dois produtos e adicione pra mim" ia para a rotina, que não
+        # busca no catálogo e inventava produtos (chatbot real, 2026-10-26).
+        logger.warning("Roteador escolheu %s; pedido de produtos novos vai para produto", rota)
+        rota = "produto"
+    if rota != "produto" and _aceita_oferta_de_sugestao(pergunta_do_usuario, estado):
+        # "Quer que eu sugira produtos para limpeza e protetor solar?" -> "sim" ia
+        # de novo para a rotina, que repetia a mesma pergunta (chatbot real,
+        # 2026-10-26): quem sugere produto do catálogo é o especialista de produto.
+        logger.warning("Roteador escolheu %s; 'sim' a uma oferta de sugestão vai para produto", rota)
+        rota = "produto"
 
     if rota not in _ROTAS_VALIDAS:
         # Small talk ou fora de escopo: o próprio roteador já formulou a
