@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from venus_sdk.alergias import termo_bate, termos_da_alergia
 from venus_sdk.nodes._evidencias import dados_da_evidencia
 from venus_sdk.texto import remover_acentos
 
@@ -245,3 +246,56 @@ def _resumo_do_item(item: dict, nomes: dict[str, str]) -> str:
     notas = item.get("notas") if isinstance(item.get("notas"), dict) else {}
     lista = ", ".join(f"{campo}={valor}" for campo, valor in notas.items())
     return f"product_id {product_id} = {nomes.get(product_id)}" + (f" (notas: {lista})" if lista else "")
+
+
+# Afirmação de que o produto é seguro para as alergias do usuário: "sem ácido
+# salicílico", "não contém álcool", "compatível com suas alergias".
+_RE_ALEGA_SEM_ALERGENO = re.compile(
+    r"\bsem\s+(?:o\s+|a\s+)?(?:[áa]cido|[áa]lcool|fragr[aâ]ncia|perfume|parabeno|sulfato|silicone)"
+    r"|\bn[ãa]o\s+cont[eéê]m\b|\bn[ãa]o\s+t[eê]m\s+(?:[áa]cido|[áa]lcool)|\blivres?\s+de\b"
+    r"|compat[íi]ve(?:l|is)\s+com\s+(?:as\s+)?(?:suas\s+)?(?:alergias|restri[cç][õo]es)"
+    r"|n[ãa]o\s+batem?\s+com\s+(?:as\s+)?(?:suas\s+)?alergias"
+    r"|segur[oa]s?\s+para\s+(?:a\s+|as\s+)?(?:sua|suas)\s+alergias?",
+    re.IGNORECASE,
+)
+
+
+def conferir_alegacao_de_alergia(especialista: dict, evidencias: list[dict] | None) -> list[str]:
+    """Problemas quando o texto afirma que um produto não tem o ingrediente da
+    alergia sem ter consultado os ingredientes DELE, ou quando os ingredientes
+    consultados batem com uma alergia declarada. No chatbot real (2026-10-26),
+    com alergia a ácido salicílico e álcool, o especialista sugeriu dois produtos
+    "sem ácido salicílico nem álcool" sem consultar nenhum ingrediente, e o Juiz
+    LLM aprovou."""
+    texto = " ".join(str(especialista.get(campo) or "") for campo in ("resposta", "recomendacao", "acompanhamento"))
+    if not _RE_ALEGA_SEM_ALERGENO.search(texto):
+        return []
+    produtos = [item for item in especialista.get("produtos") or [] if isinstance(item, dict)]
+    if not produtos:
+        return ["o texto afirma que um produto não tem ingrediente da alergia, mas o JSON não diz em `produtos` "
+                "qual produto foi conferido"]
+    alergias = dados_da_evidencia(evidencias, "get_user_allergies")
+    nomes_alergia = [
+        str(a.get("allergy_name")) for a in alergias if isinstance(a, dict) and a.get("allergy_name")
+    ] if isinstance(alergias, list) else []
+    problemas = []
+    for item in produtos:
+        product_id, nome = item.get("product_id"), item.get("nome") or f"product_id {item.get('product_id')}"
+        ingredientes = dados_da_evidencia(evidencias, "get_product_ingredients", product_id=product_id)
+        if not isinstance(ingredientes, list) or not ingredientes:
+            problemas.append(
+                f"o texto afirma que {nome} não tem ingrediente da alergia, mas os ingredientes do product_id "
+                f"{product_id} não foram consultados com get_product_ingredients — consulte antes de afirmar"
+            )
+            continue
+        for alergia in nomes_alergia:
+            termos = termos_da_alergia(alergia)
+            achado = next(
+                (str(i.get("common_name") or i.get("inci_name")) for i in ingredientes if isinstance(i, dict)
+                 if any(termo_bate(t, str(v)) for t in termos for v in (i.get("inci_name"), i.get("common_name")) if v)),
+                None,
+            )
+            if achado:
+                problemas.append(f"{nome} (product_id {product_id}) contém {achado}, que bate com a alergia a {alergia} "
+                                 "— não o sugira como compatível")
+    return problemas

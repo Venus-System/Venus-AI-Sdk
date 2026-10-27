@@ -550,3 +550,11 @@ def test_nota_de_copia_homonima_do_produto_e_aceita_mas_de_outro_produto_nao() -
     problemas, _ = conferir_amarracao(_especialista("O CeraVe Creme Hidratante tem nota 76/100.", [item_errado]),
                                       evidencias)
     assert problemas
+
+
+def test_rotina_que_sugere_produto_fora_dos_passos_vai_ao_llm() -> None:
+    """Chatbot real (2026-10-26): o agente de rotina "sugeriu" produtos que nenhuma tool trouxe."""
+    _, invoke = _julgar_rotina(
+        "1) CeraVe Espuma Cremosa de Limpeza Hidratante; 2) CeraVe Creme Reparador para as Mãos. "
+        "Por exemplo, adicione o La Roche-Posay Toleriane aos favoritos.")
+    invoke.assert_called_once()

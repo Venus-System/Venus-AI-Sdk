@@ -196,6 +196,12 @@ async def main() -> None:
         except (ImportError, ValueError) as erro:
             print(f"Não foi possível criar o checkpointer Mongo: {erro}")
             return
+        except Exception as erro:  # noqa: BLE001 - rede/DNS fora: segue sem Mongo
+            # Ex.: rede que bloqueia o DNS do Atlas (mongodb+srv) — antes o script
+            # quebrava aqui com traceback, sem nem começar a conversa.
+            print(f"Não consegui conectar no MongoDB ({type(erro).__name__}); o histórico desta conversa "
+                  "fica só na memória.\n")
+            checkpointer = criar_checkpointer_em_memoria()
     else:
         checkpointer = criar_checkpointer_em_memoria()
     store = criar_store_em_memoria()
