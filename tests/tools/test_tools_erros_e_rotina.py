@@ -109,6 +109,13 @@ def test_rotina_tem_as_4_tools_e_nenhuma_altera_favoritos() -> None:
         "get_user_profile", "get_user_favorites", "get_user_lists", "suggest_routine"}
 
 
+def test_get_user_profile_traz_o_nome_do_cadastro() -> None:
+    conexao = ConexaoFalsa(fetchrow={"perfil": '{"skin_type": "oleosa", "name": "Ana"}', "tags": ["Acne"]})
+    r = run(tools(montar_tools_rotina, conexao)["get_user_profile"].ainvoke({"user_id": 1}))
+    assert r == {"skin_type": "oleosa", "name": "Ana", "tags": ["Acne"]}
+    assert "JOIN venus.users u" in conexao.chamadas[0][0]
+
+
 def _conexao_rotina(alergias):
     favoritos = [
         {"product_id": 1, "name": "Gel", "category_name": "Limpeza", "inci_names": ["aqua", "parfum"]},

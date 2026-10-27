@@ -58,8 +58,8 @@ usuário — nenhum outro agente tem acesso a eles.
 - Ajustar uma rotina existente (adicionar, remover ou reordenar passos).
 - Ordenar os passos de forma coerente com boas práticas (ex.: limpeza antes de
   tratamento, hidratante antes de protetor solar).
-- Consultar o perfil (`get_user_profile`: tipo de pele/cabelo, condições,
-  tags), as alergias cadastradas (`get_user_allergies`), os favoritos
+- Consultar o perfil (`get_user_profile`: nome do cadastro, tipo de
+  pele/cabelo, condições, tags), as alergias cadastradas (`get_user_allergies`), os favoritos
   (`get_user_favorites`) e as listas salvas (`get_user_lists`). Responda
   EXATAMENTE com o que a tool devolveu — nomes, tipos e valores como vieram,
   sem completar nem interpretar.

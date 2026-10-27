@@ -51,7 +51,8 @@ async def test_todas_as_tools_de_leitura(t) -> None:
     assert (await t["get_ingredient_effects"].ainvoke({"ingredient_id": 1, "profile_tag": "pele oleosa"}))[0]["effect_name"]
     assert (await t["get_ingredient_regulations"].ainvoke({"ingredient_id": 5}))[0]["agency"] == "ANVISA"
     assert (await t["get_user_allergies"].ainvoke({"user_id": 1}))[0]["severity"] == "moderada"
-    assert (await t["get_user_profile"].ainvoke({"user_id": 1}))["skin_type"] == "oleosa"
+    perfil = await t["get_user_profile"].ainvoke({"user_id": 1})
+    assert perfil["skin_type"] == "oleosa" and perfil["name"] == "Ana (teste)"
     assert len(await t["get_user_favorites"].ainvoke({"user_id": 1})) == 5
     assert (await t["get_user_lists"].ainvoke({"user_id": 1}))[0]["list_name"] == "Rotina de manhã"
 
