@@ -581,7 +581,9 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
             rotina_montada,
             None if rotina_montada or not (pede_favoritos or sem_preferencia) else _parte_favoritos(evidencias),
             _parte_listas(evidencias) if pede_listas or sem_preferencia else None,
-            _parte_perfil(evidencias),
+            # Em produto/ingrediente o perfil é só contexto para personalizar: virando
+            # "dado da conta", escondia a ficha do produto (chatbot real, 2026-10-28).
+            _parte_perfil(evidencias) if estado.get("rota") == "rotina" else None,
         ) if parte
     ]
     # Numa pergunta sobre a conta, a busca de produto foi só um meio (achar o

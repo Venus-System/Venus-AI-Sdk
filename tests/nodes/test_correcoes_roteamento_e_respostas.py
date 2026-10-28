@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 from _fakes import LLMScript
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from venus_sdk.llm import models
 from venus_sdk.nodes import especialistas
@@ -48,6 +48,34 @@ def test_dados_da_conta_nao_sao_respondidos_pelo_roteador(mensagem: str) -> None
     estado = _rotear(mensagem, "Oii, Sophia!! Você tem pele mista.")
     assert decidir_especialista(estado) == "rotina"
     assert "resposta_final" not in estado
+
+
+def _rotear_com(estado: dict, resposta_do_llm: str) -> dict:
+    llm = LLMScript(script=[AIMessage(content=resposta_do_llm)])
+    with patch("venus_sdk.nodes.roteador.get_llm_rapido", return_value=llm):
+        return no_roteador(estado)
+
+
+def test_pergunta_pelo_nome_sem_ele_na_conversa_vai_para_o_perfil() -> None:
+    # Chatbot real (2026-10-28): o roteador respondeu "MEMORIA_USUARIO={}\nNão lembro seu nome".
+    mensagem = "qual é o meu nome?"
+    estado = _rotear_com({"mensagem_usuario": mensagem, "historico": [HumanMessage(mensagem)],
+                          "usuario_id_postgres": 142}, "MEMORIA_USUARIO={}\nNão lembro seu nome ainda!")
+    assert decidir_especialista(estado) == "rotina"
+    assert estado["pergunta_original"] == mensagem
+
+
+def test_nome_dito_na_conversa_continua_respondido_pelo_roteador() -> None:
+    historico = [HumanMessage("meu nome é Marina"), AIMessage("Oi, Marina!"), HumanMessage("qual é o meu nome?")]
+    estado = _rotear_com({"mensagem_usuario": "qual é o meu nome?", "historico": historico,
+                          "usuario_id_postgres": 142}, "Marina! Já te decorei.")
+    assert decidir_especialista(estado) == "direto"
+    assert estado["resposta_final"] == "Marina! Já te decorei."
+
+
+def test_resposta_direta_nao_ecoa_linhas_de_contexto() -> None:
+    estado = _rotear("oi, tudo bem?", "MEMORIA_USUARIO={}\nOii, tudo ótimo! E com você?")
+    assert estado["resposta_final"] == "Oii, tudo ótimo! E com você?"
 
 
 def test_duvida_de_privacidade_sobre_favoritos_continua_no_faq() -> None:
@@ -210,6 +238,17 @@ def test_resposta_segura_de_produto_so_comenta_ingredientes_quando_nao_pedidos()
         texto = no_orquestrador(estado)["resposta_final"]
     assert "Ele tem 2 ingredientes cadastrados — quer que eu liste?" in texto
     assert "GLICEROL" not in texto
+
+
+def test_resposta_segura_de_produto_nao_troca_a_ficha_pelo_perfil() -> None:
+    # Produto e ingrediente consultam o perfil só para personalizar; na resposta
+    # segura ele não pode ocupar o lugar do produto pesquisado.
+    estado = _estado_de_produto_detalhado("O Creme X serve pra mim?")
+    estado["evidencias_tools"].append(_evidencia("get_user_profile", {"skin_type": "oily", "is_pregnant": True}))
+    with patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador", side_effect=AssertionError("sem LLM")):
+        texto = no_orquestrador(estado)["resposta_final"]
+    assert "Creme X (Marca), da categoria Hidratante." in texto
+    assert "No seu perfil" not in texto
 
 
 def _resposta_segura(dominio: str, evidencias: list[tuple[str, object]]) -> str:

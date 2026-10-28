@@ -1,9 +1,8 @@
-"""Tools do agente Rotina — perfil, favoritos e listas do usuário (Postgres,
-schema `venus`), mais uma sugestão de rotina montada SÓ com dado real."""
+"""Tools do agente Rotina — favoritos e listas do usuário (Postgres, schema
+`venus`), mais uma sugestão de rotina montada SÓ com dado real."""
 
 from __future__ import annotations
 
-import json
 import re
 from typing import Any
 
@@ -197,19 +196,6 @@ _SQL_FAVORITOS_COM_INGREDIENTES = """
 """
 
 
-_SQL_PERFIL_DO_USUARIO = """
-    SELECT ((to_jsonb(up) - 'user_profile_id' - 'fk_user_id' - 'is_active' - 'created_at'
-             - 'updated_at') || jsonb_build_object('name', u.name))::text AS perfil,
-           COALESCE((SELECT array_agg(pt.name ORDER BY pt.name)
-                     FROM venus.user_profile_tags upt
-                     JOIN venus.profile_tags pt ON pt.profile_tag_id = upt.fk_profile_tag_id
-                     WHERE upt.fk_user_id = up.fk_user_id AND upt.is_active), '{}') AS tags
-    FROM venus.user_profiles up
-    JOIN venus.users u ON u.user_id = up.fk_user_id
-    WHERE up.fk_user_id = $1 AND up.is_active
-"""
-
-
 _SQL_FAVORITOS_DO_USUARIO = """
     SELECT p.product_id, p.name, b.name AS brand_name, pc.name AS category_name
     FROM venus.favorites f
@@ -260,21 +246,6 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
     exigir_pool(pool, "montar_tools_rotina")
 
     @tool
-    async def get_user_profile(user_id: int) -> dict:
-        """Traz o perfil do usuário (nome do cadastro, tipo de pele/cabelo, sensibilidade, condições como
-        acne/melasma/gestação e tags de perfil) — base para montar ou ajustar uma rotina."""
-        # `to_jsonb(up)` em vez de colunas fixas: o schema do perfil evolui (a coluna
-        # `hair_type` já sumiu do banco real) e uma coluna a menos não pode derrubar a tool.
-        user_id = resolver_user_id(user_id)
-        if user_id is None:
-            return SEM_USUARIO_IDENTIFICADO
-        resultado = await consultar(pool, "get_user_profile", _SQL_PERFIL_DO_USUARIO, user_id, uma_linha=True,
-                                    vazio="o usuário não tem perfil cadastrado")
-        if isinstance(resultado, dict) and "perfil" in resultado:
-            return {**json.loads(resultado["perfil"]), "tags": resultado["tags"]}
-        return resultado
-
-    @tool
     async def get_user_favorites(user_id: int) -> list[dict] | dict:
         """Lista os produtos favoritados pelo usuário (id, nome, marca,
         categoria). A rotina só pode usar produtos daqui ou das listas."""
@@ -311,4 +282,5 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
 
     # Todas só leem. Não existe tool para adicionar nem remover favorito de
     # propósito: mexer nos favoritos é decisão do usuário, feita por ele no app.
-    return [get_user_profile, get_user_favorites, get_user_lists, suggest_routine]
+    # O perfil (`get_user_profile`) fica em `tools/compartilhadas.py`, junto das alergias.
+    return [get_user_favorites, get_user_lists, suggest_routine]

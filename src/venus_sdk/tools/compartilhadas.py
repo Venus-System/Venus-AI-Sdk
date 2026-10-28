@@ -1,8 +1,10 @@
-"""Tool compartilhada entre produto, ingrediente e rotina
-(`venus.user_allergies` + `venus.allergies`)."""
+"""Tools compartilhadas entre produto, ingrediente e rotina: alergias
+(`venus.user_allergies` + `venus.allergies`) e perfil do usuário
+(`venus.user_profiles` + `venus.users` + `venus.user_preferences`)."""
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from langchain_core.tools import BaseTool, tool
@@ -21,9 +23,35 @@ _SQL_ALERGIAS_DO_USUARIO = """
 # "sem alergia declarada" tem resposta própria (é válida, não erro).
 _MARCADOR_SEM_ALERGIAS = "__sem_alergias__"
 
+# `to_jsonb(...)` em vez de colunas fixas: o schema do perfil evolui (a coluna
+# `hair_type` já sumiu do banco real) e uma coluna a menos não pode derrubar a
+# tool. As preferências ("Valores" no app: vegano, cruelty free...) vêm de
+# `user_preferences`; quem nunca marcou nenhuma recebe `{}`.
+_SQL_PERFIL_DO_USUARIO = """
+    SELECT ((to_jsonb(up) - 'user_profile_id' - 'fk_user_id' - 'is_active' - 'created_at'
+             - 'updated_at')
+            || jsonb_build_object(
+                   'name', u.name,
+                   'preferences', COALESCE(
+                       (SELECT to_jsonb(pf) - 'user_preference_id' - 'fk_user_id' - 'created_at' - 'updated_at'
+                        FROM venus.user_preferences pf
+                        WHERE pf.fk_user_id = up.fk_user_id
+                        ORDER BY pf.updated_at DESC
+                        LIMIT 1),
+                       '{}'::jsonb)))::text AS perfil,
+           COALESCE((SELECT array_agg(pt.name ORDER BY pt.name)
+                     FROM venus.user_profile_tags upt
+                     JOIN venus.profile_tags pt ON pt.profile_tag_id = upt.fk_profile_tag_id
+                     WHERE upt.fk_user_id = up.fk_user_id AND upt.is_active), '{}') AS tags
+    FROM venus.user_profiles up
+    JOIN venus.users u ON u.user_id = up.fk_user_id
+    WHERE up.fk_user_id = $1 AND up.is_active
+"""
+
 
 def montar_tools_compartilhadas(pool: Any) -> list[BaseTool]:
-    """Monta a tool `get_user_allergies`, com o `pool` capturado por closure.
+    """Monta `get_user_allergies` e `get_user_profile`, com o `pool` capturado
+    por closure.
 
     Levanta `ValueError` se `pool` for `None` — só na hora em que o
     especialista tentar de fato usá-la (`nodes/especialistas.py` só chama
@@ -46,4 +74,19 @@ def montar_tools_compartilhadas(pool: Any) -> list[BaseTool]:
                     "mensagem": "o usuário não declarou nenhuma alergia"}
         return resposta
 
-    return [get_user_allergies]
+    @tool
+    async def get_user_profile(user_id: int) -> dict:
+        """Traz o perfil que o usuário preencheu no app: nome do cadastro, faixa etária, gênero, tipo de
+        pele, fototipo, sensibilidade, tipo de cabelo, couro cabeludo, gestação/amamentação, condições de
+        pele (acne, rosácea, eczema, hiperpigmentação, melasma), preferências de valores (`preferences`:
+        vegano, cruelty free, sem fragrância...) e tags de perfil. Alergias ficam em `get_user_allergies`."""
+        user_id = resolver_user_id(user_id)
+        if user_id is None:
+            return SEM_USUARIO_IDENTIFICADO
+        resultado = await consultar(pool, "get_user_profile", _SQL_PERFIL_DO_USUARIO, user_id, uma_linha=True,
+                                    vazio="o usuário não tem perfil cadastrado")
+        if isinstance(resultado, dict) and "perfil" in resultado:
+            return {**json.loads(resultado["perfil"]), "tags": resultado["tags"]}
+        return resultado
+
+    return [get_user_allergies, get_user_profile]

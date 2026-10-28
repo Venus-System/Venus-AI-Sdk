@@ -62,8 +62,8 @@ tag do Git.
 | Agente | Papel | Tools |
 | --- | --- | --- |
 | **Roteador** | Classifica a intenção e escolhe o especialista; responde direto small talk e perguntas fora de escopo. | — |
-| **Produto** | Busca produtos, notas, ingredientes e a nota personalizada para o usuário. | `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`, `get_user_allergies` |
-| **Ingrediente** | Explica o que um ingrediente faz, suas propriedades, efeitos e regulação. | `search_ingredient`, `get_ingredient_summary`, `get_ingredient_properties`, `get_ingredient_effects`, `get_ingredient_regulations`, `get_user_allergies`, `converter_concentracao`, `comparar_concentracao_com_limite` |
+| **Produto** | Busca produtos, notas, ingredientes e a nota personalizada para o usuário. | `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`, `get_user_allergies`, `get_user_profile` |
+| **Ingrediente** | Explica o que um ingrediente faz, suas propriedades, efeitos e regulação. | `search_ingredient`, `get_ingredient_summary`, `get_ingredient_properties`, `get_ingredient_effects`, `get_ingredient_regulations`, `get_user_allergies`, `get_user_profile`, `converter_concentracao`, `comparar_concentracao_com_limite` |
 | **Rotina** | Monta a rotina de manhã e de noite a partir dos favoritos, excluindo o que bate com as alergias. | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `suggest_routine`, `get_user_allergies`, `calcular_tempo_de_uso`, `calcular_datas_de_aplicacao` e, se configurados, as tools do Google Calendar e o `check_routine_health` (Neo4j) |
 | **FAQ** | Responde perguntas institucionais (score, privacidade, LGPD, limites da IA) por RAG. | `faq_retriever`, `buscar_na_web` e tools MCP/A2A extras |
 | **Juiz** | Confere a resposta do especialista contra o que as tools devolveram; reprova o que não tem lastro. | — |

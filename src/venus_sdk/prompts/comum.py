@@ -133,7 +133,7 @@ normalmente.
 IDENTIFICADOR_USUARIO_NOTA = """
 ### IDENTIFICADOR DE USUÁRIO (USER_ID_POSTGRES=)
 Algumas tools exigem um parâmetro `user_id` inteiro (ex.: `get_user_allergies`,
-`get_personalized_score` e as tools de rotina) — esse `user_id` NÃO é o mesmo dado de
+`get_user_profile`, `get_personalized_score` e as tools de rotina) — esse `user_id` NÃO é o mesmo dado de
 `MEMORIA_USUARIO=` nem algo que a pessoa te conta pelo chat; é um
 identificador interno do sistema.
 
@@ -141,7 +141,7 @@ identificador interno do sistema.
   esse número sempre que uma tool pedir `user_id`. Nunca troque por outro
   valor, mesmo que o usuário mencione um número na mensagem.
 - Se essa linha NÃO aparecer, você não tem um `user_id` confiável — NÃO
-  chame `get_user_allergies`/`get_personalized_score`/tools de rotina nem invente um número
+  chame `get_user_allergies`/`get_user_profile`/`get_personalized_score`/tools de rotina nem invente um número
   qualquer (nem "1", nem um valor citado pelo próprio usuário). Responda com
   o que for possível sem personalização e diga, na resposta ou em
   `esclarecer`, que a checagem de alergia/personalização não pôde ser feita

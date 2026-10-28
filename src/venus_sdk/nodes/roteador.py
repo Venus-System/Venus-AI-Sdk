@@ -109,6 +109,16 @@ _RE_DADOS_DA_CONTA = re.compile(
     r"alergias? cadastrad\w*|minhas alergias)\b",
     re.IGNORECASE,
 )
+# "Qual é meu nome?" sem o nome ter aparecido na conversa: o nome do cadastro vem
+# do perfil (agente de rotina). O roteador respondia "Seu nome é," em branco ou
+# "não lembro seu nome" (chatbot real, 2026-10-28).
+_RE_PERGUNTA_NOME = re.compile(r"\b(qual|como)\b[^?]{0,15}\bmeu nome\b|\bcomo (eu )?me chamo\b", re.IGNORECASE)
+_RE_DISSE_O_NOME = re.compile(r"\b(meu nome [ée]|me chamo|pode me chamar de)\b", re.IGNORECASE)
+# Linhas de contexto que o roteador recebe e às vezes ecoa na resposta direta
+# ("MEMORIA_USUARIO={}" chegou ao usuário no chatbot real, 2026-10-28).
+_LINHA_DE_CONTEXTO_RE = re.compile(
+    r"^[ \t]*(MEMORIA_USUARIO|PRODUTO_EM_TELA|USER_ID_POSTGRES)[ \t]*=.*(?:\n|$)", re.MULTILINE
+)
 # "Ingredientes/composição DO [produto]": pergunta de produto, não de ingrediente
 # isolado (só o agente de produto tem `get_product_ingredients`).
 _RE_COMPOSICAO_DE = re.compile(r"\b(ingredientes|composi[cç][aã]o|f[oó]rmula)\s+d[oa]s?\b", re.IGNORECASE)
@@ -369,6 +379,19 @@ def _recapitulacao(estado: EstadoVenus) -> str | None:
     return None
 
 
+def _pergunta_o_nome_do_cadastro(pergunta: str, estado: EstadoVenus) -> bool:
+    """"Qual é meu nome?" quando o nome não foi dito nesta conversa nem está na
+    memória: quem responde é o perfil (`get_user_profile`)."""
+    if not _RE_PERGUNTA_NOME.search(pergunta) or not estado.get("usuario_id_postgres"):
+        return False
+    if (estado.get("memorias_usuario") or {}).get("nome"):
+        return False
+    anteriores = list(estado.get("historico") or [])[:-1]
+    return not any(
+        getattr(m, "type", "") == "human" and _RE_DISSE_O_NOME.search(str(m.content)) for m in anteriores
+    )
+
+
 def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     """Chama o LLM roteador com `ROUTER_PROMPT_COMPLETO` e extrai o
     protocolo `ROUTE=.../PERGUNTA_ORIGINAL=...` (ou responde diretamente em
@@ -424,6 +447,9 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
         # 2026-10-26): quem sugere produto do catálogo é o especialista de produto.
         logger.warning("Roteador escolheu %s; 'sim' a uma oferta de sugestão vai para produto", rota)
         rota = "produto"
+    if rota not in _ROTAS_VALIDAS and _pergunta_o_nome_do_cadastro(pergunta_do_usuario, estado):
+        logger.warning("Roteador respondeu direto; pergunta pelo nome do cadastro vai para rotina")
+        rota = "rotina"
 
     if rota not in _ROTAS_VALIDAS:
         # Small talk ou fora de escopo: o próprio roteador já formulou a
@@ -431,7 +457,7 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
         # Uma proposta de agendamento sem resposta expira aqui. A cara só é
         # `magoada` se o usuário vai ver a reação que o roteador escreveu.
         magoada = reacao == "magoada" and bool(texto) and texto == texto_do_llm
-        texto = _MARCADOR_RE.sub("", texto).strip()
+        texto = _MARCADOR_RE.sub("", _LINHA_DE_CONTEXTO_RE.sub("", texto)).strip()
         return {
             "rota": None,
             "produto_em_contexto": produto_em_contexto,

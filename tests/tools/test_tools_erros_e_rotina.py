@@ -48,7 +48,7 @@ def test_resultado_vazio_e_estruturado_nunca_lista_vazia(fab, nome, args) -> Non
     (montar_tools_produto, "search_product", {"termo": "shampoo"}),
     (montar_tools_ingrediente, "get_ingredient_summary", {"ingredient_id": 1}),
     (montar_tools_compartilhadas, "get_user_allergies", {"user_id": 1}),
-    (montar_tools_rotina, "get_user_profile", {"user_id": 1}),
+    (montar_tools_compartilhadas, "get_user_profile", {"user_id": 1}),
     (montar_tools_rotina, "suggest_routine", {"user_id": 1}),
 ])
 def test_excecao_do_driver_vira_erro_estruturado(fab, nome, args) -> None:
@@ -104,16 +104,23 @@ def test_rotina_tools_sem_pool_levanta() -> None:
         montar_tools_rotina(None)
 
 
-def test_rotina_tem_as_4_tools_e_nenhuma_altera_favoritos() -> None:
+def test_rotina_tem_as_3_tools_e_nenhuma_altera_favoritos() -> None:
     assert set(tools(montar_tools_rotina, ConexaoFalsa())) == {
-        "get_user_profile", "get_user_favorites", "get_user_lists", "suggest_routine"}
+        "get_user_favorites", "get_user_lists", "suggest_routine"}
 
 
-def test_get_user_profile_traz_o_nome_do_cadastro() -> None:
-    conexao = ConexaoFalsa(fetchrow={"perfil": '{"skin_type": "oleosa", "name": "Ana"}', "tags": ["Acne"]})
-    r = run(tools(montar_tools_rotina, conexao)["get_user_profile"].ainvoke({"user_id": 1}))
-    assert r == {"skin_type": "oleosa", "name": "Ana", "tags": ["Acne"]}
-    assert "JOIN venus.users u" in conexao.chamadas[0][0]
+def test_compartilhadas_trazem_alergias_e_perfil() -> None:
+    assert set(tools(montar_tools_compartilhadas, ConexaoFalsa())) == {"get_user_allergies", "get_user_profile"}
+
+
+def test_get_user_profile_traz_nome_e_preferencias() -> None:
+    perfil = '{"skin_type": "oleosa", "is_pregnant": true, "name": "Ana", "preferences": {"prefer_vegan": true}}'
+    conexao = ConexaoFalsa(fetchrow={"perfil": perfil, "tags": ["Acne"]})
+    r = run(tools(montar_tools_compartilhadas, conexao)["get_user_profile"].ainvoke({"user_id": 1}))
+    assert r == {"skin_type": "oleosa", "is_pregnant": True, "name": "Ana",
+                 "preferences": {"prefer_vegan": True}, "tags": ["Acne"]}
+    sql = conexao.chamadas[0][0]
+    assert "JOIN venus.users u" in sql and "FROM venus.user_preferences pf" in sql
 
 
 def _conexao_rotina(alergias):

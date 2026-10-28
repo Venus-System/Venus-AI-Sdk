@@ -79,9 +79,9 @@ def test_mcp_nao_expoe_tools_com_user_id_por_padrao():
     from venus_sdk.mcp.servidor import criar_servidor_mcp
 
     nomes = {t.name for t in run(criar_servidor_mcp(pool=PoolFalso(ConexaoFalsa())).list_tools())}
-    assert "get_user_allergies" not in nomes and "search_product" in nomes
+    assert "get_user_allergies" not in nomes and "get_user_profile" not in nomes and "search_product" in nomes
     com_opt_in = criar_servidor_mcp(pool=PoolFalso(ConexaoFalsa()), incluir_dados_do_usuario=True)
-    assert "get_user_allergies" in {t.name for t in run(com_opt_in.list_tools())}
+    assert {"get_user_allergies", "get_user_profile"} <= {t.name for t in run(com_opt_in.list_tools())}
 
 
 # --- [2] rotina falha fechada sem as alergias ---

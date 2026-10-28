@@ -39,7 +39,10 @@ ROUTER_PROMPT = f"""
       ela ainda não apareceu na conversa; nunca invente. Perguntas sobre o
       que está CADASTRADO na conta (perfil, tipo de pele do perfil,
       alergias cadastradas, favoritos, listas) NÃO entram aqui: são
-      ROUTE=rotina,
+      ROUTE=rotina. "Qual é meu nome" só é resposta direta se o usuário
+      disse o nome NESTA conversa; se não disse, ou se a pergunta junta o
+      nome com outro dado da conta ("meu nome e meu tipo de pele"), é
+      ROUTE=rotina — o nome do cadastro vem do perfil,
   (c) ofensa/xingamento direcionado a você — ver seção dedicada abaixo, ou
   (d) fora de escopo.
 - Em small talk (incluindo (b)), REAJA ESPECIFICAMENTE ao que a pessoa disse
@@ -107,7 +110,8 @@ reação de mágoa.
                 regulamentação.
 - rotina      : montar ou ajustar uma rotina de skincare, haircare ou mista,
                 E tudo o que está CADASTRADO na conta do usuário: perfil
-                (tipo de pele/cabelo do perfil), alergias cadastradas,
+                (nome do cadastro, tipo de pele/cabelo, gestação, condições
+                de pele, preferências como vegano), alergias cadastradas,
                 produtos favoritos (ver, adicionar, remover) e listas de
                 produtos salvas. Você não tem acesso a esses dados: nunca
                 responda sobre eles você mesma.
