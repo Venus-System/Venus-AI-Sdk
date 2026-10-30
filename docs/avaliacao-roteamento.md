@@ -1,8 +1,8 @@
 # Avaliação do roteador
 
 Resultado de `tests/manual/avaliar_roteamento.py` sobre
-`tests/fixtures/avaliacao_roteamento.jsonl`: 45 mensagens em 7 categorias, cada uma
-com as rotas aceitas.
+`tests/fixtures/avaliacao_roteamento.jsonl`: 54 mensagens em 7 categorias, cada uma
+com as rotas aceitas (45 da primeira rodada e 9 acrescentadas depois da correção do FAQ).
 
 **O que é medido:** a taxa de acerto da rota em duas versões.
 - **Palavras-chave:** só `rota_por_palavras`, sem LLM. É a linha de base.
@@ -28,7 +28,43 @@ python tests/manual/avaliar_roteamento.py --sem-llm              # só palavras-
 python tests/manual/avaliar_roteamento.py --saida-markdown r.md  # também grava a tabela
 ```
 
-## Resultado: 2026-10-30
+## Resultado: 2026-10-30, depois da correção do FAQ
+
+**O que mudou:**
+- **Prompt do roteador:** o roteador não sabe nada sobre o próprio Venus. Pergunta sobre
+  dados, nota, conta, limites da IA ou se ela substitui um profissional é sempre
+  `ROUTE=faq`. A descrição do agente FAQ ganhou esses temas.
+- **Palavras-chave (`_RE_FAQ`):** conta (criar, apagar), metodologia da nota, fonte dos
+  dados, limites da IA e envio de dado pessoal. Elas só agem quando o LLM responde
+  direto, sem rota.
+
+**Casos novos:** 7 perguntas de FAQ escritas depois da correção, com outra formulação
+("vocês usam o que eu falo aqui pra propaganda?", "a venus consegue diagnosticar
+acne?"). Servem para medir se a correção generaliza, e não foram usadas para ajustar a
+regra. Entraram também 2 perguntas de produto parecidas com FAQ, para conferir que não
+caem lá ("de onde vem esse cheiro forte do meu shampoo?").
+
+Mesmo ambiente e cadeia de LLM; código sobre `cf363c4`; 3 rodadas.
+
+| Categoria | Palavras-chave | Roteador (3 rodadas) |
+|---|---|---|
+| produto | 70% (7/10) | 90% a 100% (9 a 10/10) |
+| ingrediente | 86% (6/7) | 100% (7/7) nas 3 |
+| rotina | 100% (8/8) | 100% (8/8) nas 3 |
+| faq | 64% (9/14) | **71% a 100% (10 a 14/14)** |
+| direto | 100% (6/6) | 100% (6/6) nas 3 |
+| mista | 100% (5/5) | 100% (5/5) nas 3 |
+| alergia_no_chat | 100% (4/4) | 100% (4/4) nas 3 |
+| **total** | **83% (45/54)** | **91% a 100% (49 a 54/54)** |
+
+**FAQ, separando os conjuntos:**
+- **As 7 perguntas originais:** 7/7 nas 3 rodadas (antes, 2 a 4 de 7).
+- **As 7 novas:** 3, 4 e 7 de 7. As que ainda escapam caem em resposta direta
+  ("propaganda", "diagnosticar acne", "a nota leva em conta o meio ambiente?") ou em
+  `produto` ("o que acontece com a nota quando a fórmula de um produto muda?").
+  Dependem só do LLM seguir o prompt, e ele não segue sempre.
+
+## Resultado anterior: 2026-10-30, antes da correção
 
 **Ambiente:**
 - código: branch `fix/rotina-sugestao-alergia`, sobre `ac1ff48`;
@@ -48,7 +84,7 @@ python tests/manual/avaliar_roteamento.py --saida-markdown r.md  # também grava
 | alergia_no_chat | 100% (4/4) | 100% (4/4) nas 3 |
 | **total** | **76% (34/45)** | **89% a 93% (40 a 42/45)** |
 
-## Leitura
+### Leitura (antes da correção)
 
 - **FAQ é o ponto fraco.** Perguntas sobre o próprio Venus ("como eu apago minha
   conta?", "de onde vêm os dados dos ingredientes?", "o venus substitui um

@@ -112,7 +112,21 @@ _RE_PRODUTO = re.compile(
 _RE_FAQ = re.compile(
     r"(venus.{0,40}\b(score|funciona|regras?|pol[ií]tica|privacidade|dados)\b|"
     r"\b(score|funciona|regras?|pol[ií]tica|privacidade|dados)\b.{0,40}venus|"
-    r"\b(meus dados|privacidade|lgpd|seus termos|como funciona o score)\b)", re.IGNORECASE)
+    r"\b(meus dados|privacidade|lgpd|seus termos|como funciona o score)\b|"
+    # Perguntas sobre o próprio Venus que o LLM respondia direto, às vezes
+    # inventando ("os dados vêm da FDA") — ver docs/avaliacao-roteamento.md.
+    # Conta no app (criar, apagar):
+    r"\b(apag|exclu|delet|cancel|encerr|cri)\w*\b.{0,15}\bconta\b|"
+    # Metodologia e fontes:
+    r"\bcomo\b.{0,25}\b(notas?|scores?|pontua\w*)\b.{0,25}\b(calcul|funcion|defin)\w*|"
+    r"\bcomo\b.{0,10}\b(calcul|funcion|defin)\w*\b.{0,15}\b(notas?|scores?|pontua\w*)\b|"
+    r"\bde onde v[eê]m\b.{0,12}\b(dados|informa\w*|notas?|scores?|fontes?)\b|\bfontes? (dos|de) dados\b|"
+    # Limites da IA:
+    r"\bsubstitu\w*\b.{0,20}\b(dermatologista|m[eé]dic\w*|profissional)\b|"
+    r"\bconfiar\b.{0,20}\b(na|em) (ia|intelig[eê]ncia artificial|venus|voc[eê])\b|"
+    # Dado pessoal no chat:
+    r"\b(seguro|posso)\b.{0,30}\b(mandar|enviar|compartilhar|passar|digitar)\b.{0,20}"
+    r"\b(cpf|e-?mail|telefone|endere[cç]o|dados)\b)", re.IGNORECASE)
 
 # Pedidos sobre o que está CADASTRADO na conta (perfil, alergias cadastradas,
 # favoritos, listas): só o agente de rotina tem essas tools. Aplicado MESMO

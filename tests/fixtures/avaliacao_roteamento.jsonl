@@ -43,3 +43,12 @@
 {"pergunta": "não sou mais alérgico a perfume", "rotas": ["direto", "rotina", "produto", "ingrediente"], "categoria": "alergia_no_chat"}
 {"pergunta": "tenho alergia a óleo de coco", "rotas": ["direto", "rotina", "produto", "ingrediente"], "categoria": "alergia_no_chat"}
 {"pergunta": "fiquei sensível a ácido glicólico", "rotas": ["direto", "rotina", "produto", "ingrediente"], "categoria": "alergia_no_chat"}
+{"pergunta": "quero sair do app e levar meus dados, como faço?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "vocês usam o que eu falo aqui pra propaganda?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "a nota de vocês leva em conta o meio ambiente?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "a venus consegue diagnosticar acne?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "quem decide a pontuação dos produtos?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "o que acontece com a nota quando a fórmula de um produto muda?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "de onde vêm as informações sobre regulação?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "de onde vem esse cheiro forte do meu shampoo?", "rotas": ["produto"], "categoria": "produto"}
+{"pergunta": "esse protetor substitui o hidratante?", "rotas": ["produto"], "categoria": "produto"}
