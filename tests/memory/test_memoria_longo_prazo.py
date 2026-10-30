@@ -122,27 +122,25 @@ def test_atualizar_memoria_usa_mensagem_anonimizada_nao_pergunta_reformulada() -
 
 
 def test_atualizar_memoria_concatena_listas_em_vez_de_sobrescrever() -> None:
-    """Alergias declaradas em turnos diferentes têm que se acumular — um
-    merge raso (`{**atual, **novos}`) perdia a alergia do turno anterior
-    sempre que uma nova era declarada (ver `nodes/memoria.py::_mesclar_perfil`
-    e `prompts/memoria.py`, que instrui o extrator a emitir "alergias" como
-    lista)."""
+    """Valores de lista declarados em turnos diferentes têm que se acumular —
+    um merge raso (`{**atual, **novos}`) perdia o valor do turno anterior
+    (ver `nodes/memoria.py::_mesclar_perfil`)."""
     store = criar_store_em_memoria()
-    store.put(("memorias", "u1"), "perfil", {"alergias": ["óleo essencial de lavanda"]})
+    store.put(("memorias", "u1"), "perfil", {"preferencias": ["vegano"]})
 
     with patch("venus_sdk.nodes.memoria.get_llm_rapido") as get_llm_mock:
-        get_llm_mock.return_value.invoke.return_value = _resposta_llm('{"alergias": ["fragrância sintética"]}')
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm('{"preferencias": ["sem cheiro forte"]}')
         resultado = no_atualizar_memoria(
             {
                 "usuario_id": "u1",
-                "memorias_usuario": {"alergias": ["óleo essencial de lavanda"]},
-                "mensagem_anonimizada": "também sou alérgica a fragrância sintética",
+                "memorias_usuario": {"preferencias": ["vegano"]},
+                "mensagem_anonimizada": "também evito produto com cheiro forte",
                 "resposta_final": "Anotado!",
             },
             store=store,
         )
 
-    esperado = {"alergias": ["óleo essencial de lavanda", "fragrância sintética"]}
+    esperado = {"preferencias": ["vegano", "sem cheiro forte"]}
     assert resultado == {"memorias_usuario": esperado}
     assert store.get(("memorias", "u1"), "perfil").value == esperado
 

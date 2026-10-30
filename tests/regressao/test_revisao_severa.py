@@ -250,13 +250,13 @@ def test_turno_bloqueado_nao_mexe_na_memoria():
 
 def test_memoria_mescla_com_o_que_esta_no_store_e_nao_com_o_estado_antigo():
     store = InMemoryStore()
-    store.put(("memorias", "u1"), "perfil", {"tipo_pele": "oleosa", "alergias": ["parfum"]})
-    estado = {"usuario_id": "u1", "mensagem_anonimizada": "sou alérgica a sulfato", "resposta_final": "ok",
+    store.put(("memorias", "u1"), "perfil", {"tipo_pele": "oleosa", "preferencias": ["vegano"]})
+    estado = {"usuario_id": "u1", "mensagem_anonimizada": "evito sulfato", "resposta_final": "ok",
               "memorias_usuario": {}}
-    llm = LLMScript(script=[AIMessage(content='{"alergias": ["sulfato"]}')])
+    llm = LLMScript(script=[AIMessage(content='{"preferencias": ["sem sulfato"]}')])
     with patch.object(memoria, "get_llm_rapido", return_value=llm):
         memoria.no_atualizar_memoria(estado, store=store)
-    assert store.get(("memorias", "u1"), "perfil").value == {"tipo_pele": "oleosa", "alergias": ["parfum", "sulfato"]}
+    assert store.get(("memorias", "u1"), "perfil").value == {"tipo_pele": "oleosa", "preferencias": ["vegano", "sem sulfato"]}
 
 
 # --- [6] data e hora de cada chamada ---

@@ -112,6 +112,9 @@ Três detalhes que definem o comportamento:
 - **Parte da conferência é feita em código, sem LLM.** Números de tools de cálculo
   que não aparecem na resposta, nota atribuída ao produto errado e alergia afirmada
   sem lastro são reprovados antes de o juiz chamar o modelo.
+- **O alerta de alergia não depende do LLM.** Depois do orquestrador, o código cruza
+  as alergias do cadastro com os ingredientes consultados e anexa um alerta de texto
+  fixo quando há conflito, mesmo que a reescrita do LLM tenha omitido ou suavizado o aviso.
 
 ## Decisões de projeto
 
@@ -266,6 +269,19 @@ São duas memórias diferentes, e as duas são opcionais:
 | Chave | `thread_id`, em `config["configurable"]` | `usuario_id`, no estado de entrada |
 | Sobrevive à troca de conversa? | Não | Sim |
 | Sem ela | Passe o histórico em `historico` a cada chamada | Os nós de memória viram no-op |
+
+Regras da memória de longo prazo (`nodes/memoria.py`):
+
+- **Alergia não entra.** A fonte é o cadastro do app (`get_user_allergies`); o campo
+  é descartado do que o extrator devolve e de perfis antigos que já o tinham.
+- **Correção.** Valor novo substitui o antigo; `{"remover": ["campo"]}` apaga um fato
+  que deixou de valer.
+- **Expiração.** Cada campo guarda a data da última atualização (chave `perfil_datas`);
+  fato não reafirmado há mais de `VENUS_MEMORIA_TTL_DIAS` (padrão 180, `0` desliga)
+  deixa de valer.
+- **Exclusão (LGPD).** `apagar_memoria(store, usuario_id)` apaga perfil e datas; o
+  backend chama na exclusão da conta. O histórico do checkpointer é apagado à parte.
+- **Auditoria.** Cada gravação registra no log quais campos mudaram, sem os valores.
 
 O agendamento na agenda Google **exige checkpointer**: a proposta espera o "sim" do
 usuário no estado da conversa até a mensagem seguinte.

@@ -25,7 +25,6 @@ usuário e NUNCA participa da conversa.
 ### O QUE GUARDAR
 Guarde apenas fatos estáveis sobre a PESSOA, não sobre a conversa em si:
 - tipo/característica de pele ou cabelo (ex.: "pele oleosa", "cabelo cacheado 3a")
-- alergias e sensibilidades relatadas (ex.: "alérgica a fragrância")
 - preferências declaradas (ex.: "prefere produtos veganos", "evita cheiro forte")
 - nome, se o usuário se apresentou
 - objetivo de rotina de longo prazo (ex.: "quer tratar acne hormonal")
@@ -36,6 +35,9 @@ NÃO guarde:
 - suposição sem base no que o usuário disse (nunca invente)
 - dado sensível sem relação com skincare/haircare (CPF, endereço, cartão —
   isso nunca deve virar memória, mesmo que apareça na troca)
+- alergias e sensibilidades: a fonte é o cadastro de alergias do app, que a
+  Venus consulta a cada conversa. Se o usuário contar uma alergia, não guarde
+  nada sobre ela
 
 
 ### ENTRADA
@@ -49,18 +51,13 @@ JSON plano, só com os campos NOVOS ou ATUALIZADOS — não repita o que já est
 idêntico em PERFIL_ATUAL:
 {{"campo": "valor"}}
 
-Campos que podem ter MAIS DE UM valor ao longo do tempo (hoje: "alergias")
-são sempre uma LISTA de strings, mesmo quando só há um valor novo nesta
-troca — ex.: {{"alergias": ["fragrância"]}}, nunca {{"alergias": "fragrância"}}.
-Isso importa porque quem funde o perfil (`nodes/memoria.py`) concatena listas
-em vez de sobrescrever, então uma alergia nova não pode apagar uma anterior.
-Se PERFIL_ATUAL já tiver "alergias" como lista, inclua só a(s) NOVA(s) — a
-fusão com a lista existente é feita por fora, você não precisa repetir as
-que já estão lá.
+Os campos (nome, tipo_pele, objetivo, preferências...) são string simples —
+um valor novo SUBSTITUI o antigo (é uma atualização, não um acúmulo).
 
-Os demais campos (nome, tipo_pele, objetivo, preferências...) continuam
-string simples — ali um valor novo SUBSTITUI o antigo (é uma atualização,
-não um acúmulo).
+Se o usuário disser que um fato de PERFIL_ATUAL deixou de valer e não houver
+valor novo para pôr no lugar ("não quero mais tratar acne"), apague o campo
+com a chave especial "remover", uma lista com os nomes dos campos:
+{{"remover": ["objetivo"]}}
 
 Se não houver nada durável a guardar nesta troca, responda exatamente:
 NADA
@@ -89,16 +86,23 @@ NADA"""
 MEMORIA_SHOT_3 = """
 PERFIL_ATUAL={"nome": "Sophia"}
 PERGUNTA_USUARIO=descobri que sou alérgica a óleo essencial de lavanda
-RESPOSTA_VENUS=[resposta confirmando que vai levar isso em conta]
+RESPOSTA_VENUS=[resposta sobre a alergia]
 Extrator:
-{"alergias": ["óleo essencial de lavanda"]}"""
+NADA"""
 
 MEMORIA_SHOT_4 = """
-PERFIL_ATUAL={"nome": "Sophia", "alergias": ["óleo essencial de lavanda"]}
-PERGUNTA_USUARIO=ah, e também sou alérgica a fragrância sintética
-RESPOSTA_VENUS=[resposta confirmando que vai levar isso em conta também]
+PERFIL_ATUAL={"nome": "Sophia", "objetivo": "tratar acne"}
+PERGUNTA_USUARIO=a acne já passou, agora só quero manter a pele hidratada
+RESPOSTA_VENUS=[resposta sobre hidratação]
 Extrator:
-{"alergias": ["fragrância sintética"]}"""
+{"objetivo": "manter a pele hidratada"}"""
+
+MEMORIA_SHOT_5 = """
+PERFIL_ATUAL={"nome": "Sophia", "preferencia": "só produtos veganos"}
+PERGUNTA_USUARIO=pode esquecer aquilo de vegano, não ligo mais pra isso
+RESPOSTA_VENUS=[resposta confirmando]
+Extrator:
+{"remover": ["preferencia"]}"""
 
 MEMORIA_SHOTS_CUT = (
     "FIM DOS EXEMPLOS. "
@@ -112,5 +116,6 @@ MEMORIA_PROMPT_COMPLETO = (
     MEMORIA_SHOT_2      + "\n\n" +
     MEMORIA_SHOT_3      + "\n\n" +
     MEMORIA_SHOT_4      + "\n\n" +
+    MEMORIA_SHOT_5      + "\n\n" +
     MEMORIA_SHOTS_CUT
 )
