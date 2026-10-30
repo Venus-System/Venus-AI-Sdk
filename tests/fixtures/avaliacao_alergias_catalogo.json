@@ -1,0 +1,2190 @@
+{
+ "descricao": "Alergias de venus.allergies e ingredientes usados em produtos (venus.product_ingredients), catálogo de QA em 2026-10-30. 'conflitos' é o gabarito: INCI de cada ingrediente que conflita com a alergia; os demais pares não conflitam.",
+ "alergias": [
+  "Ácido salicílico",
+  "Álcool",
+  "Alérgenos de Fragrância (UE)",
+  "Benzyl Salicylate",
+  "Formaldeído",
+  "Fragrância",
+  "Lanolina",
+  "Látex",
+  "Limonene",
+  "Linalool",
+  "Metais",
+  "Óleo de amêndoas",
+  "Parabenos",
+  "Parfum",
+  "Phenoxyethanol",
+  "Propilenoglicol",
+  "Soja",
+  "Sulfatos"
+ ],
+ "ingredientes": [
+  {
+   "inci": "2-MERCAPTONICOTINOYL GLYCINE",
+   "comum": ""
+  },
+  {
+   "inci": "2-OLEAMIDO-1,3-OCTADECANEDIOL",
+   "comum": ""
+  },
+  {
+   "inci": "ACETYL DIPEPTIDE-1 CETYL ESTER",
+   "comum": ""
+  },
+  {
+   "inci": "ACETYL TRIBUTYL CITRATE",
+   "comum": "ACETILCITRATO DE TRIBUTILA"
+  },
+  {
+   "inci": "ACRYLAMIDE/SODIUM",
+   "comum": ""
+  },
+  {
+   "inci": "ACRYLAMIDE/SODIUM ACRYLOYLDIMETHYLTAURATE COPOLYMER",
+   "comum": ""
+  },
+  {
+   "inci": "ACRYLATES/C10-30 ALKYL ACRYLATE CROSSPOLYMER",
+   "comum": "CROSPOLÍMERO DE ACRILATOS/ACRILATO DE ALQUILA C10-30"
+  },
+  {
+   "inci": "ACRYLOYLDIMETHYHLTAURATE COPOLYMER",
+   "comum": ""
+  },
+  {
+   "inci": "ADENOSINE",
+   "comum": ""
+  },
+  {
+   "inci": "ADIPIC ACID/NEOPENTYL GLYCOL/TRIMELLITIC ANHYDRIDE COPOLYMER",
+   "comum": ""
+  },
+  {
+   "inci": "ALANINE",
+   "comum": "ALANINA"
+  },
+  {
+   "inci": "ALCOHOL",
+   "comum": "ÁLCOOL ETÍLICO"
+  },
+  {
+   "inci": "ALCOHOL DENAT.",
+   "comum": "ÁLCOOL ETÍLICO DENATURADO"
+  },
+  {
+   "inci": "ALFA-GLUCANO OLIGOSSACARÍDEO",
+   "comum": ""
+  },
+  {
+   "inci": "ALOE BARBADENSIS LEAF EXTRACT",
+   "comum": ""
+  },
+  {
+   "inci": "ALPHA-ISOMETHYL IONONE",
+   "comum": "ALFA-ISOMETIL IONONA"
+  },
+  {
+   "inci": "ALUMINA",
+   "comum": "ALUMINA"
+  },
+  {
+   "inci": "ALUMINUM HYDROXIDE",
+   "comum": "HIDRÓXIDO DE ALUMÍNIO"
+  },
+  {
+   "inci": "ALUMINUM SESQUICHLOROHYDRATE",
+   "comum": "SESQUICLORIDRATO DE ALUMÍNIO"
+  },
+  {
+   "inci": "ALUMINUM STARCH OCTENYLSUCCINATE",
+   "comum": "Octenilsuccinato de amido alumínio"
+  },
+  {
+   "inci": "ALUMINUM ZIRCONIUM PENTACHLOROHYDRATE",
+   "comum": "PENTACLORIDRATO DE ALUMÍNIO E ZIRCÔNIO"
+  },
+  {
+   "inci": "AMIDO",
+   "comum": ""
+  },
+  {
+   "inci": "AMINOMETHYL PROPANOL",
+   "comum": "AMINOMETILPROPANOL"
+  },
+  {
+   "inci": "AMINOPROPYL DIMETHICONE",
+   "comum": "AMINOPROPIL DIMETICONA"
+  },
+  {
+   "inci": "AMMONIUM ACRYLOYLDIMETHYHLTAURATE / STEARETH 25 METACRYLATE CROSSPOLYMER",
+   "comum": ""
+  },
+  {
+   "inci": "AMMONIUM ACRYLOYLDIMETHYLTAURATE/VP COPOLYMER",
+   "comum": ""
+  },
+  {
+   "inci": "AMMONIUM LACTATE",
+   "comum": "LACTATO DE AMÔNIO"
+  },
+  {
+   "inci": "AMMONIUM POLYACRYLOYLDIMETHYL TAURATE",
+   "comum": ""
+  },
+  {
+   "inci": "AMODIMETHICONE",
+   "comum": "AMODIMETICONA"
+  },
+  {
+   "inci": "AQUA",
+   "comum": "ÁGUA"
+  },
+  {
+   "inci": "AQUA / WATER",
+   "comum": ""
+  },
+  {
+   "inci": "AQUA / WATER / EAU",
+   "comum": ""
+  },
+  {
+   "inci": "ARGANIA SPINOSA KERNEL OIL",
+   "comum": ""
+  },
+  {
+   "inci": "ARGININE",
+   "comum": "ARGININA"
+  },
+  {
+   "inci": "ASCORBIC ACID",
+   "comum": "ÁCIDO ASCÓRBICO"
+  },
+  {
+   "inci": "ASCORBYL GLUCOSIDE",
+   "comum": ""
+  },
+  {
+   "inci": "ASPARTIC ACID",
+   "comum": ""
+  },
+  {
+   "inci": "ASTROCARYUM MURUMURU SEED BUTTER",
+   "comum": ""
+  },
+  {
+   "inci": "BEHENTRIMONIUM CHLORIDE",
+   "comum": "CLORETO DE BEENTRIMÔNIO"
+  },
+  {
+   "inci": "BEHENTRIMONIUM METHOSULFATE",
+   "comum": "METOSSULFATO DE BEENTRIMÔNIO"
+  },
+  {
+   "inci": "BEHENYL ALCOHOL",
+   "comum": "ÁLCOOL BEENÍLICO"
+  },
+  {
+   "inci": "BENZOIC ACID",
+   "comum": "ÁCIDO BENZOICO"
+  },
+  {
+   "inci": "BENZYL ALCOHOL",
+   "comum": "ÁLCOOL BENZÍLICO"
+  },
+  {
+   "inci": "BENZYL BENZOATE",
+   "comum": "BENZOATO DE BENZILA"
+  },
+  {
+   "inci": "BENZYL SALICYLATE",
+   "comum": "SALICILATO DE BENZILA"
+  },
+  {
+   "inci": "BERTHOLLETIA EXCELSA SEED OIL",
+   "comum": ""
+  },
+  {
+   "inci": "BHT",
+   "comum": "BUTIL-HIDROXITOLUENO"
+  },
+  {
+   "inci": "BIOSACCHARIDE GUM-1",
+   "comum": "GOMA BIOSSACARÍDICA-1"
+  },
+  {
+   "inci": "BIS-ETHYLHEXYLOXYPHENOL METHOXYPHENYL TRIAZINE",
+   "comum": "BIS-ETILHEXILOXIFENOL METOXIFENIL TRIAZINA"
+  },
+  {
+   "inci": "BIS-PEG/PPG-16/16 PEG/PPG-16/16 DIMETHICONE",
+   "comum": "BIS-PEG/PPG-16/16 PEG/PPG-16/16 DIMETICONA"
+  },
+  {
+   "inci": "BIS-STEARYL DIMETHICONE",
+   "comum": "BIS-ESTEARIL DIMETICONA"
+  },
+  {
+   "inci": "BISABOLOL",
+   "comum": "BISABOLOL"
+  },
+  {
+   "inci": "BRASSICA CAMPESTRIS OLEIFERA OIL / RAPESEED SEED OIL",
+   "comum": ""
+  },
+  {
+   "inci": "BRASSICA CAMPESTRIS SEED OIL / RAPESEED SEED OIL",
+   "comum": ""
+  },
+  {
+   "inci": "BUTILENOGLICOL",
+   "comum": ""
+  },
+  {
+   "inci": "BUTYL ACETATE",
+   "comum": "ACETATO DE BUTILA"
+  },
+  {
+   "inci": "BUTYL METHOXYDIBENZOYLMETHANE",
+   "comum": "AVOBENZONA"
+  },
+  {
+   "inci": "BUTYLENE GLYCOL",
+   "comum": "BUTILENO GLICOL"
+  },
+  {
+   "inci": "BUTYLENE GLYCOL DICAPRYLATE/DICAPRATE",
+   "comum": "DICAPRILATO/DICAPRATO DE BUTILENO GLICOL"
+  },
+  {
+   "inci": "BUTYLENE/ETHYLENE/STYRENE COPOLYMER",
+   "comum": ""
+  },
+  {
+   "inci": "BUTYROSPERMUM PARKII BUTTER",
+   "comum": ""
+  },
+  {
+   "inci": "BUTYROSPERMUM PARKII BUTTER / SHEA BUTTER",
+   "comum": ""
+  },
+  {
+   "inci": "C12-15 ALKYL BENZOATE",
+   "comum": "BENZOATO DE ALQUILA C12-15"
+  },
+  {
+   "inci": "C12-20 ALKYL GLUCOSIDE",
+   "comum": ""
+  },
+  {
+   "inci": "C13-14 ISOPARAFFIN",
+   "comum": "ISOPARAFINA C13-14"
+  },
+  {
+   "inci": "C14-22 ALCOHOLS",
+   "comum": ""
+  },
+  {
+   "inci": "C30-45 ALKYL DIMETHICONE",
+   "comum": "C30-45 ALQUIL DIMETICONA"
+  },
+  {
+   "inci": "CAFFEINE",
+   "comum": "CAFEÍNA"
+  },
+  {
+   "inci": "CALCIUM CHLORIDE",
+   "comum": "CLORETO DE CÁLCIO"
+  },
+  {
+   "inci": "CALCIUM GLUCONATE",
+   "comum": "GLICONATO DE CÁLCIO"
+  },
+  {
+   "inci": "CALENDULA OFFICINALIS FLOWER EXTRACT",
+   "comum": "EXTRATO DE CALÊNDULA"
+  },
+  {
+   "inci": "CAMELINA SATIVA SEED OIL",
+   "comum": ""
+  },
+  {
+   "inci": "CAMELLIA JAPONICA FLOWER EXTRACT",
+   "comum": ""
+  },
+  {
+   "inci": "CAMELLIA OLEIFERA SEED OIL",
+   "comum": ""
+  },
+  {
+   "inci": "CANOLA OIL",
+   "comum": ""
+  },
+  {
+   "inci": "CAPRILILGLICOL",
+   "comum": ""
+  },
+  {
+   "inci": "CAPRILOIL GLICINA",
+   "comum": ""
+  },
+  {
+   "inci": "CAPRYLIC/CAPRIC TRIGLYCERIDE",
+   "comum": "TRIGLICERÍDEO CAPRÍLICO/CÁPRICO"
+  },
+  {
+   "inci": "CAPRYLOYL GLYCINE",
+   "comum": "CAPRILOIL GLICINA"
+  },
+  {
+   "inci": "CAPRYLOYL SALICYLIC ACID",
+   "comum": "CAPRILOIL ÁCIDO SALICÍLICO"
+  },
+  {
+   "inci": "CAPRYLYL GLYCOL",
+   "comum": "CAPRILILGLICOL"
+  },
+  {
+   "inci": "CAPRYLYL METHICONE",
+   "comum": ""
+  },
+  {
+   "inci": "CAPRYLYL/CAPRYL GLUCOSIDE",
+   "comum": "CAPRILIL/CAPRIL GLICOSÍDEO"
+  },
+  {
+   "inci": "CARBOMER",
+   "comum": "CARBÔMER"
+  },
+  {
+   "inci": "CARNOSINE",
+   "comum": ""
+  },
+  {
+   "inci": "CARRAGEENAN",
+   "comum": "CARRAGENINA"
+  },
+  {
+   "inci": "CERA ALBA",
+   "comum": "CERA BRANCA DE ABELHA"
+  },
+  {
+   "inci": "CERA MICROCRISTALLINA",
+   "comum": "CERA MICROCRISTALINA"
+  },
+  {
+   "inci": "CERAMIDA AP",
+   "comum": ""
+  },
+  {
+   "inci": "CERAMIDA EOP",
+   "comum": ""
+  },
+  {
+   "inci": "CERAMIDA NP",
+   "comum": ""
+  },
+  {
+   "inci": "CERAMIDE AP",
+   "comum": ""
+  },
+  {
+   "inci": "CERAMIDE EOP",
+   "comum": ""
+  },
+  {
+   "inci": "CERAMIDE NP",
+   "comum": ""
+  },
+  {
+   "inci": "CERESIN",
+   "comum": "CERESINA"
+  },
+  {
+   "inci": "CETEARETH-20",
+   "comum": "CETEARETE-20"
+  },
+  {
+   "inci": "CETEARETH-6",
+   "comum": "CETEARETE-6"
+  },
+  {
+   "inci": "CETEARYL ALCOHOL",
+   "comum": "ÁLCOOL CETEARÍLICO"
+  },
+  {
+   "inci": "CETEARYL ETHYLHEXANOATE",
+   "comum": "ETILEXANOATO DE CETEARILA"
+  },
+  {
+   "inci": "CETEARYL GLUCOSIDE",
+   "comum": "CETEARIL GLICOSÍDEO"
+  },
+  {
+   "inci": "CETEARYL ISONONANOATE",
+   "comum": "ISONONANOATO DE CETEARILA"
+  },
+  {
+   "inci": "CETEARYL OLIVATE",
+   "comum": ""
+  },
+  {
+   "inci": "CETIL POLIETILENOGLICOL/POLIPROPILENOGLICOL-10/1 DIMETICONA",
+   "comum": ""
+  },
+  {
+   "inci": "CETOMACROGOL 1000",
+   "comum": ""
+  },
+  {
+   "inci": "CETRIMONIUM CHLORIDE",
+   "comum": "CLORETO DE CETRIMÔNIO"
+  },
+  {
+   "inci": "CETYL ALCOHOL",
+   "comum": "ÁLCOOL CETÍLICO"
+  },
+  {
+   "inci": "CHLORPHENESIN",
+   "comum": "CLORFENESINA"
+  },
+  {
+   "inci": "CHOLESTEROL",
+   "comum": "COLESTEROL"
+  },
+  {
+   "inci": "CI 16035",
+   "comum": "CORANTE VERMELHO ALLURA 129"
+  },
+  {
+   "inci": "CI 17200",
+   "comum": "CORANTE VERMELHO 33"
+  },
+  {
+   "inci": "CI 17200 / RED 33",
+   "comum": ""
+  },
+  {
+   "inci": "CI 19140",
+   "comum": "CORANTE AMARELO DE TARTRAZINA 19140"
+  },
+  {
+   "inci": "CI 42090",
+   "comum": "CORANTE AZUL BRILHANTE 42090"
+  },
+  {
+   "inci": "CI 45410",
+   "comum": ""
+  },
+  {
+   "inci": "CI 77007",
+   "comum": ""
+  },
+  {
+   "inci": "CI 77491",
+   "comum": ""
+  },
+  {
+   "inci": "CI 77492",
+   "comum": ""
+  },
+  {
+   "inci": "CI 77499",
+   "comum": ""
+  },
+  {
+   "inci": "CI 77891",
+   "comum": "CORANTE BRANCO 77891"
+  },
+  {
+   "inci": "CI 77891 / TITANIUM DIOXIDE",
+   "comum": ""
+  },
+  {
+   "inci": "CITRAL",
+   "comum": "CITRAL"
+  },
+  {
+   "inci": "CITRATO DE ZINCO",
+   "comum": ""
+  },
+  {
+   "inci": "CITRIC ACID",
+   "comum": "ÁCIDO CÍTRICO"
+  },
+  {
+   "inci": "CITRONELLOL",
+   "comum": "CITRONELOL"
+  },
+  {
+   "inci": "COCAMIDE MEA",
+   "comum": "MONOETANOLAMINA DE COCAMIDA"
+  },
+  {
+   "inci": "COCAMIDOPROPYL BETAINE",
+   "comum": "COCAMIDOPROPIL BETAÍNA"
+  },
+  {
+   "inci": "COCAMIDOPROPYL HYDROXYSULTAINE",
+   "comum": "COCAMIDOPROPIL HIDROXISSULTAÍNA"
+  },
+  {
+   "inci": "COCO-BETAINE",
+   "comum": "COCO-BETAÍNA"
+  },
+  {
+   "inci": "COCO-CAPRYLATE/CAPRATE",
+   "comum": "COCO-CAPRILATO/CAPRATO"
+  },
+  {
+   "inci": "COCO-GLUCOSIDE",
+   "comum": "COCO-GLICOSÍDEO"
+  },
+  {
+   "inci": "COCOGLYCERIDES",
+   "comum": "COCOGLICERÍDEOS"
+  },
+  {
+   "inci": "COCONUT ACID",
+   "comum": "ÁCIDO DE COCO"
+  },
+  {
+   "inci": "COCOS NUCIFERA OIL",
+   "comum": "ÓLEO DE COCO"
+  },
+  {
+   "inci": "COLESTEROL",
+   "comum": ""
+  },
+  {
+   "inci": "COPERNICIA CERIFERA CERA",
+   "comum": "CERA DE CARNAÚBA"
+  },
+  {
+   "inci": "COUMARIN",
+   "comum": "CUMARINA"
+  },
+  {
+   "inci": "CYCLOHEXASILOXANE",
+   "comum": ""
+  },
+  {
+   "inci": "CYCLOPENTASILOXANE",
+   "comum": ""
+  },
+  {
+   "inci": "CYSTOSEIRA TAMARISCIFOLIA EXTRACT",
+   "comum": ""
+  },
+  {
+   "inci": "DECYL GLUCOSIDE",
+   "comum": "DECIL GLICOSÍDEO"
+  },
+  {
+   "inci": "DECYLENE GLYCOL",
+   "comum": ""
+  },
+  {
+   "inci": "DEHYDROXANTHAN GUM",
+   "comum": ""
+  },
+  {
+   "inci": "DENATONIUM BENZOATE",
+   "comum": "BENZOATO DE DENATÔNIO"
+  },
+  {
+   "inci": "DEXTROMANOSE",
+   "comum": ""
+  },
+  {
+   "inci": "DI-ISOESTEARATO DE POLIGLICERILA-3",
+   "comum": ""
+  },
+  {
+   "inci": "DIBUTYL ADIPATE",
+   "comum": "ADIPATO DE DIBUTILA"
+  },
+  {
+   "inci": "DICAPRYLYL CARBONATE",
+   "comum": ""
+  },
+  {
+   "inci": "DICAPRYLYL ETHER",
+   "comum": "ÉTER DICAPRÍLICO"
+  },
+  {
+   "inci": "DIETHYLAMINO HYDROXYBENZOYL HEXYL BENZOATE",
+   "comum": "BENZOATO DE DIETILAMINO HIDROXIBENZOIL HEXILA"
+  },
+  {
+   "inci": "DIISOPROPYL ADIPATE",
+   "comum": "ADIPATO DE DIISOPROPILA"
+  },
+  {
+   "inci": "DIISOPROPYL SEBACATE",
+   "comum": "SEBACATO DE DIISOPROPILA"
+  },
+  {
+   "inci": "DIMETHICONE",
+   "comum": "DIMETICONA"
+  },
+  {
+   "inci": "DIMETHICONE CROSSPOLYMER",
+   "comum": "CROSPOLÍMERO DE DIMETICONA"
+  },
+  {
+   "inci": "DIMETHICONE/VINYL DIMETHICONE CROSSPOLYMER",
+   "comum": "CROSPOLÍMERO DE DIMETICONA/VINIL DIMETICONA"
+  },
+  {
+   "inci": "DIMETHICONOL",
+   "comum": "DIMETICONOL"
+  },
+  {
+   "inci": "DIMETHYL ISOSORBIDE",
+   "comum": "DIMETIL ISOSSORBIDA"
+  },
+  {
+   "inci": "DIMETICONA",
+   "comum": ""
+  },
+  {
+   "inci": "DIPOTASSIUM GLYCYRRHIZATE",
+   "comum": "GLICIRRIZATO DIPOTÁSSICO"
+  },
+  {
+   "inci": "DIPOTASSIUM PHOSPHATE",
+   "comum": "FOSFATO DIPOTÁSSICO"
+  },
+  {
+   "inci": "DISODIUM COCOYL GLUTAMATE",
+   "comum": "COCOIL GLUTAMATO DISSÓDICO"
+  },
+  {
+   "inci": "DISODIUM EDTA",
+   "comum": "EDETATO DISSÓDICO"
+  },
+  {
+   "inci": "DISODIUM LAURETH SULFOSUCCINATE",
+   "comum": "LAURETE SULFOSSUCCINATO DISSÓDICO"
+  },
+  {
+   "inci": "DISODIUM STEAROYL GLUTAMATE",
+   "comum": ""
+  },
+  {
+   "inci": "DISSUCCINATO DE ETILENODIAMINA TRISSÓDICO",
+   "comum": ""
+  },
+  {
+   "inci": "DISTARCH PHOSPHATE",
+   "comum": "FOSFATO DE DIAMIDO"
+  },
+  {
+   "inci": "DISTEARDIMONIUM HECTORITE",
+   "comum": ""
+  },
+  {
+   "inci": "DIÓXIDO DE SILÍCIO",
+   "comum": ""
+  },
+  {
+   "inci": "DIÓXIDO DE TITÂNIO",
+   "comum": ""
+  },
+  {
+   "inci": "EDETATO DE SÓDIO",
+   "comum": ""
+  },
+  {
+   "inci": "EDETATO DISSÓDICO",
+   "comum": ""
+  },
+  {
+   "inci": "ELAEIS GUINEENSIS OIL",
+   "comum": "ÓLEO DE PALMISTE"
+  },
+  {
+   "inci": "ESTEARATO DE ETILENOGLICOL ACETILADO",
+   "comum": ""
+  },
+  {
+   "inci": "ETHYL ACETATE",
+   "comum": "ACETATO DE ETILA"
+  },
+  {
+   "inci": "ETHYLENE/PROPYLENE/STYRENE COPOLYMER",
+   "comum": ""
+  },
+  {
+   "inci": "ETHYLHEXYL PALMITATE",
+   "comum": "PALMITATO DE ETILEXILA"
+  },
+  {
+   "inci": "ETHYLHEXYL SALICYLATE",
+   "comum": "OCTISSALATO"
+  },
+  {
+   "inci": "ETHYLHEXYL TRIAZONE",
+   "comum": "ETILHEXIL TRIAZONA"
+  },
+  {
+   "inci": "ETHYLHEXYLGLYCERIN",
+   "comum": "ETILHEXILGLICERINA"
+  },
+  {
+   "inci": "ETIDRONIC ACID",
+   "comum": "ÁCIDO ETIDRÔNICO"
+  },
+  {
+   "inci": "ETILEXILGLICERINA",
+   "comum": ""
+  },
+  {
+   "inci": "EUGENOL",
+   "comum": "EUGENOL"
+  },
+  {
+   "inci": "EXTRATO DA FOLHA DE ALOE BARBADENSIS",
+   "comum": ""
+  },
+  {
+   "inci": "EXTRATO DE ASCOPHYLLUM NODOSUM",
+   "comum": ""
+  },
+  {
+   "inci": "EXTRATO DE ASPARAGOPSIS ARMATA",
+   "comum": ""
+  },
+  {
+   "inci": "EXTRATO DE CHRYSANTHELLUM INDICUM",
+   "comum": ""
+  },
+  {
+   "inci": "EXTRATO DE EQUISETUM ARVENSE",
+   "comum": ""
+  },
+  {
+   "inci": "EXTRATO DE FOLHA DE CENTELLA ASIATICA",
+   "comum": ""
+  },
+  {
+   "inci": "FENOXIETANOL",
+   "comum": ""
+  },
+  {
+   "inci": "FERMENTO DE VITREOSCILLA",
+   "comum": ""
+  },
+  {
+   "inci": "FITOESFINGOSINA",
+   "comum": ""
+  },
+  {
+   "inci": "FOSFATO DE POTÁSSIO DIBÁSICO",
+   "comum": ""
+  },
+  {
+   "inci": "FOSFATO DE POTÁSSIO MONOBÁSICO",
+   "comum": ""
+  },
+  {
+   "inci": "GELATIN CROSSPOLYMER",
+   "comum": "Gelatin Crosspolymer"
+  },
+  {
+   "inci": "GELLAN GUM",
+   "comum": "GOMA GELANA"
+  },
+  {
+   "inci": "GERANIOL",
+   "comum": "GERANIOL"
+  },
+  {
+   "inci": "GERANYL ACETATE",
+   "comum": "ACETATO DE GERANILA"
+  },
+  {
+   "inci": "GLICEROL",
+   "comum": ""
+  },
+  {
+   "inci": "GLICONATO DE MANGANÊS",
+   "comum": ""
+  },
+  {
+   "inci": "GLICONATO DE ZINCO",
+   "comum": ""
+  },
+  {
+   "inci": "GLUCONOLACTONE",
+   "comum": "GLICONOLACTONA"
+  },
+  {
+   "inci": "GLUCOSE",
+   "comum": "GLICOSE"
+  },
+  {
+   "inci": "GLUCOSYLRUTIN",
+   "comum": ""
+  },
+  {
+   "inci": "GLYCERIN",
+   "comum": "GLICEROL"
+  },
+  {
+   "inci": "GLYCEROL",
+   "comum": ""
+  },
+  {
+   "inci": "GLYCERYL GLUCOSIDE",
+   "comum": ""
+  },
+  {
+   "inci": "GLYCERYL ISOSTEARATE",
+   "comum": "ISOESTEARATO DE GLICERILA"
+  },
+  {
+   "inci": "GLYCERYL OLEATE",
+   "comum": "OLEATO DE GLICERILA"
+  },
+  {
+   "inci": "GLYCERYL STEARATE",
+   "comum": "MONOESTEARATO DE GLICERILA"
+  },
+  {
+   "inci": "GLYCERYL STEARATE CITRATE",
+   "comum": "CITRATO DE ESTEARATO DE GLICERILA"
+  },
+  {
+   "inci": "GLYCERYL STEARATE SE",
+   "comum": "ESTEARATO DE GLICERILA AUTOEMULSIONANTE"
+  },
+  {
+   "inci": "GLYCINE",
+   "comum": "GLICINA"
+  },
+  {
+   "inci": "GLYCINE SOJA GERM EXTRACT",
+   "comum": "EXTRATO DE GÉRMEN DE SOJA"
+  },
+  {
+   "inci": "GLYCINE SOJA OIL",
+   "comum": "ÓLEO DE SOJA"
+  },
+  {
+   "inci": "GLYCINE SOJA OIL / SOYBEAN OIL",
+   "comum": ""
+  },
+  {
+   "inci": "GLYCOL DISTEARATE",
+   "comum": "DIESTEARATO DE ETILENOGLICOL"
+  },
+  {
+   "inci": "GLYCOLIC ACID",
+   "comum": "ÁCIDO GLICÓLICO"
+  },
+  {
+   "inci": "GLYCYRRHETINIC ACID",
+   "comum": "ENOXOLONA"
+  },
+  {
+   "inci": "GLYCYRRHIZA INFLATA ROOT EXTRACT",
+   "comum": ""
+  },
+  {
+   "inci": "GOMA XANTANA",
+   "comum": ""
+  },
+  {
+   "inci": "GUAR GUM",
+   "comum": ""
+  },
+  {
+   "inci": "HECTORITE",
+   "comum": "HECTORITA"
+  },
+  {
+   "inci": "HELIANTHUS ANNUUS HYBRID OIL",
+   "comum": ""
+  },
+  {
+   "inci": "HELIANTHUS ANNUUS SEED OIL",
+   "comum": "ÓLEO DA SEMENTE DE GIRASSOL"
+  },
+  {
+   "inci": "HEXYL CINNAMAL",
+   "comum": "HEXIL CINAMAL"
+  },
+  {
+   "inci": "HEXYLENE GLYCOL",
+   "comum": "HEXILENO GLICOL"
+  },
+  {
+   "inci": "HIALURONATO DE SÓDIO",
+   "comum": ""
+  },
+  {
+   "inci": "HIDRÓXIDO DE ALUMÍNIO",
+   "comum": ""
+  },
+  {
+   "inci": "HIDRÓXIDO DE SÓDIO",
+   "comum": ""
+  },
+  {
+   "inci": "HISTIDINE",
+   "comum": "HISTIDINA"
+  },
+  {
+   "inci": "HOMOSALATE",
+   "comum": "HOMOSSALATO"
+  },
+  {
+   "inci": "HYDROGENATED COCO-GLYCERIDES",
+   "comum": "COCO-GLICERÍDEOS HIDROGENADOS"
+  },
+  {
+   "inci": "HYDROGENATED LECITHIN",
+   "comum": "LECITINA HIDROGENADA"
+  },
+  {
+   "inci": "HYDROLYZED CORN PROTEIN",
+   "comum": "PROTEÍNA DE MILHO HIDROLISADA"
+  },
+  {
+   "inci": "HYDROLYZED HYALURONIC ACID",
+   "comum": ""
+  },
+  {
+   "inci": "HYDROLYZED JOJOBA ESTERS",
+   "comum": ""
+  },
+  {
+   "inci": "HYDROLYZED SILK",
+   "comum": "SEDA HIDROLISADA"
+  },
+  {
+   "inci": "HYDROLYZED SOY PROTEIN",
+   "comum": "PROTEÍNA DE SOJA HIDROLISADA"
+  },
+  {
+   "inci": "HYDROLYZED WHEAT PROTEIN",
+   "comum": "PROTEÍNA DE TRIGO HIDROLISADA"
+  },
+  {
+   "inci": "HYDROXYACETOPHENONE",
+   "comum": ""
+  },
+  {
+   "inci": "HYDROXYCITRONELLAL",
+   "comum": "HIDROXICITRONELAL"
+  },
+  {
+   "inci": "HYDROXYETHYL ACRYLATE/SODIUM ACRYLOYLDIMETHYL TAURATE COPOLYMER",
+   "comum": ""
+  },
+  {
+   "inci": "HYDROXYETHYL UREA",
+   "comum": ""
+  },
+  {
+   "inci": "HYDROXYETHYLPIPERAZINE ETHANE SULFONIC ACID",
+   "comum": ""
+  },
+  {
+   "inci": "HYDROXYPROPYL STARCH PHOSPHATE",
+   "comum": ""
+  },
+  {
+   "inci": "INULIN LAURYL CARBAMATE",
+   "comum": ""
+  },
+  {
+   "inci": "IRIS FLORENTINA ROOT EXTRACT",
+   "comum": "EXTRATO DE RAIZ DE IRÍS"
+  },
+  {
+   "inci": "ISOAMYL LAURATE",
+   "comum": "LAURATO DE ISOAMILA"
+  },
+  {
+   "inci": "ISOBUTANE",
+   "comum": "ISOBUTANO"
+  },
+  {
+   "inci": "ISOBUTYLAMIDO THIAZOLYL RESORCINOL",
+   "comum": ""
+  },
+  {
+   "inci": "ISOCETYL STEARATE",
+   "comum": "ESTEARATO DE ISOCETILA"
+  },
+  {
+   "inci": "ISODODECANE",
+   "comum": "ISODODECANO"
+  },
+  {
+   "inci": "ISOESTEARATO DE POLIGLICERILA-4",
+   "comum": ""
+  },
+  {
+   "inci": "ISOEUGENOL",
+   "comum": "ISOEUGENOL"
+  },
+  {
+   "inci": "ISOHEXADECANE",
+   "comum": "ISOEXADECANO"
+  },
+  {
+   "inci": "ISOLEUCINE",
+   "comum": "ISOLEUCINA"
+  },
+  {
+   "inci": "ISONONANOATO DE ISONONILA",
+   "comum": ""
+  },
+  {
+   "inci": "ISONONYL ISONONANOATE",
+   "comum": "ISONONANOATO DE ISONONILA"
+  },
+  {
+   "inci": "ISOPROPYL ALCOHOL",
+   "comum": "ÁLCOOL ISOPROPÍLICO"
+  },
+  {
+   "inci": "ISOPROPYL LAUROYL SARCOSINATE",
+   "comum": ""
+  },
+  {
+   "inci": "ISOPROPYL MYRISTATE",
+   "comum": "MIRISTATO DE ISOPROPILA"
+  },
+  {
+   "inci": "ISOPROPYL PALMITATE",
+   "comum": "PALMITATO DE ISOPROPILA"
+  },
+  {
+   "inci": "ISOQUERCITRIN",
+   "comum": ""
+  },
+  {
+   "inci": "KAOLIN",
+   "comum": "CAULIM"
+  },
+  {
+   "inci": "LACTIC ACID",
+   "comum": "ÁCIDO LÁCTICO"
+  },
+  {
+   "inci": "LACTOBACILLUS",
+   "comum": ""
+  },
+  {
+   "inci": "LACTOSERUM",
+   "comum": ""
+  },
+  {
+   "inci": "LANOLIN ALCOHOL",
+   "comum": "ÁLCOOL DE LANOLINA"
+  },
+  {
+   "inci": "LAURETH-7",
+   "comum": "LAURETE-7"
+  },
+  {
+   "inci": "LAUROIL LACTILATO DE SÓDIO",
+   "comum": ""
+  },
+  {
+   "inci": "LAUROMACROGOL 400",
+   "comum": ""
+  },
+  {
+   "inci": "LAURYL GLUCOSIDE",
+   "comum": "LAURIL GLICOSÍDEO"
+  },
+  {
+   "inci": "LAURYL LAURATE",
+   "comum": ""
+  },
+  {
+   "inci": "LAVANDULA ANGUSTIFOLIA FLOWER EXTRACT",
+   "comum": "EXTRATO DA FLOR DE LAVANDA"
+  },
+  {
+   "inci": "LIMONENE",
+   "comum": "LIMONENO"
+  },
+  {
+   "inci": "LINALOOL",
+   "comum": "LINALOL"
+  },
+  {
+   "inci": "LINALYL ACETATE",
+   "comum": "ACETATO DE LINALILA"
+  },
+  {
+   "inci": "LINOLEAMIDOPROPYL PG-DIMONIUM CHLORIDE PHOSPHATE",
+   "comum": "CLORETO FOSFATO DE LINOLEAMIDOPROPIL PG-DIMÔNIO"
+  },
+  {
+   "inci": "LINUM USITATISSIMUM SEED OIL",
+   "comum": "ÓLEO DA SEMENTE DE LINHAÇA"
+  },
+  {
+   "inci": "MACROGOL 100 STEARATE",
+   "comum": ""
+  },
+  {
+   "inci": "MACROGOL 2000 STEARATE",
+   "comum": ""
+  },
+  {
+   "inci": "MADECASSOSIDE",
+   "comum": ""
+  },
+  {
+   "inci": "MAGNESIUM STEARATE",
+   "comum": "ESTEARATO DE MAGNÉSIO"
+  },
+  {
+   "inci": "MAGNESIUM SULFATE",
+   "comum": "SULFATO DE MAGNÉSIO"
+  },
+  {
+   "inci": "MALTODEXTRIN",
+   "comum": "MALTODEXTRINA"
+  },
+  {
+   "inci": "MALTODEXTRINA",
+   "comum": ""
+  },
+  {
+   "inci": "MANNOSE",
+   "comum": ""
+  },
+  {
+   "inci": "MANTEIGA DE BUTYROSPERMUM PARKII",
+   "comum": ""
+  },
+  {
+   "inci": "MENTHOL",
+   "comum": "MENTOL"
+  },
+  {
+   "inci": "METHYL METHACRYLATE CROSSPOLYMER",
+   "comum": "CROSPOLÍMERO DE METACRILATO DE METILA"
+  },
+  {
+   "inci": "METHYLENE BIS-BENZOTRIAZOLYL TETRAMETHYLBUTYLPHENOL",
+   "comum": "METILENO BIS-BENZOTRIAZOLIL TETRAMETILBUTILFENOL"
+  },
+  {
+   "inci": "METOSSULFATO DE BEENTRIMÔNIO",
+   "comum": ""
+  },
+  {
+   "inci": "MICA",
+   "comum": "MICA"
+  },
+  {
+   "inci": "MINERAL OIL",
+   "comum": ""
+  },
+  {
+   "inci": "MYRISTIC ACID",
+   "comum": "ÁCIDO MIRÍSTICO"
+  },
+  {
+   "inci": "MYRISTYL MYRISTATE",
+   "comum": "MIRISTATO DE MIRISTILA"
+  },
+  {
+   "inci": "MYRTRIMONIUM BROMIDE",
+   "comum": "BROMETO DE TETRADÔNIO"
+  },
+  {
+   "inci": "NIACINAMIDE",
+   "comum": "NICOTINAMIDA"
+  },
+  {
+   "inci": "NICOTINAMIDA",
+   "comum": ""
+  },
+  {
+   "inci": "NITROCELLULOSE",
+   "comum": "PIROXILINA"
+  },
+  {
+   "inci": "NYLON-12",
+   "comum": "NÁILON-12"
+  },
+  {
+   "inci": "NYLON-611/DIMETHICONE COPOLYMER",
+   "comum": "COPOLÍMERO DE NÁILON-611/DIMETICONA"
+  },
+  {
+   "inci": "OCTOCRYLENE",
+   "comum": "OCTOCRILENO"
+  },
+  {
+   "inci": "OCTYLDODECANOL",
+   "comum": "OCTILDODECANOL"
+  },
+  {
+   "inci": "OENOCARPUS BATAUA FRUIT OIL",
+   "comum": ""
+  },
+  {
+   "inci": "OLEA EUROPAEA FRUIT OIL",
+   "comum": "ÓLEO DO FRUTO DE OLIVEIRA"
+  },
+  {
+   "inci": "OPHIOPOGON JAPONICUS ROOT EXTRACT",
+   "comum": ""
+  },
+  {
+   "inci": "ORYZA SATIVA WAX",
+   "comum": ""
+  },
+  {
+   "inci": "PALMITIC ACID",
+   "comum": "ÁCIDO PALMÍTICO"
+  },
+  {
+   "inci": "PANTENOL",
+   "comum": ""
+  },
+  {
+   "inci": "PANTHENOL",
+   "comum": "PANTENOL"
+  },
+  {
+   "inci": "PANTOLACTONE",
+   "comum": ""
+  },
+  {
+   "inci": "PARAFFIN",
+   "comum": "PARAFINA"
+  },
+  {
+   "inci": "PARAFFINUM LIQUIDUM",
+   "comum": "PARAFINA LÍQUIDA"
+  },
+  {
+   "inci": "PARAFFINUM LIQUIDUM / MINERAL OIL",
+   "comum": ""
+  },
+  {
+   "inci": "PARFUM",
+   "comum": "Fragrância"
+  },
+  {
+   "inci": "PARFUM / FRAGRANCE",
+   "comum": "Fragrância"
+  },
+  {
+   "inci": "PCA",
+   "comum": "ÁCIDO PIDÓLICO"
+  },
+  {
+   "inci": "PEG",
+   "comum": ""
+  },
+  {
+   "inci": "PEG-10 DIMETHICONE",
+   "comum": "DIMETICONA PEG-10"
+  },
+  {
+   "inci": "PEG-100 STEARATE",
+   "comum": "ESTEARATO PEG-100"
+  },
+  {
+   "inci": "PEG-120 METHYL GLUCOSE DIOLEATE",
+   "comum": "DIOLEATO DE METIL GLICOSE PEG-120"
+  },
+  {
+   "inci": "PEG-150 DISTEARATE",
+   "comum": "DIESTEARATO DE PEG-150"
+  },
+  {
+   "inci": "PEG-150 PENTAERYTHRITYL TETRASTEARATE",
+   "comum": "TETRAESTEARATO DE PENTAERITRITILA PEG-150"
+  },
+  {
+   "inci": "PEG-20 METHYL GLUCOSE SESQUISTEARATE",
+   "comum": "SESQUIESTEARATO DE METIL GLICOSE PEG-20"
+  },
+  {
+   "inci": "PEG-200 HYDROGENATED GLYCERYL PALMATE",
+   "comum": "PALMATO DE GLICERILA HIDROGENADO PEG-200"
+  },
+  {
+   "inci": "PEG-30 DIPOLYHYDROXYSTEARATE",
+   "comum": "DIPOLIHIDROXIESTEARATO PEG-30"
+  },
+  {
+   "inci": "PEG-30 GLYCERYL COCOATE",
+   "comum": "COCOATO DE GLICERILA PEG-30"
+  },
+  {
+   "inci": "PEG-40 HYDROGENATED CASTOR OIL",
+   "comum": "ÓLEO DE RÍCINO HIDROGENADO PEG-40"
+  },
+  {
+   "inci": "PEG-6 CAPRYLIC/CAPRIC GLYCERIDES",
+   "comum": "GLICERÍDEOS CAPRÍLICO/CÁPRICO PEG-6"
+  },
+  {
+   "inci": "PEG-7 CAPRYLIC/CAPRIC GLYCERIDES",
+   "comum": ""
+  },
+  {
+   "inci": "PEG-7 GLYCERYL COCOATE",
+   "comum": "COCOATO DE GLICERILA PEG-7"
+  },
+  {
+   "inci": "PEG-8 LAURATE",
+   "comum": "LAURATO DE PEG-8"
+  },
+  {
+   "inci": "PENTACLETHRA MACROLOBA SEED OIL",
+   "comum": ""
+  },
+  {
+   "inci": "PENTAERYTHRITYL TETRA-DI-T-BUTYL HYDROXYHYDROCINNAMATE",
+   "comum": "Pentaeritritil Tetra-di-t-butil Hidroxihidrocinamato"
+  },
+  {
+   "inci": "PENTILENOGLICOL",
+   "comum": ""
+  },
+  {
+   "inci": "PENTYLENE GLYCOL",
+   "comum": ""
+  },
+  {
+   "inci": "PERLITE",
+   "comum": ""
+  },
+  {
+   "inci": "PETROLATUM",
+   "comum": "PETROLATO"
+  },
+  {
+   "inci": "PHENOXYETHANOL",
+   "comum": "FENOXIETANOL"
+  },
+  {
+   "inci": "PHENYLALANINE",
+   "comum": ""
+  },
+  {
+   "inci": "PHENYLBENZIMIDAZOLE SULFONIC ACID",
+   "comum": "ÁCIDO FENILBENZIMIDAZOL SULFÔNICO"
+  },
+  {
+   "inci": "PHYLLANTHUS EMBLICA FRUIT EXTRACT",
+   "comum": ""
+  },
+  {
+   "inci": "PHYTIC ACID",
+   "comum": "ÁCIDO FÍTICO"
+  },
+  {
+   "inci": "PHYTOSPHINGOSINE",
+   "comum": ""
+  },
+  {
+   "inci": "POGOSTEMON CABLIN OIL",
+   "comum": ""
+  },
+  {
+   "inci": "POLI-ISOBUTENO HIDROGENADO",
+   "comum": ""
+  },
+  {
+   "inci": "POLOXAMER 407",
+   "comum": "POLOXÂMERO 407"
+  },
+  {
+   "inci": "POLYACRYLAMIDE",
+   "comum": "POLIACRILAMIDA"
+  },
+  {
+   "inci": "POLYACRYLATE CROSSPOLYMER-6",
+   "comum": ""
+  },
+  {
+   "inci": "POLYACRYLATE-6 CROSSPOLYMER",
+   "comum": ""
+  },
+  {
+   "inci": "POLYBUTENE",
+   "comum": "POLIBUTENO"
+  },
+  {
+   "inci": "POLYGLYCERYL-10 LAURATE",
+   "comum": "LAURATO DE POLIGLICERILA-10"
+  },
+  {
+   "inci": "POLYGLYCERYL-2 DIPOLYHYDROXYSTEARATE",
+   "comum": ""
+  },
+  {
+   "inci": "POLYGLYCERYL-3 CAPRYLATE",
+   "comum": ""
+  },
+  {
+   "inci": "POLYGLYCERYL-3 DIISOSTEARATE",
+   "comum": "DIISOESTEARATO DE POLIGLICERILA-3"
+  },
+  {
+   "inci": "POLYMETHYLSILSESQUIOXANE",
+   "comum": "POLIMETILSILSESQUIOXANO"
+  },
+  {
+   "inci": "POLYPROPYLSILSESQUIOXANE",
+   "comum": ""
+  },
+  {
+   "inci": "POLYQUATERNIUM-10",
+   "comum": "POLIQUATÉRNIO-10"
+  },
+  {
+   "inci": "POLYQUATERNIUM-39",
+   "comum": "POLIQUATÉRNIO-39"
+  },
+  {
+   "inci": "POLYQUATERNIUM-47",
+   "comum": ""
+  },
+  {
+   "inci": "POLYQUATERNIUM-53",
+   "comum": ""
+  },
+  {
+   "inci": "POLYQUATERNIUM-6",
+   "comum": "POLIQUATÉRNIO-6"
+  },
+  {
+   "inci": "POLYQUATERNIUM-7",
+   "comum": "POLIQUATÉRNIO-7"
+  },
+  {
+   "inci": "POLYSILICONE-11",
+   "comum": ""
+  },
+  {
+   "inci": "POLYSORBATE 20",
+   "comum": "POLISSORBATO 20"
+  },
+  {
+   "inci": "POLYSORBATE 60",
+   "comum": "POLISSORBATO 60"
+  },
+  {
+   "inci": "POLYSORBATE 80",
+   "comum": "POLISORBATO 80"
+  },
+  {
+   "inci": "POTASSIUM CETYL PHOSPHATE",
+   "comum": "CETIL FOSFATO DE POTÁSSIO"
+  },
+  {
+   "inci": "POTASSIUM HYDROXIDE",
+   "comum": "HIDRÓXIDO DE POTÁSSIO"
+  },
+  {
+   "inci": "POTASSIUM PHOSPHATE",
+   "comum": "FOSFATO DE POTÁSSIO"
+  },
+  {
+   "inci": "POTASSIUM SORBATE",
+   "comum": "SORBATO DE POTÁSSIO"
+  },
+  {
+   "inci": "PPG-15 STEARYL ETHER",
+   "comum": "ÉTER POLIPROPILENOGLICOL MONOESTEARÍLICO"
+  },
+  {
+   "inci": "PPG-26-BUTETH-26",
+   "comum": "PPG-26-BUTETE-26"
+  },
+  {
+   "inci": "PPG-5-CETETH-20",
+   "comum": "PPG-5 CETETE-20"
+  },
+  {
+   "inci": "PPG-6-DECYLTETRADECETH-30",
+   "comum": "PPG-6-DECILTETRADECETE-30"
+  },
+  {
+   "inci": "PROLINE",
+   "comum": ""
+  },
+  {
+   "inci": "PROPANEDIOL",
+   "comum": ""
+  },
+  {
+   "inci": "PROPANODIOL",
+   "comum": ""
+  },
+  {
+   "inci": "PROPYL GALLATE",
+   "comum": "GALATO DE PROPILA"
+  },
+  {
+   "inci": "PROPYLENE CARBONATE",
+   "comum": "CARBONATO DE PROPILENO"
+  },
+  {
+   "inci": "PROPYLENE GLYCOL",
+   "comum": "PROPILENO GLICOL"
+  },
+  {
+   "inci": "PROPYLENE GLYCOL DIHEPTANOATE",
+   "comum": ""
+  },
+  {
+   "inci": "PROPYLHEPTYL CAPRYLATE",
+   "comum": ""
+  },
+  {
+   "inci": "PRUNUS AMYGDALUS DULCIS OIL",
+   "comum": "ÓLEO DE AMÊNDOAS DOCES"
+  },
+  {
+   "inci": "PVP",
+   "comum": "POLI VINIL PIRROLIDONA"
+  },
+  {
+   "inci": "Peg-20",
+   "comum": "Peg-20"
+  },
+  {
+   "inci": "Peg-40 Stearate",
+   "comum": "ESTEARATO DE PEG-40"
+  },
+  {
+   "inci": "Peg-8",
+   "comum": "Peg-8"
+  },
+  {
+   "inci": "Poloxamer 124",
+   "comum": "POLOXÂMERO 124"
+  },
+  {
+   "inci": "Poloxamer 184",
+   "comum": "POLOXÂMERO 184"
+  },
+  {
+   "inci": "Poloxamer 338",
+   "comum": "POLOXÂMERO 338"
+  },
+  {
+   "inci": "QUARTZ",
+   "comum": ""
+  },
+  {
+   "inci": "RETINOL",
+   "comum": "RETINOL"
+  },
+  {
+   "inci": "RETINYL PALMITATE",
+   "comum": "PALMITATO DE RETINOL"
+  },
+  {
+   "inci": "RICINUS COMMUNIS SEED OIL",
+   "comum": "ÓLEO DA SEMENTE DE MAMONA"
+  },
+  {
+   "inci": "SALICYLIC ACID",
+   "comum": "ÁCIDO SALICÍLICO"
+  },
+  {
+   "inci": "SARCOSINE",
+   "comum": ""
+  },
+  {
+   "inci": "SCLEROCARYA BIRREA SEED OIL",
+   "comum": ""
+  },
+  {
+   "inci": "SERINE",
+   "comum": "SERINA"
+  },
+  {
+   "inci": "SESQUIESTEARATO DE METIL GLICOSE",
+   "comum": ""
+  },
+  {
+   "inci": "SESQUIESTEARATO DE POLIETILENOGLICOL-20 METIL GLICOSE",
+   "comum": ""
+  },
+  {
+   "inci": "SILICA",
+   "comum": "SÍLICA"
+  },
+  {
+   "inci": "SILICA SILYLATE",
+   "comum": "SILILATO DE SÍLICA"
+  },
+  {
+   "inci": "SODIUM ACRYLATES COPOLYMER",
+   "comum": "OPOLÍMERO DE ACRILATOS DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM ARACHIDATE",
+   "comum": ""
+  },
+  {
+   "inci": "SODIUM ASCORBYL PHOSPHATE",
+   "comum": ""
+  },
+  {
+   "inci": "SODIUM BENZOATE",
+   "comum": "BENZOATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM C12-15 PARETH-15 SULFONATE",
+   "comum": "SULFONATO DE SÓDIO C12-15 PARETE-15"
+  },
+  {
+   "inci": "SODIUM C14-16 OLEFIN SULFONATE",
+   "comum": "OLEFINA C14-16 SULFONATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM CAPRATE",
+   "comum": ""
+  },
+  {
+   "inci": "SODIUM CAPRYLATE",
+   "comum": "CAPRILATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM CETEARYL SULFATE",
+   "comum": "CETEARIL SULFATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM CHLORIDE",
+   "comum": "CLORETO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM CITRATE",
+   "comum": "CITRATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM COCO-SULFATE",
+   "comum": "COCO SULFATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM COCOAMPHOACETATE",
+   "comum": "COCOANFOACETATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM COCOYL GLUTAMATE",
+   "comum": "COCOIL GLUTAMATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM COCOYL ISETHIONATE",
+   "comum": "COCOIL ISETIONATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM DODECYLBENZENESULFONATE",
+   "comum": "DODECILBENZENOSSULFONATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM EDTA",
+   "comum": ""
+  },
+  {
+   "inci": "SODIUM GLUCONATE",
+   "comum": "GLICONATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM HYALURONATE",
+   "comum": "HIALURONATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM HYDROXIDE",
+   "comum": "HIDRÓXIDO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM LACTATE",
+   "comum": "LACTATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM LAURATE",
+   "comum": "LAURATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM LAURETH SULFATE",
+   "comum": "SULFATO DE SÓDIO LAURETE"
+  },
+  {
+   "inci": "SODIUM LAUROYL LACTYLATE",
+   "comum": "LAUROIL LACTILATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM LAUROYL SARCOSINATE",
+   "comum": "LAUROIL SARCOSINATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM LINOLEATE",
+   "comum": ""
+  },
+  {
+   "inci": "SODIUM METHYL COCOYL TAURATE",
+   "comum": "METIL COCOIL TAURATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM METHYL STEAROYL TAURATE",
+   "comum": "METIL ESTEAROIL TAURATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM MYRISTATE",
+   "comum": "MIRISTATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM OLEATE",
+   "comum": "OLEATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM PALM KERNELATE",
+   "comum": "PALMISTATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM PALMATE",
+   "comum": "PALMATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM PALMITATE",
+   "comum": "PALMITATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM PCA",
+   "comum": "PIDOLATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM POLYACRYLATE",
+   "comum": "POLIACRILATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM POLYGLUTAMATE",
+   "comum": "POLIGLUTAMATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM STEARATE",
+   "comum": "ESTEARATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM STEAROYL GLUTAMATE",
+   "comum": "ESTEAROIL GLUTAMATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM SULFATE",
+   "comum": "SULFATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM THIOSULFATE",
+   "comum": "TIOSSULFATO DE SÓDIO"
+  },
+  {
+   "inci": "SODIUM XYLENESULFONATE",
+   "comum": "XILENOSSULFONATO DE SÓDIO"
+  },
+  {
+   "inci": "SORBATO DE POTÁSSIO",
+   "comum": ""
+  },
+  {
+   "inci": "SORBITAN ISOSTEARATE",
+   "comum": "ISOESTEARATO DE SORBITANA"
+  },
+  {
+   "inci": "SORBITAN OLIVATE",
+   "comum": ""
+  },
+  {
+   "inci": "SORBITAN STEARATE",
+   "comum": "ESTEARATO DE SORBITANA"
+  },
+  {
+   "inci": "SORBITAN TRISTEARATE",
+   "comum": "TRIESTEARATO DE SORBITANA"
+  },
+  {
+   "inci": "SORBITOL",
+   "comum": "SORBITOL"
+  },
+  {
+   "inci": "SQUALANE",
+   "comum": "ESQUALANO"
+  },
+  {
+   "inci": "STARCH",
+   "comum": ""
+  },
+  {
+   "inci": "STEARALKONIUM BENTONITE",
+   "comum": "BENTONITA DE ESTEARALCÔNIO"
+  },
+  {
+   "inci": "STEARETH-10",
+   "comum": "ESTEARETE-10"
+  },
+  {
+   "inci": "STEARETH-2",
+   "comum": "ESTEARETE-2"
+  },
+  {
+   "inci": "STEARETH-20",
+   "comum": "ESTEARETE-20"
+  },
+  {
+   "inci": "STEARETH-21",
+   "comum": "ESTEARETE-21"
+  },
+  {
+   "inci": "STEARIC ACID",
+   "comum": "ÁCIDO ESTÁRICO"
+  },
+  {
+   "inci": "STEARYL ALCOHOL",
+   "comum": "ÁLCOOL ESTEARÍLICO"
+  },
+  {
+   "inci": "STYRENE/ACRYLATES COPOLYMER",
+   "comum": "COPOLÍMERO DE ESTIRENO/ACRILATOS"
+  },
+  {
+   "inci": "SUCO DA RAIZ DE POLYMNIA SONCHIFOLIA",
+   "comum": ""
+  },
+  {
+   "inci": "SUCROSE",
+   "comum": "SACAROSE"
+  },
+  {
+   "inci": "SUCROSE COCOATE",
+   "comum": "COCOATO DE SACAROSE"
+  },
+  {
+   "inci": "SUCROSE TRISTEARATE",
+   "comum": "TRIESTEARATO DE SACAROSE"
+  },
+  {
+   "inci": "SULFATO DE MAGNÉSIO",
+   "comum": ""
+  },
+  {
+   "inci": "SYNTHETIC WAX",
+   "comum": "CERA SINTÉTICA"
+  },
+  {
+   "inci": "T-BUTYL ALCOHOL",
+   "comum": "ÁLCOOL T-BUTIL"
+  },
+  {
+   "inci": "TALC",
+   "comum": "TALCO"
+  },
+  {
+   "inci": "TAPIOCA STARCH",
+   "comum": "AMIDO DE TAPIOCA"
+  },
+  {
+   "inci": "TEREPHTHALYLIDENE DICAMPHOR SULFONIC ACID",
+   "comum": "ÁCIDO TERFTALILIDENO DICAMFORA SULFÔNICO"
+  },
+  {
+   "inci": "TETRA-DI-T-BUTIL HIDRÓXI-HIDROCINAMATO DE PENTAERITRITILA",
+   "comum": ""
+  },
+  {
+   "inci": "TETRAHEXYLDECYL ASCORBATE",
+   "comum": ""
+  },
+  {
+   "inci": "TETRASODIUM EDTA",
+   "comum": "EDETATO TETRASSÓDICO"
+  },
+  {
+   "inci": "THEOBROMA CACAO SEED BUTTER",
+   "comum": ""
+  },
+  {
+   "inci": "THEOBROMA GRANDIFLORUM SEED BUTTER",
+   "comum": ""
+  },
+  {
+   "inci": "THREONINE",
+   "comum": ""
+  },
+  {
+   "inci": "TITANIUM DIOXIDE",
+   "comum": "DIÓXIDO DE TITÂNIO"
+  },
+  {
+   "inci": "TOCOFEROL",
+   "comum": ""
+  },
+  {
+   "inci": "TOCOPHEROL",
+   "comum": "TOCOFEROL"
+  },
+  {
+   "inci": "TOCOPHERYL ACETATE",
+   "comum": ""
+  },
+  {
+   "inci": "TOLUENE SULFONIC ACID",
+   "comum": "ÁCIDO TOLUENO SULFÔNICO"
+  },
+  {
+   "inci": "TREHALOSE",
+   "comum": "TREALOSE"
+  },
+  {
+   "inci": "TRI-HIDROXIESTEARINA",
+   "comum": ""
+  },
+  {
+   "inci": "TRIACONTANYL PVP",
+   "comum": ""
+  },
+  {
+   "inci": "TRIDECETH-6",
+   "comum": "TRIDECETE-6"
+  },
+  {
+   "inci": "TRIETHANOLAMINE",
+   "comum": "TRIETANOLAMINA"
+  },
+  {
+   "inci": "TRIETHOXYCAPRYLYLSILANE",
+   "comum": ""
+  },
+  {
+   "inci": "TRIETHYL CITRATE",
+   "comum": "CITRATO DE TRIETILA"
+  },
+  {
+   "inci": "TRIGLICERÍDEO CAPRÍLICO/CÁPRICO",
+   "comum": ""
+  },
+  {
+   "inci": "TRIHYDROXYSTEARIN",
+   "comum": "TRIIDROXIESTEARINA"
+  },
+  {
+   "inci": "TRIISONONANOIN",
+   "comum": "TRIISONONANOÍNA"
+  },
+  {
+   "inci": "TRIMETHYL PENTAPHENYL TRISILOXANE",
+   "comum": "TRIMETIL PENTAFENIL TRISSILOXANO"
+  },
+  {
+   "inci": "TRIMETHYLSILOXYPHENYL DIMETHICONE",
+   "comum": "TRIMETILSILOXIFENIL DIMETICONA"
+  },
+  {
+   "inci": "TRIMETHYLSILOXYSILICATE",
+   "comum": "TRIMETILSILOXISSILICATO"
+  },
+  {
+   "inci": "TRIPEPTIDE-1",
+   "comum": ""
+  },
+  {
+   "inci": "TRISODIUM EDTA",
+   "comum": "EDETATO TRISSÓDICO"
+  },
+  {
+   "inci": "TRISODIUM ETHYLENEDIAMINE DISUCCINATE",
+   "comum": ""
+  },
+  {
+   "inci": "TROLAMINA",
+   "comum": ""
+  },
+  {
+   "inci": "TROLAMINE",
+   "comum": ""
+  },
+  {
+   "inci": "VALINE",
+   "comum": "LEVOVALINA"
+  },
+  {
+   "inci": "VITREOSCILLA FERMENT",
+   "comum": ""
+  },
+  {
+   "inci": "VP/EICOSENE COPOLYMER",
+   "comum": "COPOLÍMERO DE VINIL PIRROLIDONA/EICOSENO"
+  },
+  {
+   "inci": "XANTHAN GUM",
+   "comum": "GOMA XANTANA"
+  },
+  {
+   "inci": "ZEA MAYS GERM OIL",
+   "comum": "ÓLEO DO GERME DE MILHO"
+  },
+  {
+   "inci": "ZEA MAYS STARCH",
+   "comum": "AMIDO DE MILHO"
+  },
+  {
+   "inci": "ZEA MAYS STARCH / CORN STARCH",
+   "comum": ""
+  },
+  {
+   "inci": "ZINC GLUCONATE",
+   "comum": "GLICONATO DE ZINCO"
+  },
+  {
+   "inci": "ZINC PCA",
+   "comum": "PIDOLATO DE ZINCO"
+  },
+  {
+   "inci": "ÁCIDO CÍTRICO",
+   "comum": ""
+  },
+  {
+   "inci": "ÁGUA",
+   "comum": ""
+  },
+  {
+   "inci": "ÁLCOOL CETOESTEARÍLICO",
+   "comum": ""
+  },
+  {
+   "inci": "ÁLCOOL CETÍLICO",
+   "comum": ""
+  },
+  {
+   "inci": "ÉSTERES DA JOJOBA",
+   "comum": ""
+  },
+  {
+   "inci": "ÓLEO DE AMÊNDOAS",
+   "comum": ""
+  },
+  {
+   "inci": "ÓLEO VEGETAL HIDROGENADO",
+   "comum": ""
+  }
+ ],
+ "conflitos": {
+  "Ácido salicílico": [
+   "BENZYL SALICYLATE",
+   "CAPRYLOYL SALICYLIC ACID",
+   "ETHYLHEXYL SALICYLATE",
+   "HOMOSALATE",
+   "SALICYLIC ACID"
+  ],
+  "Álcool": [
+   "ALCOHOL",
+   "ALCOHOL DENAT.",
+   "ISOPROPYL ALCOHOL"
+  ],
+  "Alérgenos de Fragrância (UE)": [
+   "ALPHA-ISOMETHYL IONONE",
+   "BENZYL ALCOHOL",
+   "BENZYL BENZOATE",
+   "BENZYL SALICYLATE",
+   "CITRAL",
+   "CITRONELLOL",
+   "COUMARIN",
+   "EUGENOL",
+   "GERANIOL",
+   "HEXYL CINNAMAL",
+   "HYDROXYCITRONELLAL",
+   "ISOEUGENOL",
+   "LIMONENE",
+   "LINALOOL",
+   "PARFUM",
+   "PARFUM / FRAGRANCE"
+  ],
+  "Benzyl Salicylate": [
+   "BENZYL SALICYLATE"
+  ],
+  "Formaldeído": [],
+  "Fragrância": [
+   "ALPHA-ISOMETHYL IONONE",
+   "BENZYL BENZOATE",
+   "BENZYL SALICYLATE",
+   "CITRAL",
+   "CITRONELLOL",
+   "COUMARIN",
+   "EUGENOL",
+   "GERANIOL",
+   "HEXYL CINNAMAL",
+   "HYDROXYCITRONELLAL",
+   "ISOEUGENOL",
+   "LIMONENE",
+   "LINALOOL",
+   "PARFUM",
+   "PARFUM / FRAGRANCE"
+  ],
+  "Lanolina": [
+   "LANOLIN ALCOHOL"
+  ],
+  "Látex": [],
+  "Limonene": [
+   "LIMONENE"
+  ],
+  "Linalool": [
+   "LINALOOL"
+  ],
+  "Metais": [],
+  "Óleo de amêndoas": [
+   "PRUNUS AMYGDALUS DULCIS OIL",
+   "ÓLEO DE AMÊNDOAS"
+  ],
+  "Parabenos": [],
+  "Parfum": [
+   "ALPHA-ISOMETHYL IONONE",
+   "BENZYL BENZOATE",
+   "BENZYL SALICYLATE",
+   "CITRAL",
+   "CITRONELLOL",
+   "COUMARIN",
+   "EUGENOL",
+   "GERANIOL",
+   "HEXYL CINNAMAL",
+   "HYDROXYCITRONELLAL",
+   "ISOEUGENOL",
+   "LIMONENE",
+   "LINALOOL",
+   "PARFUM",
+   "PARFUM / FRAGRANCE"
+  ],
+  "Phenoxyethanol": [
+   "FENOXIETANOL",
+   "PHENOXYETHANOL"
+  ],
+  "Propilenoglicol": [
+   "PROPYLENE GLYCOL",
+   "PROPYLENE GLYCOL DIHEPTANOATE"
+  ],
+  "Soja": [
+   "GLYCINE SOJA GERM EXTRACT",
+   "GLYCINE SOJA OIL",
+   "GLYCINE SOJA OIL / SOYBEAN OIL",
+   "HYDROLYZED SOY PROTEIN"
+  ],
+  "Sulfatos": [
+   "SODIUM CETEARYL SULFATE",
+   "SODIUM COCO-SULFATE",
+   "SODIUM LAURETH SULFATE"
+  ]
+ }
+}

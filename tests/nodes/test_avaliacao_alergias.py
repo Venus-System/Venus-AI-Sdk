@@ -42,6 +42,21 @@ def test_alcoois_graxos_nunca_viram_conflito(relatorio):
     assert not [caso for caso in relatorio["falsos"] if caso["alergia"] == "Álcool"]
 
 
+def test_catalogo_de_producao_sem_erro(avaliar_alergias):
+    # As 18 alergias de venus.allergies × os ingredientes usados em produtos, com
+    # gabarito escrito sem `alergias.py`. Antes da correção de 2026-10-30: 53/71
+    # conflitos achados e 5 falsos (Parfum, propilenoglicol, metossulfato...).
+    catalogo = avaliar_alergias.avaliar_catalogo()
+    assert catalogo["pares"] > 9000
+    assert catalogo["perdidos"] == [] and catalogo["falsos"] == []
+
+
+def test_intervalo_de_confianca(avaliar_alergias):
+    baixo, alto = avaliar_alergias.intervalo(47, 47)
+    assert alto == 1.0 and 0.92 < baixo < 0.93
+
+
 def test_script_imprime_a_tabela(avaliar_alergias, capsys):
     assert avaliar_alergias.main([]) == 0
-    assert "Conflitos achados (recall)" in capsys.readouterr().out
+    saida = capsys.readouterr().out
+    assert "Conflitos achados (recall)" in saida and "IC 95%" in saida and "Catálogo de produção" in saida
