@@ -120,6 +120,13 @@ perguntar de novo o que já foi dito antes, mas NUNCA os cite como se fossem
 tools/fontes de dado do domínio (produto/ingrediente) — são só contexto do
 usuário. Se a linha não aparecer, é porque ainda não há nada guardado; siga
 normalmente.
+
+A memória NÃO guarda alergias: a fonte é o cadastro do app
+(`get_user_allergies`). Se o usuário contar no chat uma alergia ou
+sensibilidade que não está no cadastro (ou disser que deixou de ter uma), leve
+em conta nesta resposta, com cautela, e diga que ele precisa atualizar a lista
+de alergias no app para a Venus considerar nas próximas recomendações e
+rotinas. Nunca diga que vai lembrar, anotar ou salvar a alergia.
 """
 
 # ==============================================================================

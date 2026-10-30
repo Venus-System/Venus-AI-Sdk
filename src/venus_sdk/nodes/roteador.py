@@ -44,6 +44,22 @@ _RESPOSTA_DIRETA_FALLBACK = (
     "ingrediente ou rotina de skincare e haircare — quer falar sobre algum deles?"
 )
 
+# "Sou alérgica a lavanda" sem pergunta vira resposta direta, e o LLM respondia
+# "vou lembrar disso". A memória não guarda alergia (a fonte é o cadastro do
+# app, ver `nodes/memoria.py`): a resposta é fixa e manda atualizar o cadastro —
+# também para "não sou mais alérgica".
+_RE_DECLARA_ALERGIA = re.compile(
+    r"\b((sou|fiquei|estou|era)\s+(mais\s+)?(al[eé]rgic[oa]|sens[ií]vel)|"
+    r"(tenho|tive|descobri|desenvolvi)\s+(uma\s+)?(alergia|sensibilidade)|"
+    r"me\s+d[aá]\s+alergia)\b",
+    re.IGNORECASE,
+)
+_RESPOSTA_ALERGIA_NO_CHAT = (
+    "Obrigada por me contar! Eu uso as alergias do seu cadastro nas recomendações e nas rotinas, "
+    "então atualize a sua lista de alergias no app para eu levar isso em conta. "
+    "Quer que eu confira algum produto ou ingrediente?"
+)
+
 # Chamadas ao LLM roteador por invocação (a 1ª + uma nova tentativa se ela levantar).
 _TENTATIVAS_LLM_ROTEADOR = 2
 
@@ -458,6 +474,8 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
         # `magoada` se o usuário vai ver a reação que o roteador escreveu.
         magoada = reacao == "magoada" and bool(texto) and texto == texto_do_llm
         texto = _MARCADOR_RE.sub("", _LINHA_DE_CONTEXTO_RE.sub("", texto)).strip()
+        if _RE_DECLARA_ALERGIA.search(pergunta_do_usuario):
+            texto, magoada = _RESPOSTA_ALERGIA_NO_CHAT, False
         return {
             "rota": None,
             "produto_em_contexto": produto_em_contexto,

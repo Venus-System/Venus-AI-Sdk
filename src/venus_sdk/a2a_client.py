@@ -15,7 +15,7 @@ from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
-from venus_sdk.prompts.guardrail_rules import contem_tentativa_de_injecao
+from venus_sdk.prompts.guardrail_rules import anonimizar_entrada, contem_tentativa_de_injecao
 
 logger = logging.getLogger(__name__)
 
@@ -73,12 +73,17 @@ def montar_tool_a2a(agentes: dict[str, str] | None = None, *, httpx_client: Any 
     @tool("consultar_agente_externo")
     async def _consultar(agente: str, pergunta: str) -> dict:
         """Consulta um agente externo via A2A. `agente` deve ser um dos
-        nomes disponíveis; `pergunta` é o texto a enviar. Devolve
+        nomes disponíveis; `pergunta` é o texto a enviar: só a dúvida, sem
+        nome, alergias, perfil nem outro dado do usuário. Devolve
         `{"agente", "resposta"}` — cite o agente como fonte."""
         if agente not in agentes:
             return {"erro": f"agente desconhecido; disponíveis: {nomes_disponiveis}"}
         try:
-            resposta = await consultar_agente_externo(agentes[agente], pergunta, httpx_client=httpx_client)
+            # A pergunta sai do sistema: CPF, e-mail, telefone etc. são mascarados
+            # mesmo que o LLM (ou uma injeção vinda da web) os tenha posto nela.
+            resposta = await consultar_agente_externo(
+                agentes[agente], anonimizar_entrada(pergunta), httpx_client=httpx_client
+            )
         except Exception as exc:  # noqa: BLE001
             logger.warning("Falha ao consultar agente A2A %s: %s", agente, exc)
             return {"erro": "não consegui consultar o agente externo agora", "detalhe": type(exc).__name__}
