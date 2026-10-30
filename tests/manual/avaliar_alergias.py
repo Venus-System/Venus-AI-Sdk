@@ -1,7 +1,14 @@
 """Avaliação do casamento alergia × ingrediente e do alerta na resposta final.
 
-Lê `tests/fixtures/avaliacao_alergias.jsonl` (alergia do cadastro, ingrediente
-com INCI e nome comum, e se há conflito de verdade) e mede:
+Duas bases:
+- `tests/fixtures/avaliacao_alergias.jsonl`: pares escritos à mão (alergia,
+  ingrediente com INCI e nome comum, e se há conflito de verdade), com casos
+  difíceis de propósito;
+- `tests/fixtures/avaliacao_alergias_catalogo.json`: as 18 alergias do catálogo
+  de produção × os 515 ingredientes usados em produtos, com o gabarito de
+  conflitos definido por regras escritas à parte (não usa `alergias.py`).
+
+Mede:
 - o casamento de `venus_sdk/alergias.py` (o mesmo de `suggest_routine`, do
   Juiz e do Orquestrador): conflitos achados, perdidos e falsos;
 - o alerta ponta a ponta: o Orquestrador recebe um texto do LLM que não fala
@@ -20,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -27,6 +35,7 @@ from unittest.mock import patch
 
 RAIZ = Path(__file__).resolve().parents[2]
 FIXTURE = RAIZ / "tests" / "fixtures" / "avaliacao_alergias.jsonl"
+FIXTURE_CATALOGO = RAIZ / "tests" / "fixtures" / "avaliacao_alergias_catalogo.json"
 _TEXTO_DO_LLM = "O Produto Teste é ótimo para o dia a dia."
 
 from venus_sdk.alergias import termos_da_alergia, termos_em_conflito  # noqa: E402
@@ -78,6 +87,42 @@ def avaliar(casos: list[dict]) -> dict:
     }
 
 
+def intervalo(acertos: int, total: int, z: float = 1.96) -> tuple[float, float]:
+    """Intervalo de confiança de 95% (Wilson) para a proporção `acertos/total`.
+    Com 0 erros em 47 casos, a taxa real de erro ainda pode chegar a uns 7%."""
+    if not total:
+        return 0.0, 1.0
+    p = acertos / total
+    centro = (p + z * z / (2 * total)) / (1 + z * z / total)
+    margem = z * math.sqrt(p * (1 - p) / total + z * z / (4 * total * total)) / (1 + z * z / total)
+    return max(0.0, centro - margem), min(1.0, centro + margem)
+
+
+def _taxa(acertos: int, total: int) -> str:
+    baixo, alto = intervalo(acertos, total)
+    return f"{acertos / total:.1%} ({acertos}/{total}; IC 95%: {baixo:.1%} a {alto:.1%})" if total else "-"
+
+
+def avaliar_catalogo() -> dict:
+    """Cada alergia do catálogo × cada ingrediente usado em produtos."""
+    dados = json.loads(FIXTURE_CATALOGO.read_text(encoding="utf-8"))
+    perdidos, falsos, pares = [], [], 0
+    for alergia in dados["alergias"]:
+        termos = termos_da_alergia(alergia)
+        esperados = set(dados["conflitos"][alergia])
+        for ingrediente in dados["ingredientes"]:
+            pares += 1
+            nome = ingrediente["inci"] or ingrediente["comum"]
+            achou = bool(termos_em_conflito(termos, [ingrediente["inci"], ingrediente["comum"]]))
+            if nome in esperados and not achou:
+                perdidos.append((alergia, nome))
+            elif achou and nome not in esperados:
+                falsos.append((alergia, nome))
+    conflitos = sum(len(lista) for lista in dados["conflitos"].values())
+    return {"pares": pares, "conflitos": conflitos, "achados": conflitos - len(perdidos),
+            "perdidos": perdidos, "falsos": falsos}
+
+
 def _linha(caso: dict) -> str:
     nota = f" ({caso['nota']})" if caso.get("nota") else ""
     lacuna = "" if caso.get("lacuna_conhecida") else " **— fora das lacunas conhecidas**"
@@ -92,15 +137,28 @@ def main(argv: list[str] | None = None) -> int:
     r = avaliar(carregar())
     sem_conflito = r["total"] - r["conflitos"]
     linhas = [
+        "Casos escritos à mão:", "",
         "| Medida | Resultado |", "|---|---|",
-        f"| Conflitos achados (recall) | {r['achados'] / r['conflitos']:.0%} ({r['achados']}/{r['conflitos']}) |",
-        f"| Falsos conflitos | {len(r['falsos'])}/{sem_conflito} |",
-        f"| Resposta final com o alerta certo | {r['total'] - len(r['alerta_errado'])}/{r['total']} |",
+        f"| Conflitos achados (recall) | {_taxa(r['achados'], r['conflitos'])} |",
+        f"| Sem conflito e sem alerta | {_taxa(sem_conflito - len(r['falsos']), sem_conflito)} |",
+        f"| Resposta final com o alerta certo | {_taxa(r['total'] - len(r['alerta_errado']), r['total'])} |",
     ]
     if r["perdidos"]:
         linhas += ["", "Conflitos perdidos:"] + [_linha(caso) for caso in r["perdidos"]]
     if r["falsos"]:
         linhas += ["", "Falsos conflitos:"] + [_linha(caso) for caso in r["falsos"]]
+
+    c = avaliar_catalogo()
+    sem_conflito = c["pares"] - c["conflitos"]
+    linhas += [
+        "", "Catálogo de produção (alergias × ingredientes usados em produtos):", "",
+        "| Medida | Resultado |", "|---|---|",
+        f"| Pares avaliados | {c['pares']} |",
+        f"| Conflitos achados (recall) | {_taxa(c['achados'], c['conflitos'])} |",
+        f"| Sem conflito e sem alerta | {_taxa(sem_conflito - len(c['falsos']), sem_conflito)} |",
+    ]
+    linhas += [f"- perdido: {alergia} × {nome}" for alergia, nome in c["perdidos"]]
+    linhas += [f"- falso: {alergia} × {nome}" for alergia, nome in c["falsos"]]
     texto = "\n".join(linhas)
     print(texto)
     if args.saida_markdown:

@@ -45,3 +45,16 @@
 {"alergia": "Sulfato", "inci": "SODIUM SULFATE", "comum": "Sulfato de sódio", "conflito": false, "nota": "sal mineral"}
 {"alergia": "Sulfato", "inci": "AMMONIUM LAURYL SULFATE", "comum": "Lauril sulfato de amônio", "conflito": true}
 {"alergia": "Sulfato", "inci": "SODIUM COCO-SULFATE", "comum": "Coco sulfato de sódio", "conflito": true}
+{"alergia": "Parfum", "inci": "LINALOOL", "comum": "Linalol", "conflito": true, "nota": "alergia em inglês, alérgeno da UE"}
+{"alergia": "Propilenoglicol", "inci": "PROPYLENE GLYCOL", "comum": "Propileno glicol", "conflito": true, "nota": "nome comum com espaço"}
+{"alergia": "Propilenoglicol", "inci": "PPG-15 STEARYL ETHER", "comum": "Éter polipropilenoglicol monoestearílico", "conflito": false, "nota": "PPG, outra molécula"}
+{"alergia": "Propilenoglicol", "inci": "PROPANEDIOL", "comum": "Propanodiol", "conflito": false, "nota": "1,3-propanediol, não é PG"}
+{"alergia": "Sulfatos", "inci": "BEHENTRIMONIUM METHOSULFATE", "comum": "Metossulfato de beentrimônio", "conflito": false, "nota": "condicionador, não surfactante"}
+{"alergia": "Sulfatos", "inci": "SODIUM THIOSULFATE", "comum": "Tiossulfato de sódio", "conflito": false, "nota": "sal"}
+{"alergia": "Formaldeído", "inci": "DMDM HYDANTOIN", "comum": "DMDM hidantoína", "conflito": true, "nota": "liberador de formaldeído"}
+{"alergia": "Formaldeído", "inci": "FORMALDEHYDE", "comum": "Formaldeído", "conflito": true}
+{"alergia": "Lanolina", "inci": "LANOLIN", "comum": "LANOLIN", "conflito": true, "nota": "só o INCI em inglês"}
+{"alergia": "Ácido salicílico", "inci": "HOMOSALATE", "comum": "Homossalato", "conflito": true, "nota": "filtro salicilato sem 'salicyl' no INCI"}
+{"alergia": "Phenoxyethanol", "inci": "FENOXIETANOL", "comum": "FENOXIETANOL", "conflito": true, "nota": "nome em português no campo INCI"}
+{"alergia": "Soja", "inci": "METHYL DIHYDROISOJASMONATE", "comum": "Di-hidroisojasmonato de metila", "conflito": false, "nota": "contém 'soja' no meio da palavra"}
+{"alergia": "Alérgenos de Fragrância (UE)", "inci": "BENZYL ALCOHOL", "comum": "Álcool benzílico", "conflito": true, "nota": "na lista da UE"}
