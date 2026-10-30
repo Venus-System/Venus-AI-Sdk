@@ -454,6 +454,7 @@ Scripts manuais, que usam LLM e banco de verdade e por isso gastam cota:
 | `tests/manual/avaliar_guardrail.py` | Regex sozinha × regex + LLM em frases de injeção e legítimas ([resultados](docs/avaliacao-guardrail.md)). |
 | `tests/manual/avaliar_roteamento.py` | Acerto da rota por categoria, palavras-chave × roteador com LLM ([resultados](docs/avaliacao-roteamento.md)). |
 | `tests/manual/avaliar_alergias.py` | Casamento alergia × ingrediente e alerta na resposta final; sem LLM, também roda no `pytest` ([resultados](docs/avaliacao-alergias.md)). |
+| `tests/manual/medir_custo.py` | Tokens, modelo, tempo e rota de cada chamada de LLM em conversas reais; base do relatório de custo ([resultados](docs/custo-e-roi.md)). |
 | `scripts/medir_llms.py` | Latência e disponibilidade dos modelos configurados. |
 
 ## CI/CD
@@ -527,6 +528,8 @@ docs/               # arquitetura, Neo4j e resultados das avaliações
   [`docs/avaliacao-roteamento.md`](docs/avaliacao-roteamento.md) e
   [`docs/avaliacao-alergias.md`](docs/avaliacao-alergias.md): metodologia e
   resultados das avaliações.
+- [`docs/custo-e-roi.md`](docs/custo-e-roi.md): custo para 100 e 1.000 usuários
+  semanais, latência, índice de erros, custo por resolução e ROI.
 - [Arquitetura do sistema inteiro](https://github.com/Venus-System/Venus-AI-api/blob/develop/docs/arquitetura-sistema.md)
   (app, API, bancos, LLMs e integrações), no repositório da API.
 - [`CHANGELOG.md`](CHANGELOG.md): o que mudou em cada versão e como migrar.
@@ -542,9 +545,12 @@ mensagem, com o tempo de cada nó do grafo e os tokens e custo de cada chamada d
 marcados por usuário e conversa. Um middleware grava a duração e o status de cada
 requisição no Mongo, de onde sai a taxa de erro.
 
-**Pendente:** custo estimado para 100 e 1.000 usuários, ROI e custo por resolução
-(calculados a partir do Langfuse), e o resultado de cada turno no trace (rota, se o
-Juiz aprovou por regra ou por LLM, tentativas, alerta de alergia anexado).
+**Custo e ROI:** custo para 100 e 1.000 usuários semanais, latência, índice de erros,
+custo por resolução e ROI em [`docs/custo-e-roi.md`](docs/custo-e-roi.md), a partir de
+uma medição com conversas reais.
+
+**Pendente:** o resultado de cada turno no trace (rota, se o Juiz aprovou por regra ou
+por LLM, tentativas, alerta de alergia anexado).
 
 ## Licença
 

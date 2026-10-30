@@ -38,7 +38,7 @@ Estado atual: tools de produto/ingrediente/rotina (Postgres, schema+seed em
 verificados por `tests/manual/verificar_tools.py` e pelos testes em `tests/`
 (`pytest -m integration` roda as tools contra um Postgres real). A
 observabilidade fica na API (`venus_api`: Langfuse por nó, com tokens e custo, e
-métricas HTTP no Mongo); pendente: estimativa de custo, ROI e o resultado de cada turno
+métricas HTTP no Mongo); custo, latência e ROI em `docs/custo-e-roi.md`; pendente: o resultado de cada turno
 no trace. Avaliações em `docs/avaliacao-*.md` (RAG, guardrail, roteamento, alergias). O roteador tem uma rede de
 segurança (`nodes/roteador.py::e_small_talk`) contra saudação roteada para
 especialista.
