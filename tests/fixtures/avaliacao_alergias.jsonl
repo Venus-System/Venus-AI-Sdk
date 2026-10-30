@@ -1,19 +1,19 @@
 {"alergia": "Fragrância (Parfum)", "inci": "PARFUM", "comum": "Fragrância", "conflito": true}
 {"alergia": "Fragrância (Parfum)", "inci": "FRAGRANCE", "comum": "Fragrância", "conflito": true}
 {"alergia": "Fragrância (Parfum)", "inci": "AROMA", "comum": "Aroma", "conflito": true}
-{"alergia": "Fragrância (Parfum)", "inci": "LIMONENE", "comum": "Limoneno", "conflito": true, "nota": "alérgeno de fragrância da lista da UE", "lacuna_conhecida": true}
-{"alergia": "Fragrância (Parfum)", "inci": "LINALOOL", "comum": "Linalol", "conflito": true, "nota": "alérgeno de fragrância da lista da UE", "lacuna_conhecida": true}
+{"alergia": "Fragrância (Parfum)", "inci": "LIMONENE", "comum": "Limoneno", "conflito": true, "nota": "alérgeno de fragrância da lista da UE"}
+{"alergia": "Fragrância (Parfum)", "inci": "LINALOOL", "comum": "Linalol", "conflito": true, "nota": "alérgeno de fragrância da lista da UE"}
 {"alergia": "Fragrância (Parfum)", "inci": "GLYCERIN", "comum": "Glicerina", "conflito": false}
 {"alergia": "Fragrância (Parfum)", "inci": "NIACINAMIDE", "comum": "Niacinamida", "conflito": false}
 {"alergia": "Ácido Salicílico (salicilatos)", "inci": "SALICYLIC ACID", "comum": "Ácido salicílico", "conflito": true}
-{"alergia": "Ácido Salicílico (salicilatos)", "inci": "SODIUM SALICYLATE", "comum": "Salicilato de sódio", "conflito": true, "nota": "salicilato", "lacuna_conhecida": true}
-{"alergia": "Ácido Salicílico (salicilatos)", "inci": "BETAINE SALICYLATE", "comum": "Salicilato de betaína", "conflito": true, "nota": "salicilato", "lacuna_conhecida": true}
+{"alergia": "Ácido Salicílico (salicilatos)", "inci": "SODIUM SALICYLATE", "comum": "Salicilato de sódio", "conflito": true, "nota": "salicilato"}
+{"alergia": "Ácido Salicílico (salicilatos)", "inci": "BETAINE SALICYLATE", "comum": "Salicilato de betaína", "conflito": true, "nota": "salicilato"}
 {"alergia": "Ácido Salicílico (salicilatos)", "inci": "GLYCOLIC ACID", "comum": "Ácido glicólico", "conflito": false}
 {"alergia": "Ácido Salicílico (salicilatos)", "inci": "NIACINAMIDE", "comum": "Niacinamida", "conflito": false}
 {"alergia": "Nozes / Karité", "inci": "BUTYROSPERMUM PARKII BUTTER", "comum": "Manteiga de karité", "conflito": true}
 {"alergia": "Nozes / Karité", "inci": "JUGLANS REGIA SHELL POWDER", "comum": "Pó de casca de nozes", "conflito": true}
-{"alergia": "Nozes / Karité", "inci": "PRUNUS AMYGDALUS DULCIS OIL", "comum": "Óleo de amêndoas doces", "conflito": true, "nota": "amêndoa é oleaginosa (nut)", "lacuna_conhecida": true}
-{"alergia": "Nozes / Karité", "inci": "MACADAMIA TERNIFOLIA SEED OIL", "comum": "Óleo de macadâmia", "conflito": true, "nota": "macadâmia é oleaginosa (nut)", "lacuna_conhecida": true}
+{"alergia": "Nozes / Karité", "inci": "PRUNUS AMYGDALUS DULCIS OIL", "comum": "Óleo de amêndoas doces", "conflito": true, "nota": "amêndoa é oleaginosa (nut)"}
+{"alergia": "Nozes / Karité", "inci": "MACADAMIA TERNIFOLIA SEED OIL", "comum": "Óleo de macadâmia", "conflito": true, "nota": "macadâmia é oleaginosa (nut)"}
 {"alergia": "Nozes / Karité", "inci": "GLYCERIN", "comum": "Glicerina", "conflito": false}
 {"alergia": "Álcool", "inci": "ALCOHOL DENAT.", "comum": "Álcool desnaturado", "conflito": true}
 {"alergia": "Álcool", "inci": "ALCOHOL", "comum": "Álcool etílico", "conflito": true}
@@ -24,7 +24,7 @@
 {"alergia": "Álcool", "inci": "PHENOXYETHANOL", "comum": "Fenoxietanol", "conflito": false, "nota": "contém 'etanol' no nome"}
 {"alergia": "Sulfato", "inci": "SODIUM LAURYL SULFATE", "comum": "Lauril sulfato de sódio", "conflito": true}
 {"alergia": "Sulfato", "inci": "SODIUM LAURETH SULFATE", "comum": "Lauril éter sulfato de sódio", "conflito": true}
-{"alergia": "Sulfato", "inci": "MAGNESIUM SULFATE", "comum": "Sulfato de magnésio", "conflito": false, "nota": "sal, não é o surfactante que quem evita sulfato quer evitar", "lacuna_conhecida": true}
+{"alergia": "Sulfato", "inci": "MAGNESIUM SULFATE", "comum": "Sulfato de magnésio", "conflito": false, "nota": "sal, não é o surfactante que quem evita sulfato quer evitar"}
 {"alergia": "Silicone", "inci": "DIMETHICONE", "comum": "Dimeticona", "conflito": true}
 {"alergia": "Silicone", "inci": "CYCLOPENTASILOXANE", "comum": "Ciclopentasiloxano", "conflito": true}
 {"alergia": "Silicone", "inci": "AMODIMETHICONE", "comum": "Amodimeticona", "conflito": true}
@@ -32,3 +32,16 @@
 {"alergia": "Parabenos", "inci": "METHYLPARABEN", "comum": "Metilparabeno", "conflito": true}
 {"alergia": "Parabenos", "inci": "PROPYLPARABEN", "comum": "Propilparabeno", "conflito": true}
 {"alergia": "Parabenos", "inci": "PHENOXYETHANOL", "comum": "Fenoxietanol", "conflito": false}
+{"alergia": "Fragrância (Parfum)", "inci": "GERANIOL", "comum": "Geraniol", "conflito": true, "nota": "alérgeno de fragrância da lista da UE"}
+{"alergia": "Fragrância (Parfum)", "inci": "COUMARIN", "comum": "Cumarina", "conflito": true, "nota": "alérgeno de fragrância da lista da UE"}
+{"alergia": "Fragrância (Parfum)", "inci": "CITRIC ACID", "comum": "Ácido cítrico", "conflito": false, "nota": "não é o citral"}
+{"alergia": "Fragrância (Parfum)", "inci": "BENZYL ALCOHOL", "comum": "Álcool benzílico", "conflito": false, "nota": "na lista da UE, mas usado como conservante"}
+{"alergia": "Ácido Salicílico (salicilatos)", "inci": "BENZYL SALICYLATE", "comum": "Salicilato de benzila", "conflito": true, "nota": "salicilato"}
+{"alergia": "Nozes / Karité", "inci": "ANACARDIUM OCCIDENTALE NUT OIL", "comum": "Óleo de castanha de caju", "conflito": true}
+{"alergia": "Nozes / Karité", "inci": "CORYLUS AVELLANA SEED OIL", "comum": "Óleo de avelã", "conflito": true}
+{"alergia": "Nozes / Karité", "inci": "COCOS NUCIFERA OIL", "comum": "Óleo de coco", "conflito": false, "nota": "coco não é oleaginosa"}
+{"alergia": "Nozes / Karité", "inci": "AESCULUS HIPPOCASTANUM SEED EXTRACT", "comum": "Extrato de castanha-da-índia", "conflito": false, "nota": "não é oleaginosa"}
+{"alergia": "Nozes / Karité", "inci": "MELALEUCA CAJUPUTI LEAF OIL", "comum": "Óleo de cajepute", "conflito": false, "nota": "contém 'caju' no INCI"}
+{"alergia": "Sulfato", "inci": "SODIUM SULFATE", "comum": "Sulfato de sódio", "conflito": false, "nota": "sal mineral"}
+{"alergia": "Sulfato", "inci": "AMMONIUM LAURYL SULFATE", "comum": "Lauril sulfato de amônio", "conflito": true}
+{"alergia": "Sulfato", "inci": "SODIUM COCO-SULFATE", "comum": "Coco sulfato de sódio", "conflito": true}

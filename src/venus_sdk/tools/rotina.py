@@ -8,6 +8,10 @@ from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
+# Mesma regra de alergia do Juiz e do Orquestrador (antes havia uma cópia aqui,
+# que já tinha divergido: só esta pegava "álcool benzílico" como álcool).
+from venus_sdk.alergias import termo_bate as _bate_com_alergia
+from venus_sdk.alergias import termos_da_alergia as _termos_da_alergia
 from venus_sdk.texto import remover_acentos
 from venus_sdk.tools._identidade import SEM_USUARIO_IDENTIFICADO, resolver_user_id
 from venus_sdk.tools._util import consultar, exigir_pool
@@ -42,24 +46,6 @@ _ATIVOS_DA_NOITE_RE = re.compile(
     r"acido mandelico|acido salicilico|tretinoina|adapaleno)(?![a-z])"
 )
 
-# Alergias no catálogo vêm em português/inglês; os ingredientes vêm como INCI.
-_SINONIMOS_ALERGIA = {
-    "fragrancia": ("parfum", "fragrance", "aroma", "perfume", "fragrancia"),
-    "perfume": ("parfum", "fragrance", "aroma", "perfume"),
-    "conservante": ("paraben", "phenoxyethanol", "methylisothiazolinone"),
-    "paraben": ("paraben",),
-    "sulfato": ("sulfate", "sulfato"),
-    "silicone": ("dimethicone", "siloxane", "silicone"),
-    "alcool": ("alcohol denat", "alcohol"),
-}
-# Álcoois graxos (emolientes) não são o "álcool" das alergias/sensibilidades.
-_ALCOOIS_GRAXOS = (
-    "cetyl", "stearyl", "cetearyl", "behenyl", "myristyl", "lauryl alcohol", "oleyl", "arachidyl",
-    "cetilico", "estearilico", "cetoestearilico", "cetearilico", "behenilico", "miristilico", "oleilico",
-)
-_TERMOS_DE_ALCOOL = ("alcool", "alcohol")
-
-
 # Categorias essenciais de uma rotina e as palavras-chave que as identificam.
 _CATEGORIAS_ESSENCIAIS = (
     ("Limpeza", ("limp",)),
@@ -68,7 +54,6 @@ _CATEGORIAS_ESSENCIAIS = (
 )
 _HORARIOS_VALIDOS = {"manha", "noite", "ambos"}
 _SEM_FAVORITOS = "o usuário não tem produtos favoritos"
-_TAMANHO_MINIMO_TERMO_ALERGIA = 3
 
 
 def _minusculo_sem_acento(texto: str) -> str:
@@ -83,26 +68,8 @@ def _ordem_categoria(categoria: str) -> int:
     return _ORDEM_DESCONHECIDA
 
 
-def _termos_da_alergia(nome: str) -> list[str]:
-    """'Fragrância (Parfum)' -> ['fragrancia (parfum)', 'fragrancia', 'parfum', + sinônimos]."""
-    base = _minusculo_sem_acento(nome)
-    termos = {base}
-    termos.update(parte.strip(" )") for parte in base.replace("(", "/").split("/") if parte.strip())
-    for chave, sinonimos in _SINONIMOS_ALERGIA.items():
-        if chave in base:
-            termos.update(sinonimos)
-    return sorted(termo for termo in termos if len(termo) >= _TAMANHO_MINIMO_TERMO_ALERGIA)
-
-
 def _rotulo(produto: dict) -> str:
     return _minusculo_sem_acento(produto["category_name"] + " " + produto["name"])
-
-
-def _bate_com_alergia(termo: str, ingrediente: str) -> bool:
-    if termo not in ingrediente:
-        return False
-    eh_termo_de_alcool = any(alcool in termo for alcool in _TERMOS_DE_ALCOOL)
-    return not (eh_termo_de_alcool and any(graxo in ingrediente for graxo in _ALCOOIS_GRAXOS))
 
 
 def _separar_por_alergia(favoritos: list[dict], termos: list[str]) -> tuple[list[dict], list[dict]]:
