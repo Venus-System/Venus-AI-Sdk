@@ -1,0 +1,54 @@
+{"pergunta": "qual a nota do Hidratante Facial CeraVe?", "rotas": ["produto"], "categoria": "produto"}
+{"pergunta": "me indica um protetor solar pra pele oleosa", "rotas": ["produto"], "categoria": "produto"}
+{"pergunta": "quais os ingredientes do sérum de vitamina C da Principia?", "rotas": ["produto"], "categoria": "produto"}
+{"pergunta": "esse shampoo é bom pra cabelo cacheado?", "rotas": ["produto"], "categoria": "produto"}
+{"pergunta": "por que esse creme foi recomendado pra mim?", "rotas": ["produto"], "categoria": "produto"}
+{"pergunta": "usei esse tônico e minha pele ficou vermelha, o que pode ser?", "rotas": ["produto"], "categoria": "produto"}
+{"pergunta": "qual hidratante corporal tem a melhor nota?", "rotas": ["produto"], "categoria": "produto"}
+{"pergunta": "esse produto tem fragrância?", "rotas": ["produto"], "categoria": "produto"}
+{"pergunta": "o que é niacinamida?", "rotas": ["ingrediente"], "categoria": "ingrediente"}
+{"pergunta": "pra que serve o ácido hialurônico?", "rotas": ["ingrediente"], "categoria": "ingrediente"}
+{"pergunta": "o ácido salicílico é proibido em algum lugar?", "rotas": ["ingrediente"], "categoria": "ingrediente"}
+{"pergunta": "retinol pode ser usado na gravidez?", "rotas": ["ingrediente"], "categoria": "ingrediente"}
+{"pergunta": "qual a diferença entre ácido glicólico e ácido lático?", "rotas": ["ingrediente"], "categoria": "ingrediente"}
+{"pergunta": "fenoxietanol faz mal?", "rotas": ["ingrediente"], "categoria": "ingrediente"}
+{"pergunta": "o que a ceramida faz na pele?", "rotas": ["ingrediente"], "categoria": "ingrediente"}
+{"pergunta": "monta uma rotina de skincare pra manhã", "rotas": ["rotina"], "categoria": "rotina"}
+{"pergunta": "quais são meus favoritos?", "rotas": ["rotina"], "categoria": "rotina"}
+{"pergunta": "tenho alguma alergia cadastrada?", "rotas": ["rotina"], "categoria": "rotina"}
+{"pergunta": "qual meu tipo de pele no perfil?", "rotas": ["rotina"], "categoria": "rotina"}
+{"pergunta": "ajusta minha rotina da noite, quero incluir esfoliação", "rotas": ["rotina"], "categoria": "rotina"}
+{"pergunta": "o que tem nas minhas listas salvas?", "rotas": ["rotina"], "categoria": "rotina"}
+{"pergunta": "agenda minha rotina da noite às 22h", "rotas": ["rotina"], "categoria": "rotina"}
+{"pergunta": "minha rotina de cabelo tá boa?", "rotas": ["rotina"], "categoria": "rotina"}
+{"pergunta": "o venus vende meus dados?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "como eu apago minha conta?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "posso confiar na IA se tenho alergia?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "como a nota dos produtos é calculada?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "de onde vêm os dados dos ingredientes?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "é seguro mandar meu CPF aqui?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "o venus substitui um dermatologista?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "oi, tudo bem?", "rotas": ["direto"], "categoria": "direto"}
+{"pergunta": "obrigada!", "rotas": ["direto"], "categoria": "direto"}
+{"pergunta": "qual a capital da França?", "rotas": ["direto"], "categoria": "direto"}
+{"pergunta": "me conta uma piada", "rotas": ["direto"], "categoria": "direto"}
+{"pergunta": "você é muito legal", "rotas": ["direto"], "categoria": "direto"}
+{"pergunta": "tchau, até amanhã", "rotas": ["direto"], "categoria": "direto"}
+{"pergunta": "esse sérum tem niacinamida? e o que ela faz?", "rotas": ["produto", "ingrediente"], "categoria": "mista"}
+{"pergunta": "monta minha rotina e me explica pra que serve o retinol", "rotas": ["rotina", "ingrediente"], "categoria": "mista"}
+{"pergunta": "qual a nota do protetor Episol e como o venus calcula essa nota?", "rotas": ["produto", "faq"], "categoria": "mista"}
+{"pergunta": "quero um shampoo sem sulfato que entre na minha rotina de cabelo", "rotas": ["produto", "rotina"], "categoria": "mista"}
+{"pergunta": "o ácido salicílico serve pra acne? tenho algum favorito com ele?", "rotas": ["ingrediente", "rotina"], "categoria": "mista"}
+{"pergunta": "descobri que sou alérgica a lavanda", "rotas": ["direto", "rotina", "produto", "ingrediente"], "categoria": "alergia_no_chat"}
+{"pergunta": "não sou mais alérgico a perfume", "rotas": ["direto", "rotina", "produto", "ingrediente"], "categoria": "alergia_no_chat"}
+{"pergunta": "tenho alergia a óleo de coco", "rotas": ["direto", "rotina", "produto", "ingrediente"], "categoria": "alergia_no_chat"}
+{"pergunta": "fiquei sensível a ácido glicólico", "rotas": ["direto", "rotina", "produto", "ingrediente"], "categoria": "alergia_no_chat"}
+{"pergunta": "quero sair do app e levar meus dados, como faço?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "vocês usam o que eu falo aqui pra propaganda?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "a nota de vocês leva em conta o meio ambiente?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "a venus consegue diagnosticar acne?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "quem decide a pontuação dos produtos?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "o que acontece com a nota quando a fórmula de um produto muda?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "de onde vêm as informações sobre regulação?", "rotas": ["faq"], "categoria": "faq"}
+{"pergunta": "de onde vem esse cheiro forte do meu shampoo?", "rotas": ["produto"], "categoria": "produto"}
+{"pergunta": "esse protetor substitui o hidratante?", "rotas": ["produto"], "categoria": "produto"}

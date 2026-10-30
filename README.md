@@ -62,8 +62,8 @@ tag do Git.
 | Agente | Papel | Tools |
 | --- | --- | --- |
 | **Roteador** | Classifica a intenção e escolhe o especialista; responde direto small talk e perguntas fora de escopo. | — |
-| **Produto** | Busca produtos, notas, ingredientes e a nota personalizada para o usuário. | `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`, `get_user_allergies` |
-| **Ingrediente** | Explica o que um ingrediente faz, suas propriedades, efeitos e regulação. | `search_ingredient`, `get_ingredient_summary`, `get_ingredient_properties`, `get_ingredient_effects`, `get_ingredient_regulations`, `get_user_allergies`, `converter_concentracao`, `comparar_concentracao_com_limite` |
+| **Produto** | Busca produtos, notas, ingredientes e a nota personalizada para o usuário. | `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`, `get_user_allergies`, `get_user_profile` |
+| **Ingrediente** | Explica o que um ingrediente faz, suas propriedades, efeitos e regulação. | `search_ingredient`, `get_ingredient_summary`, `get_ingredient_properties`, `get_ingredient_effects`, `get_ingredient_regulations`, `get_user_allergies`, `get_user_profile`, `converter_concentracao`, `comparar_concentracao_com_limite` |
 | **Rotina** | Monta a rotina de manhã e de noite a partir dos favoritos, excluindo o que bate com as alergias. | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `suggest_routine`, `get_user_allergies`, `calcular_tempo_de_uso`, `calcular_datas_de_aplicacao` e, se configurados, as tools do Google Calendar e o `check_routine_health` (Neo4j) |
 | **FAQ** | Responde perguntas institucionais (score, privacidade, LGPD, limites da IA) por RAG. | `faq_retriever`, `buscar_na_web` e tools MCP/A2A extras |
 | **Juiz** | Confere a resposta do especialista contra o que as tools devolveram; reprova o que não tem lastro. | — |
@@ -112,6 +112,9 @@ Três detalhes que definem o comportamento:
 - **Parte da conferência é feita em código, sem LLM.** Números de tools de cálculo
   que não aparecem na resposta, nota atribuída ao produto errado e alergia afirmada
   sem lastro são reprovados antes de o juiz chamar o modelo.
+- **O alerta de alergia não depende do LLM.** Depois do orquestrador, o código cruza
+  as alergias do cadastro com os ingredientes consultados e anexa um alerta de texto
+  fixo quando há conflito, mesmo que a reescrita do LLM tenha omitido ou suavizado o aviso.
 
 ## Decisões de projeto
 
@@ -266,6 +269,19 @@ São duas memórias diferentes, e as duas são opcionais:
 | Chave | `thread_id`, em `config["configurable"]` | `usuario_id`, no estado de entrada |
 | Sobrevive à troca de conversa? | Não | Sim |
 | Sem ela | Passe o histórico em `historico` a cada chamada | Os nós de memória viram no-op |
+
+Regras da memória de longo prazo (`nodes/memoria.py`):
+
+- **Alergia não entra.** A fonte é o cadastro do app (`get_user_allergies`); o campo
+  é descartado do que o extrator devolve e de perfis antigos que já o tinham.
+- **Correção.** Valor novo substitui o antigo; `{"remover": ["campo"]}` apaga um fato
+  que deixou de valer.
+- **Expiração.** Cada campo guarda a data da última atualização (chave `perfil_datas`);
+  fato não reafirmado há mais de `VENUS_MEMORIA_TTL_DIAS` (padrão 180, `0` desliga)
+  deixa de valer.
+- **Exclusão (LGPD).** `apagar_memoria(store, usuario_id)` apaga perfil e datas; o
+  backend chama na exclusão da conta. O histórico do checkpointer é apagado à parte.
+- **Auditoria.** Cada gravação registra no log quais campos mudaram, sem os valores.
 
 O agendamento na agenda Google **exige checkpointer**: a proposta espera o "sim" do
 usuário no estado da conversa até a mensagem seguinte.
@@ -436,6 +452,9 @@ Scripts manuais, que usam LLM e banco de verdade e por isso gastam cota:
 | `tests/manual/testar_conversas.py` | Conversas reais pelo grafo, só leitura. |
 | `tests/manual/avaliar_rag.py` | Hit rate@3, MRR e taxa de "não sei" do RAG ([resultados](docs/avaliacao-rag.md)). |
 | `tests/manual/avaliar_guardrail.py` | Regex sozinha × regex + LLM em frases de injeção e legítimas ([resultados](docs/avaliacao-guardrail.md)). |
+| `tests/manual/avaliar_roteamento.py` | Acerto da rota por categoria, palavras-chave × roteador com LLM ([resultados](docs/avaliacao-roteamento.md)). |
+| `tests/manual/avaliar_alergias.py` | Casamento alergia × ingrediente e alerta na resposta final; sem LLM, também roda no `pytest` ([resultados](docs/avaliacao-alergias.md)). |
+| `tests/manual/medir_custo.py` | Tokens, modelo, tempo e rota de cada chamada de LLM em conversas reais; base do relatório de custo ([resultados](docs/custo-e-roi.md)). |
 | `scripts/medir_llms.py` | Latência e disponibilidade dos modelos configurados. |
 
 ## CI/CD
@@ -504,9 +523,13 @@ docs/               # arquitetura, Neo4j e resultados das avaliações
 
 - [`docs/architecture.md`](docs/architecture.md): os módulos do SDK em detalhe.
 - [`docs/neo4j.md`](docs/neo4j.md): o check-up da rotina no Neo4j.
-- [`docs/avaliacao-rag.md`](docs/avaliacao-rag.md) e
-  [`docs/avaliacao-guardrail.md`](docs/avaliacao-guardrail.md): metodologia e
+- [`docs/avaliacao-rag.md`](docs/avaliacao-rag.md),
+  [`docs/avaliacao-guardrail.md`](docs/avaliacao-guardrail.md),
+  [`docs/avaliacao-roteamento.md`](docs/avaliacao-roteamento.md) e
+  [`docs/avaliacao-alergias.md`](docs/avaliacao-alergias.md): metodologia e
   resultados das avaliações.
+- [`docs/custo-e-roi.md`](docs/custo-e-roi.md): custo para 100 e 1.000 usuários
+  semanais, latência, índice de erros, custo por resolução e ROI.
 - [Arquitetura do sistema inteiro](https://github.com/Venus-System/Venus-AI-api/blob/develop/docs/arquitetura-sistema.md)
   (app, API, bancos, LLMs e integrações), no repositório da API.
 - [`CHANGELOG.md`](CHANGELOG.md): o que mudou em cada versão e como migrar.
@@ -517,8 +540,17 @@ docs/               # arquitetura, Neo4j e resultados das avaliações
 longo prazo, RAG com fontes externas, MCP, A2A (servidor e cliente), juiz
 anti-alucinação, guardrails, Google Calendar e check-up da rotina.
 
-**Pendente:** observabilidade e SRE: custo estimado para 100 e 1.000 usuários,
-latência por agente, taxa de erro, ROI e custo por resolução.
+**Observabilidade:** fica na API (`venus_api`), não no SDK. O Langfuse rastreia cada
+mensagem, com o tempo de cada nó do grafo e os tokens e custo de cada chamada de LLM,
+marcados por usuário e conversa. Um middleware grava a duração e o status de cada
+requisição no Mongo, de onde sai a taxa de erro.
+
+**Custo e ROI:** custo para 100 e 1.000 usuários semanais, latência, índice de erros,
+custo por resolução e ROI em [`docs/custo-e-roi.md`](docs/custo-e-roi.md), a partir de
+uma medição com conversas reais.
+
+**Pendente:** o resultado de cada turno no trace (rota, se o Juiz aprovou por regra ou
+por LLM, tentativas, alerta de alergia anexado).
 
 ## Licença
 

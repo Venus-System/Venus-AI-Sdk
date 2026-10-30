@@ -8,11 +8,11 @@ Visão geral dos módulos do SDK Venus (`src/venus_sdk/`):
   - `agente_mcp.py` — `montar_agente_mcp(llm, prompt=, tools=)`, o subgrafo ReAct reutilizável pelos especialistas; `tools` é obrigatório (Postgres, RAG, MCP e/ou A2A já carregadas).
 - **nodes/** — os nós do grafo principal:
   - `guardrails.py` — `no_guardrail_entrada`, `no_guardrail_saida`.
-  - `memoria.py` — `no_carregar_memoria`, `no_atualizar_memoria` (memória de longo prazo, por `usuario_id`).
+  - `memoria.py` — `no_carregar_memoria`, `no_atualizar_memoria` (memória de longo prazo, por `usuario_id`; sem alergias — a fonte é o cadastro —, com `remover`, data por campo em `perfil_datas`, TTL `VENUS_MEMORIA_TTL_DIAS` e `apagar_memoria(store, usuario_id)` para a LGPD).
   - `roteador.py` — `no_roteador`, `decidir_especialista`.
   - `especialistas.py` — `montar_no_agente_produto(pool)`/`montar_no_agente_ingrediente(pool)` (fábricas — o agente só é montado, e as tools só exigem `pool` de verdade, no primeiro uso real do nó) e `montar_no_agente_rotina(pool)` (tools Postgres de rotina) e `montar_no_agente_faq(indice, tools_extras)` (RAG: docs locais + web + tools MCP/A2A). O FAQ agora devolve JSON com `fontes_usadas` e passa pelo Agente Juiz.
   - `juiz.py` — `no_agente_juiz`, `decidir_pos_juiz`. Desde 2026-09-10, também recebe `EstadoVenus.evidencias_tools` (retorno bruto de cada tool chamada pelo especialista, ver `nodes/especialistas.py::_extrair_evidencias_tools`) como `RESULTADOS_TOOLS=` na entrada — sem isso, o Juiz só via o JSON final do especialista e aprovava afirmações que a tool citada em `fontes_usadas` nunca sustentou de verdade (achado ao vivo: produto sem ingrediente cadastrado, resposta "inventou" ingredientes, aprovado).
-  - `orquestrador.py` — `no_orquestrador`.
+  - `orquestrador.py` — `no_orquestrador`. Depois da reescrita do LLM, `_alertas_de_alergia` cruza as alergias do cadastro com os ingredientes consultados (`venus_sdk/alergias.py`) e anexa o alerta em texto fixo — o LLM não consegue omitir nem suavizar um conflito.
 - **tools/** — tools Postgres (via `asyncpg`, schema `venus`) dos especialistas de produto/ingrediente — consulta estruturada a um catálogo já curado (ETL de ANVISA/CosIng/PubChem), **não é RAG**:
   - `produto.py` — `montar_tools_produto(pool)`: `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`. `search_product` foi adicionada em 2026-09-10 — sem ela, uma pergunta que só citava o NOME do produto não tinha como resolver o `product_id`, e o especialista chutava um id (achado ao vivo: alucinou ingredientes de um produto sem nenhum cadastrado).
   - `ingrediente.py` — `montar_tools_ingrediente(pool)`: `search_ingredient`, `get_ingredient_summary`, `get_ingredient_properties`, `get_ingredient_effects`, `get_ingredient_regulations`.
@@ -24,8 +24,8 @@ Visão geral dos módulos do SDK Venus (`src/venus_sdk/`):
 - **tools/rotina.py** — `get_user_profile`, `get_user_favorites`, `get_user_lists`, `suggest_routine` — todas só leem (não há tool para adicionar nem remover favorito: a IA nunca altera os favoritos; usa só favoritos, exclui produtos que batem com alergias, devolve `sem_produto_para`). `tools/_util.py`: contrato comum — resultado vazio vira `{"encontrado": false, "mensagem": ...}` (nunca `[]`), exceção do driver vira `{"erro": ...}`, busca sem acento sem depender de extensão.
 - **integrations/google_calendar.py** — integração opcional (extra `google_calendar`): troca o `code` do OAuth por token, renova o `access_token` e guarda/lê o `refresh_token` de cada usuário CIFRADO (Fernet, `GOOGLE_TOKEN_ENCRYPTION_KEY`) em `venus.google_oauth_tokens`. O SDK nunca conduz o login: quem chama `trocar_codigo_por_token`/`salvar_refresh_token` é o backend do app. `tools/calendario.py` monta `check_availability` (consulta) e `prepare_routine_schedule`/`prepare_routine_removal` (preparam a proposta, sem gravar); `integrations/agenda_rotina.py` cria/atualiza/remove o evento (marcado com a propriedade privada `venus_rotina`); `nodes/agendamento.py` guarda a proposta em `agendamento_pendente` e só executa após o "sim" do usuário na mensagem seguinte. Escopos: `calendar.freebusy` + `calendar.events` (`ESCOPOS_VENUS`), entregue ao agente de rotina via `compilar_grafo_venus(tools_rotina_extras=...)`; sem ela, nada muda. Funciona com várias instâncias: o token fica no Postgres compartilhado.
 - **tools/_identidade.py** — o especialista fixa o `usuario_id_postgres` do estado (`usuario_da_conversa`) enquanto o agente roda; as tools com `user_id` usam esse valor (`resolver_user_id`), nunca o do LLM, e recusam consultar quando a conversa não tem usuário.
-- **mcp/** — `servidor.py` (FastMCP; expõe as tools LangChain, `python -m venus_sdk.mcp.servidor`; tools com `user_id` só com `--dados-do-usuario`) e `tools.py` (client via `langchain-mcp-adapters`: `get_mcp_tools()` async, config por `MCP_SERVERS`/`mcp_servers.json`; servidor indisponível → `[]`, não derruba).
-- **a2a_server.py / a2a_client.py** — Venus como agente A2A (4 skills; `usuario_id`/`usuario_id_postgres` via `metadata`) e `montar_tool_a2a` (tool `consultar_agente_externo`, agentes em `A2A_AGENTES_EXTERNOS`).
+- **mcp/** — `servidor.py` (FastMCP; expõe as tools LangChain, `python -m venus_sdk.mcp.servidor`; tools com `user_id` só com `--dados-do-usuario`) e `tools.py` (client via `langchain-mcp-adapters`: `get_mcp_tools()` async, config por `MCP_SERVERS`/`mcp_servers.json`; servidor indisponível → `[]`, não derruba; retorno que parece instrução ao sistema é descartado por `com_filtro_de_injecao`, o mesmo filtro da web e do A2A).
+- **a2a_server.py / a2a_client.py** — Venus como agente A2A (4 skills; `usuario_id`/`usuario_id_postgres` via `metadata`) e `montar_tool_a2a` (tool `consultar_agente_externo`, agentes em `A2A_AGENTES_EXTERNOS`; a pergunta sai por `anonimizar_entrada` e resposta com injeção é descartada).
 - **guardrail_rules.py** — regras puras de guardrail (`guardrail_entrada`, `guardrail_saida`, `anonimizar_entrada`), sem dependência do grafo/estado.
 - **llm/** — cadeias de fallback entre provedores (Groq, Mistral, Gemini): `get_llm_rapido` (roteador/memória), `get_llm_especialista` (especialistas), `get_llm_juiz` (mesma cadeia dos especialistas) e `get_llm_orquestrador` (mesma cadeia, temperatura 0). Ordem configurável por `LLM_PROVIDER` e `LLM_CADEIA_*`.
 - **config/** — configurações e variáveis de ambiente do SDK.
@@ -36,8 +36,10 @@ Visão geral dos módulos do SDK Venus (`src/venus_sdk/`):
 Estado atual: tools de produto/ingrediente/rotina (Postgres, schema+seed em
 `scripts/sql`), RAG (local + web), MCP e A2A (servidor e client) implementados e
 verificados por `tests/manual/verificar_tools.py` e pelos testes em `tests/`
-(`pytest -m integration` roda as tools contra um Postgres real). Pendência:
-observabilidade (custo, latência, taxa de erro, ROI). O roteador tem uma rede de
+(`pytest -m integration` roda as tools contra um Postgres real). A
+observabilidade fica na API (`venus_api`: Langfuse por nó, com tokens e custo, e
+métricas HTTP no Mongo); custo, latência e ROI em `docs/custo-e-roi.md`; pendente: o resultado de cada turno
+no trace. Avaliações em `docs/avaliacao-*.md` (RAG, guardrail, roteamento, alergias). O roteador tem uma rede de
 segurança (`nodes/roteador.py::e_small_talk`) contra saudação roteada para
 especialista.
 

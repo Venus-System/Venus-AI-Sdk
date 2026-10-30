@@ -44,6 +44,22 @@ _RESPOSTA_DIRETA_FALLBACK = (
     "ingrediente ou rotina de skincare e haircare — quer falar sobre algum deles?"
 )
 
+# "Sou alérgica a lavanda" sem pergunta vira resposta direta, e o LLM respondia
+# "vou lembrar disso". A memória não guarda alergia (a fonte é o cadastro do
+# app, ver `nodes/memoria.py`): a resposta é fixa e manda atualizar o cadastro —
+# também para "não sou mais alérgica".
+_RE_DECLARA_ALERGIA = re.compile(
+    r"\b((sou|fiquei|estou|era)\s+(mais\s+)?(al[eé]rgic[oa]|sens[ií]vel)|"
+    r"(tenho|tive|descobri|desenvolvi)\s+(uma\s+)?(alergia|sensibilidade)|"
+    r"me\s+d[aá]\s+alergia)\b",
+    re.IGNORECASE,
+)
+_RESPOSTA_ALERGIA_NO_CHAT = (
+    "Obrigada por me contar! Eu uso as alergias do seu cadastro nas recomendações e nas rotinas, "
+    "então atualize a sua lista de alergias no app para eu levar isso em conta. "
+    "Quer que eu confira algum produto ou ingrediente?"
+)
+
 # Chamadas ao LLM roteador por invocação (a 1ª + uma nova tentativa se ela levantar).
 _TENTATIVAS_LLM_ROTEADOR = 2
 
@@ -96,7 +112,21 @@ _RE_PRODUTO = re.compile(
 _RE_FAQ = re.compile(
     r"(venus.{0,40}\b(score|funciona|regras?|pol[ií]tica|privacidade|dados)\b|"
     r"\b(score|funciona|regras?|pol[ií]tica|privacidade|dados)\b.{0,40}venus|"
-    r"\b(meus dados|privacidade|lgpd|seus termos|como funciona o score)\b)", re.IGNORECASE)
+    r"\b(meus dados|privacidade|lgpd|seus termos|como funciona o score)\b|"
+    # Perguntas sobre o próprio Venus que o LLM respondia direto, às vezes
+    # inventando ("os dados vêm da FDA") — ver docs/avaliacao-roteamento.md.
+    # Conta no app (criar, apagar):
+    r"\b(apag|exclu|delet|cancel|encerr|cri)\w*\b.{0,15}\bconta\b|"
+    # Metodologia e fontes:
+    r"\bcomo\b.{0,25}\b(notas?|scores?|pontua\w*)\b.{0,25}\b(calcul|funcion|defin)\w*|"
+    r"\bcomo\b.{0,10}\b(calcul|funcion|defin)\w*\b.{0,15}\b(notas?|scores?|pontua\w*)\b|"
+    r"\bde onde v[eê]m\b.{0,12}\b(dados|informa\w*|notas?|scores?|fontes?)\b|\bfontes? (dos|de) dados\b|"
+    # Limites da IA:
+    r"\bsubstitu\w*\b.{0,20}\b(dermatologista|m[eé]dic\w*|profissional)\b|"
+    r"\bconfiar\b.{0,20}\b(na|em) (ia|intelig[eê]ncia artificial|venus|voc[eê])\b|"
+    # Dado pessoal no chat:
+    r"\b(seguro|posso)\b.{0,30}\b(mandar|enviar|compartilhar|passar|digitar)\b.{0,20}"
+    r"\b(cpf|e-?mail|telefone|endere[cç]o|dados)\b)", re.IGNORECASE)
 
 # Pedidos sobre o que está CADASTRADO na conta (perfil, alergias cadastradas,
 # favoritos, listas): só o agente de rotina tem essas tools. Aplicado MESMO
@@ -108,6 +138,16 @@ _RE_DADOS_DA_CONTA = re.compile(
     r"\b(favorit\w*|minhas? listas?|listas? (de produtos|salvas?)|(meu|no|do) perfil|"
     r"alergias? cadastrad\w*|minhas alergias)\b",
     re.IGNORECASE,
+)
+# "Qual é meu nome?" sem o nome ter aparecido na conversa: o nome do cadastro vem
+# do perfil (agente de rotina). O roteador respondia "Seu nome é," em branco ou
+# "não lembro seu nome" (chatbot real, 2026-10-28).
+_RE_PERGUNTA_NOME = re.compile(r"\b(qual|como)\b[^?]{0,15}\bmeu nome\b|\bcomo (eu )?me chamo\b", re.IGNORECASE)
+_RE_DISSE_O_NOME = re.compile(r"\b(meu nome [ée]|me chamo|pode me chamar de)\b", re.IGNORECASE)
+# Linhas de contexto que o roteador recebe e às vezes ecoa na resposta direta
+# ("MEMORIA_USUARIO={}" chegou ao usuário no chatbot real, 2026-10-28).
+_LINHA_DE_CONTEXTO_RE = re.compile(
+    r"^[ \t]*(MEMORIA_USUARIO|PRODUTO_EM_TELA|USER_ID_POSTGRES)[ \t]*=.*(?:\n|$)", re.MULTILINE
 )
 # "Ingredientes/composição DO [produto]": pergunta de produto, não de ingrediente
 # isolado (só o agente de produto tem `get_product_ingredients`).
@@ -369,6 +409,19 @@ def _recapitulacao(estado: EstadoVenus) -> str | None:
     return None
 
 
+def _pergunta_o_nome_do_cadastro(pergunta: str, estado: EstadoVenus) -> bool:
+    """"Qual é meu nome?" quando o nome não foi dito nesta conversa nem está na
+    memória: quem responde é o perfil (`get_user_profile`)."""
+    if not _RE_PERGUNTA_NOME.search(pergunta) or not estado.get("usuario_id_postgres"):
+        return False
+    if (estado.get("memorias_usuario") or {}).get("nome"):
+        return False
+    anteriores = list(estado.get("historico") or [])[:-1]
+    return not any(
+        getattr(m, "type", "") == "human" and _RE_DISSE_O_NOME.search(str(m.content)) for m in anteriores
+    )
+
+
 def no_roteador(estado: EstadoVenus) -> EstadoVenus:
     """Chama o LLM roteador com `ROUTER_PROMPT_COMPLETO` e extrai o
     protocolo `ROUTE=.../PERGUNTA_ORIGINAL=...` (ou responde diretamente em
@@ -424,6 +477,9 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
         # 2026-10-26): quem sugere produto do catálogo é o especialista de produto.
         logger.warning("Roteador escolheu %s; 'sim' a uma oferta de sugestão vai para produto", rota)
         rota = "produto"
+    if rota not in _ROTAS_VALIDAS and _pergunta_o_nome_do_cadastro(pergunta_do_usuario, estado):
+        logger.warning("Roteador respondeu direto; pergunta pelo nome do cadastro vai para rotina")
+        rota = "rotina"
 
     if rota not in _ROTAS_VALIDAS:
         # Small talk ou fora de escopo: o próprio roteador já formulou a
@@ -431,7 +487,9 @@ def no_roteador(estado: EstadoVenus) -> EstadoVenus:
         # Uma proposta de agendamento sem resposta expira aqui. A cara só é
         # `magoada` se o usuário vai ver a reação que o roteador escreveu.
         magoada = reacao == "magoada" and bool(texto) and texto == texto_do_llm
-        texto = _MARCADOR_RE.sub("", texto).strip()
+        texto = _MARCADOR_RE.sub("", _LINHA_DE_CONTEXTO_RE.sub("", texto)).strip()
+        if _RE_DECLARA_ALERGIA.search(pergunta_do_usuario):
+            texto, magoada = _RESPOSTA_ALERGIA_NO_CHAT, False
         return {
             "rota": None,
             "produto_em_contexto": produto_em_contexto,

@@ -1,14 +1,17 @@
-"""Tools do agente Rotina — perfil, favoritos e listas do usuário (Postgres,
-schema `venus`), mais uma sugestão de rotina montada SÓ com dado real."""
+"""Tools do agente Rotina — favoritos e listas do usuário (Postgres, schema
+`venus`), mais uma sugestão de rotina montada SÓ com dado real."""
 
 from __future__ import annotations
 
-import json
 import re
 from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
+# Mesma regra de alergia do Juiz e do Orquestrador (antes havia uma cópia aqui,
+# que já tinha divergido: só esta pegava "álcool benzílico" como álcool).
+from venus_sdk.alergias import termo_bate as _bate_com_alergia
+from venus_sdk.alergias import termos_da_alergia as _termos_da_alergia
 from venus_sdk.texto import remover_acentos
 from venus_sdk.tools._identidade import SEM_USUARIO_IDENTIFICADO, resolver_user_id
 from venus_sdk.tools._util import consultar, exigir_pool
@@ -43,24 +46,6 @@ _ATIVOS_DA_NOITE_RE = re.compile(
     r"acido mandelico|acido salicilico|tretinoina|adapaleno)(?![a-z])"
 )
 
-# Alergias no catálogo vêm em português/inglês; os ingredientes vêm como INCI.
-_SINONIMOS_ALERGIA = {
-    "fragrancia": ("parfum", "fragrance", "aroma", "perfume", "fragrancia"),
-    "perfume": ("parfum", "fragrance", "aroma", "perfume"),
-    "conservante": ("paraben", "phenoxyethanol", "methylisothiazolinone"),
-    "paraben": ("paraben",),
-    "sulfato": ("sulfate", "sulfato"),
-    "silicone": ("dimethicone", "siloxane", "silicone"),
-    "alcool": ("alcohol denat", "alcohol"),
-}
-# Álcoois graxos (emolientes) não são o "álcool" das alergias/sensibilidades.
-_ALCOOIS_GRAXOS = (
-    "cetyl", "stearyl", "cetearyl", "behenyl", "myristyl", "lauryl alcohol", "oleyl", "arachidyl",
-    "cetilico", "estearilico", "cetoestearilico", "cetearilico", "behenilico", "miristilico", "oleilico",
-)
-_TERMOS_DE_ALCOOL = ("alcool", "alcohol")
-
-
 # Categorias essenciais de uma rotina e as palavras-chave que as identificam.
 _CATEGORIAS_ESSENCIAIS = (
     ("Limpeza", ("limp",)),
@@ -69,7 +54,6 @@ _CATEGORIAS_ESSENCIAIS = (
 )
 _HORARIOS_VALIDOS = {"manha", "noite", "ambos"}
 _SEM_FAVORITOS = "o usuário não tem produtos favoritos"
-_TAMANHO_MINIMO_TERMO_ALERGIA = 3
 
 
 def _minusculo_sem_acento(texto: str) -> str:
@@ -84,26 +68,8 @@ def _ordem_categoria(categoria: str) -> int:
     return _ORDEM_DESCONHECIDA
 
 
-def _termos_da_alergia(nome: str) -> list[str]:
-    """'Fragrância (Parfum)' -> ['fragrancia (parfum)', 'fragrancia', 'parfum', + sinônimos]."""
-    base = _minusculo_sem_acento(nome)
-    termos = {base}
-    termos.update(parte.strip(" )") for parte in base.replace("(", "/").split("/") if parte.strip())
-    for chave, sinonimos in _SINONIMOS_ALERGIA.items():
-        if chave in base:
-            termos.update(sinonimos)
-    return sorted(termo for termo in termos if len(termo) >= _TAMANHO_MINIMO_TERMO_ALERGIA)
-
-
 def _rotulo(produto: dict) -> str:
     return _minusculo_sem_acento(produto["category_name"] + " " + produto["name"])
-
-
-def _bate_com_alergia(termo: str, ingrediente: str) -> bool:
-    if termo not in ingrediente:
-        return False
-    eh_termo_de_alcool = any(alcool in termo for alcool in _TERMOS_DE_ALCOOL)
-    return not (eh_termo_de_alcool and any(graxo in ingrediente for graxo in _ALCOOIS_GRAXOS))
 
 
 def _separar_por_alergia(favoritos: list[dict], termos: list[str]) -> tuple[list[dict], list[dict]]:
@@ -197,18 +163,6 @@ _SQL_FAVORITOS_COM_INGREDIENTES = """
 """
 
 
-_SQL_PERFIL_DO_USUARIO = """
-    SELECT (to_jsonb(up) - 'user_profile_id' - 'fk_user_id' - 'is_active' - 'created_at'
-            - 'updated_at')::text AS perfil,
-           COALESCE((SELECT array_agg(pt.name ORDER BY pt.name)
-                     FROM venus.user_profile_tags upt
-                     JOIN venus.profile_tags pt ON pt.profile_tag_id = upt.fk_profile_tag_id
-                     WHERE upt.fk_user_id = up.fk_user_id AND upt.is_active), '{}') AS tags
-    FROM venus.user_profiles up
-    WHERE up.fk_user_id = $1 AND up.is_active
-"""
-
-
 _SQL_FAVORITOS_DO_USUARIO = """
     SELECT p.product_id, p.name, b.name AS brand_name, pc.name AS category_name
     FROM venus.favorites f
@@ -259,21 +213,6 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
     exigir_pool(pool, "montar_tools_rotina")
 
     @tool
-    async def get_user_profile(user_id: int) -> dict:
-        """Traz o perfil do usuário (tipo de pele/cabelo, sensibilidade, condições como acne/melasma/gestação e tags de perfil)
-        — base para montar ou ajustar uma rotina."""
-        # `to_jsonb(up)` em vez de colunas fixas: o schema do perfil evolui (a coluna
-        # `hair_type` já sumiu do banco real) e uma coluna a menos não pode derrubar a tool.
-        user_id = resolver_user_id(user_id)
-        if user_id is None:
-            return SEM_USUARIO_IDENTIFICADO
-        resultado = await consultar(pool, "get_user_profile", _SQL_PERFIL_DO_USUARIO, user_id, uma_linha=True,
-                                    vazio="o usuário não tem perfil cadastrado")
-        if isinstance(resultado, dict) and "perfil" in resultado:
-            return {**json.loads(resultado["perfil"]), "tags": resultado["tags"]}
-        return resultado
-
-    @tool
     async def get_user_favorites(user_id: int) -> list[dict] | dict:
         """Lista os produtos favoritados pelo usuário (id, nome, marca,
         categoria). A rotina só pode usar produtos daqui ou das listas."""
@@ -310,4 +249,5 @@ def montar_tools_rotina(pool: Any) -> list[BaseTool]:
 
     # Todas só leem. Não existe tool para adicionar nem remover favorito de
     # propósito: mexer nos favoritos é decisão do usuário, feita por ele no app.
-    return [get_user_profile, get_user_favorites, get_user_lists, suggest_routine]
+    # O perfil (`get_user_profile`) fica em `tools/compartilhadas.py`, junto das alergias.
+    return [get_user_favorites, get_user_lists, suggest_routine]

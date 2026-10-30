@@ -96,3 +96,16 @@ def test_router_tem_secao_de_reacao_a_ofensa() -> None:
     assert "EXCEÇÃO deliberada" in PERSONA_SISTEMA
     assert "REAÇÃO A OFENSA/XINGAMENTO" in ROUTER_PROMPT_COMPLETO
     assert "desculpa se fiz algo que te incomodou" in ROUTER_PROMPT_COMPLETO.lower()
+
+
+@pytest.mark.parametrize("prompt_completo", [ESP_PRODUTO_PROMPT_COMPLETO, ESP_INGREDIENTE_PROMPT_COMPLETO])
+def test_produto_e_ingrediente_usam_o_perfil_sem_afirmar_seguranca_na_gestacao(prompt_completo: str) -> None:
+    """O perfil (`get_user_profile`) passou a ser compartilhado com produto e
+    ingrediente: os dois têm de saber que a tool existe e não podem dizer que
+    algo é seguro na gestação/amamentação sem dado de tool que sustente."""
+    assert "`get_user_profile`" in prompt_completo
+    assert "gestação/amamentação" in prompt_completo
+
+
+def test_produto_nao_afirma_que_atende_preferencia_de_valores() -> None:
+    assert "nunca afirme que atende" in ESP_PRODUTO_PROMPT_COMPLETO

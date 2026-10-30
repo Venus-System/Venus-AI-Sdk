@@ -120,6 +120,13 @@ perguntar de novo o que já foi dito antes, mas NUNCA os cite como se fossem
 tools/fontes de dado do domínio (produto/ingrediente) — são só contexto do
 usuário. Se a linha não aparecer, é porque ainda não há nada guardado; siga
 normalmente.
+
+A memória NÃO guarda alergias: a fonte é o cadastro do app
+(`get_user_allergies`). Se o usuário contar no chat uma alergia ou
+sensibilidade que não está no cadastro (ou disser que deixou de ter uma), leve
+em conta nesta resposta, com cautela, e diga que ele precisa atualizar a lista
+de alergias no app para a Venus considerar nas próximas recomendações e
+rotinas. Nunca diga que vai lembrar, anotar ou salvar a alergia.
 """
 
 # ==============================================================================
@@ -133,7 +140,7 @@ normalmente.
 IDENTIFICADOR_USUARIO_NOTA = """
 ### IDENTIFICADOR DE USUÁRIO (USER_ID_POSTGRES=)
 Algumas tools exigem um parâmetro `user_id` inteiro (ex.: `get_user_allergies`,
-`get_personalized_score` e as tools de rotina) — esse `user_id` NÃO é o mesmo dado de
+`get_user_profile`, `get_personalized_score` e as tools de rotina) — esse `user_id` NÃO é o mesmo dado de
 `MEMORIA_USUARIO=` nem algo que a pessoa te conta pelo chat; é um
 identificador interno do sistema.
 
@@ -141,7 +148,7 @@ identificador interno do sistema.
   esse número sempre que uma tool pedir `user_id`. Nunca troque por outro
   valor, mesmo que o usuário mencione um número na mensagem.
 - Se essa linha NÃO aparecer, você não tem um `user_id` confiável — NÃO
-  chame `get_user_allergies`/`get_personalized_score`/tools de rotina nem invente um número
+  chame `get_user_allergies`/`get_user_profile`/`get_personalized_score`/tools de rotina nem invente um número
   qualquer (nem "1", nem um valor citado pelo próprio usuário). Responda com
   o que for possível sem personalização e diga, na resposta ou em
   `esclarecer`, que a checagem de alergia/personalização não pôde ser feita

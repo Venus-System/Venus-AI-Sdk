@@ -507,8 +507,8 @@ def _aviso_da_agenda(evidencias: list[dict] | None) -> str:
     return "Não consegui ver sua agenda agora, então não sei se você está livre nesse horário."
 
 
-def _conflito_com_alergias(ingredientes: list, alergias: list[str]) -> str | None:
-    """"Ácido salicílico (alergia a Ácido salicílico)" se algum ingrediente bate."""
+def _par_em_conflito(ingredientes: list, alergias: list[str]) -> tuple[str, str] | None:
+    """`(ingrediente, alergia)` do primeiro ingrediente que bate com uma alergia."""
     for alergia in alergias:
         termos = termos_da_alergia(alergia)
         for ingrediente in ingredientes:
@@ -516,9 +516,64 @@ def _conflito_com_alergias(ingredientes: list, alergias: list[str]) -> str | Non
                 continue
             variantes = [str(v) for v in (ingrediente.get("inci_name"), ingrediente.get("common_name")) if v]
             if any(termo_bate(termo, variante) for termo in termos for variante in variantes):
-                nome = ingrediente.get("common_name") or ingrediente.get("inci_name")
-                return f"{nome} (alergia a {alergia})"
+                return str(ingrediente.get("common_name") or ingrediente.get("inci_name")), alergia
     return None
+
+
+def _conflito_com_alergias(ingredientes: list, alergias: list[str]) -> str | None:
+    """"Ácido salicílico (alergia a Ácido salicílico)" se algum ingrediente bate."""
+    par = _par_em_conflito(ingredientes, alergias)
+    return f"{par[0]} (alergia a {par[1]})" if par else None
+
+
+def _alergias_declaradas(evidencias: list[dict] | None) -> list[str]:
+    dados = dados_da_evidencia(evidencias, "get_user_allergies")
+    if not isinstance(dados, list):
+        return []
+    return [str(a.get("allergy_name")) for a in dados if isinstance(a, dict) and a.get("allergy_name")]
+
+
+def _alertas_de_alergia(texto: str, evidencias: list[dict] | None) -> list[str]:
+    """Alertas que a resposta final PRECISA trazer, calculados pelo código a
+    partir das tools (alergias do cadastro × ingredientes consultados), não pelo
+    LLM. O Orquestrador reescreve o JSON aprovado pelo Juiz e podia suavizar ou
+    perder um alerta; estes entram depois dele, sempre com o mesmo texto.
+
+    Vale para o produto consultado em detalhe, para os demais produtos com
+    ingredientes consultados que o texto cita, e para o ingrediente buscado
+    (um só resultado, ou citado no texto)."""
+    alergias = _alergias_declaradas(evidencias)
+    if not alergias:
+        return []
+    texto_compacto = _compactar(texto)
+    principal = _produto_consultado(evidencias)
+    nomes = nomes_por_id(evidencias)
+    alertas = []
+    for evidencia in evidencias or []:
+        if evidencia.get("tool") != "get_product_ingredients":
+            continue
+        product_id = (evidencia.get("argumentos") or {}).get("product_id")
+        nome = nomes.get(str(product_id)) or ""
+        if str(product_id) != str(principal) and not (nome and _compactar(nome) in texto_compacto):
+            continue
+        ingredientes = dados_da_evidencia([evidencia], "get_product_ingredients")
+        par = _par_em_conflito(ingredientes, alergias) if isinstance(ingredientes, list) else None
+        if par:
+            produto = nome or "Esse produto"
+            alertas.append(f"Atenção: {produto} tem {par[0]}, que bate com a sua alergia a {par[1]} "
+                           "(conferido no seu cadastro).")
+    buscados = dados_da_evidencia(evidencias, "search_ingredient")
+    if isinstance(buscados, list):
+        for ingrediente in buscados:
+            if not isinstance(ingrediente, dict):
+                continue
+            nome = str(ingrediente.get("common_name") or ingrediente.get("inci_name") or "")
+            if len(buscados) > 1 and not (nome and _compactar(nome) in texto_compacto):
+                continue
+            par = _par_em_conflito([ingrediente], alergias)
+            if par:
+                alertas.append(f"Atenção: {par[0]} bate com a sua alergia a {par[1]} (conferido no seu cadastro).")
+    return [alerta for alerta in dict.fromkeys(alertas) if _compactar(alerta) not in texto_compacto]
 
 
 def _parte_sugestao_com_alergia(evidencias: list[dict] | None, excluir: str | None = None) -> str | None:
@@ -581,7 +636,9 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
             rotina_montada,
             None if rotina_montada or not (pede_favoritos or sem_preferencia) else _parte_favoritos(evidencias),
             _parte_listas(evidencias) if pede_listas or sem_preferencia else None,
-            _parte_perfil(evidencias),
+            # Em produto/ingrediente o perfil é só contexto para personalizar: virando
+            # "dado da conta", escondia a ficha do produto (chatbot real, 2026-10-28).
+            _parte_perfil(evidencias) if estado.get("rota") == "rotina" else None,
         ) if parte
     ]
     # Numa pergunta sobre a conta, a busca de produto foi só um meio (achar o
@@ -698,6 +755,10 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
         texto = texto or _resposta_segura_sem_aprovacao(estado)
 
     texto = _sem_ids_internos(texto) or _RESPOSTA_ORQUESTRADOR_FALLBACK
+    alertas = _alertas_de_alergia(texto, estado.get("evidencias_tools"))
+    if alertas:
+        logger.info("Alerta de alergia anexado pelo código (%d)", len(alertas))
+        texto = "\n\n".join([texto, *alertas])
     pendentes = estado.get("agendamento_pendente")
     if pendentes and _AFIRMA_AGENDAMENTO_RE.search(texto):
         logger.warning("Orquestrador afirmou um agendamento ainda não confirmado; texto substituído")

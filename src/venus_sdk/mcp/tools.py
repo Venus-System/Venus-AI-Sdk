@@ -11,6 +11,7 @@ Configuração (por ordem): argumento `servidores`, variável `MCP_SERVERS`
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import os
@@ -18,7 +19,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from venus_sdk.prompts.guardrail_rules import contem_tentativa_de_injecao
+
 logger = logging.getLogger(__name__)
+
+RESULTADO_DESCARTADO = json.dumps(
+    {"erro": "a resposta da tool externa foi descartada por segurança"}, ensure_ascii=False
+)
 
 
 def config_padrao_venus() -> dict[str, Any]:
@@ -58,4 +65,38 @@ async def get_mcp_tools(servidores: dict[str, Any] | None = None, *,
     except Exception:  # noqa: BLE001
         logger.exception("Não consegui carregar tools MCP")
         return []
-    return [tool for tool in tools if apenas is None or tool.name in apenas]
+    return [com_filtro_de_injecao(tool) for tool in tools if apenas is None or tool.name in apenas]
+
+
+def _texto_do_conteudo(conteudo: Any) -> str:
+    """Texto de um retorno de tool MCP: string, ou lista de strings/blocos `{"text": ...}`."""
+    if isinstance(conteudo, str):
+        return conteudo
+    if isinstance(conteudo, list):
+        return "\n".join(
+            str(bloco.get("text") or "") if isinstance(bloco, dict) else str(bloco) for bloco in conteudo
+        )
+    return str(conteudo)
+
+
+def com_filtro_de_injecao(tool: Any) -> Any:
+    """Descarta o retorno da tool quando ele parece instrução ao sistema
+    (injeção indireta), com o mesmo filtro da busca web e do A2A. O guardrail de
+    entrada só vê a mensagem do usuário; o que um servidor MCP externo devolve
+    chegava ao agente sem passar por nada."""
+    original = getattr(tool, "coroutine", None)
+    if original is None:
+        return tool
+
+    @functools.wraps(original)
+    async def coroutine(*args: Any, **kwargs: Any) -> Any:
+        resultado = await original(*args, **kwargs)
+        # Tools do adapter usam `response_format="content_and_artifact"`.
+        conteudo = resultado[0] if isinstance(resultado, tuple) else resultado
+        if not contem_tentativa_de_injecao(_texto_do_conteudo(conteudo)):
+            return resultado
+        logger.warning("Resposta da tool MCP %s descartada: parece instrução ao sistema", tool.name)
+        return (RESULTADO_DESCARTADO, None) if isinstance(resultado, tuple) else RESULTADO_DESCARTADO
+
+    tool.coroutine = coroutine
+    return tool

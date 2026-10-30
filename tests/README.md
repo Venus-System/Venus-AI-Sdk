@@ -31,4 +31,7 @@ python tests/manual/verificar_tools.py    # chama CADA tool (Postgres, RAG, web,
 python tests/manual/testar_conversas.py   # conversas reais pelo grafo, só leitura
 python tests/manual/avaliar_rag.py        # hit rate@3, MRR e "não sei" do RAG do FAQ (--indice qdrant, --embeddings hash; resultados em docs/avaliacao-rag.md)
 python tests/manual/avaliar_guardrail.py  # regex x regex + LLM nas frases de tests/guardrails/fixtures (resultados em docs/avaliacao-guardrail.md)
+python tests/manual/avaliar_roteamento.py # acerto da rota por categoria, palavras-chave x LLM (resultados em docs/avaliacao-roteamento.md)
+python tests/manual/avaliar_alergias.py   # casamento alergia x ingrediente e alerta final; sem LLM, também roda no pytest (docs/avaliacao-alergias.md)
+python tests/manual/medir_custo.py        # tokens, modelo e tempo de cada chamada em conversas reais (relatório em docs/custo-e-roi.md)
 ```
