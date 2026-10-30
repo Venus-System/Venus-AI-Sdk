@@ -452,6 +452,8 @@ Scripts manuais, que usam LLM e banco de verdade e por isso gastam cota:
 | `tests/manual/testar_conversas.py` | Conversas reais pelo grafo, só leitura. |
 | `tests/manual/avaliar_rag.py` | Hit rate@3, MRR e taxa de "não sei" do RAG ([resultados](docs/avaliacao-rag.md)). |
 | `tests/manual/avaliar_guardrail.py` | Regex sozinha × regex + LLM em frases de injeção e legítimas ([resultados](docs/avaliacao-guardrail.md)). |
+| `tests/manual/avaliar_roteamento.py` | Acerto da rota por categoria, palavras-chave × roteador com LLM ([resultados](docs/avaliacao-roteamento.md)). |
+| `tests/manual/avaliar_alergias.py` | Casamento alergia × ingrediente e alerta na resposta final; sem LLM, também roda no `pytest` ([resultados](docs/avaliacao-alergias.md)). |
 | `scripts/medir_llms.py` | Latência e disponibilidade dos modelos configurados. |
 
 ## CI/CD
@@ -520,8 +522,10 @@ docs/               # arquitetura, Neo4j e resultados das avaliações
 
 - [`docs/architecture.md`](docs/architecture.md): os módulos do SDK em detalhe.
 - [`docs/neo4j.md`](docs/neo4j.md): o check-up da rotina no Neo4j.
-- [`docs/avaliacao-rag.md`](docs/avaliacao-rag.md) e
-  [`docs/avaliacao-guardrail.md`](docs/avaliacao-guardrail.md): metodologia e
+- [`docs/avaliacao-rag.md`](docs/avaliacao-rag.md),
+  [`docs/avaliacao-guardrail.md`](docs/avaliacao-guardrail.md),
+  [`docs/avaliacao-roteamento.md`](docs/avaliacao-roteamento.md) e
+  [`docs/avaliacao-alergias.md`](docs/avaliacao-alergias.md): metodologia e
   resultados das avaliações.
 - [Arquitetura do sistema inteiro](https://github.com/Venus-System/Venus-AI-api/blob/develop/docs/arquitetura-sistema.md)
   (app, API, bancos, LLMs e integrações), no repositório da API.
@@ -533,8 +537,14 @@ docs/               # arquitetura, Neo4j e resultados das avaliações
 longo prazo, RAG com fontes externas, MCP, A2A (servidor e cliente), juiz
 anti-alucinação, guardrails, Google Calendar e check-up da rotina.
 
-**Pendente:** observabilidade e SRE: custo estimado para 100 e 1.000 usuários,
-latência por agente, taxa de erro, ROI e custo por resolução.
+**Observabilidade:** fica na API (`venus_api`), não no SDK. O Langfuse rastreia cada
+mensagem, com o tempo de cada nó do grafo e os tokens e custo de cada chamada de LLM,
+marcados por usuário e conversa. Um middleware grava a duração e o status de cada
+requisição no Mongo, de onde sai a taxa de erro.
+
+**Pendente:** custo estimado para 100 e 1.000 usuários, ROI e custo por resolução
+(calculados a partir do Langfuse), e o resultado de cada turno no trace (rota, se o
+Juiz aprovou por regra ou por LLM, tentativas, alerta de alergia anexado).
 
 ## Licença
 

@@ -36,8 +36,10 @@ Visão geral dos módulos do SDK Venus (`src/venus_sdk/`):
 Estado atual: tools de produto/ingrediente/rotina (Postgres, schema+seed em
 `scripts/sql`), RAG (local + web), MCP e A2A (servidor e client) implementados e
 verificados por `tests/manual/verificar_tools.py` e pelos testes em `tests/`
-(`pytest -m integration` roda as tools contra um Postgres real). Pendência:
-observabilidade (custo, latência, taxa de erro, ROI). O roteador tem uma rede de
+(`pytest -m integration` roda as tools contra um Postgres real). A
+observabilidade fica na API (`venus_api`: Langfuse por nó, com tokens e custo, e
+métricas HTTP no Mongo); pendente: estimativa de custo, ROI e o resultado de cada turno
+no trace. Avaliações em `docs/avaliacao-*.md` (RAG, guardrail, roteamento, alergias). O roteador tem uma rede de
 segurança (`nodes/roteador.py::e_small_talk`) contra saudação roteada para
 especialista.
 
