@@ -4,10 +4,9 @@ Medição do grafo com LLMs e Postgres de verdade (`tests/manual/medir_custo.py`
 a partir dela, o custo estimado para 100 e 1.000 usuários semanais, a latência, o
 índice de erros, o custo por resolução e o ROI.
 
-**Base:** 19 turnos em 12 conversas (produto, ingrediente, rotina, FAQ, conversa, fora
-de escopo e injeção), só leitura, com os usuários de teste do seed. É uma rodada só,
-com amostra pequena e a mistura de assuntos escolhida para o teste: os números são
-indicativos.
+**Base:** 57 turnos em 3 rodadas de 12 conversas (produto, ingrediente, rotina, FAQ,
+conversa, fora de escopo e injeção), só leitura, com usuários de teste. A mistura de
+assuntos foi escolhida para o teste, então os números são indicativos.
 
 ## Como rodar
 
@@ -19,52 +18,65 @@ python tests/manual/medir_custo.py --ler-json medicao.json     # refaz o resumo 
 O FAQ usa o índice local, sem Qdrant; o volume de tokens é o mesmo. Os preços estão
 em `PRECOS`, no próprio script.
 
-## Medição: 2026-10-30
+## Medição: 2026-11-02, SDK v0.5.0
 
 **Ambiente:**
-- código: branch `fix/rotina-sugestao-alergia`, sobre `4a0c26c`;
-- planos gratuitos dos provedores; cadeia do especialista começando pelo
-  `groq:openai/gpt-oss-120b`, e a rápida pelo `mistral:ministral-14b-latest`.
+- código: cópia exata da `develop` em `87a44cb` (tag `v0.5.0`), sem mudanças locais;
+- 3 rodadas seguidas, 57 turnos, com as chaves dos planos gratuitos dos provedores;
+- cadeia do especialista começando pelo `groq:openai/gpt-oss-120b`, e a rápida pelo
+  `mistral:ministral-14b-latest`.
 
-### O que acontece em um turno
+A medição anterior, de 2026-10-30 (19 turnos, US$ 0,0055 por turno, mediana de 21,6 s e
+p95 de 58,5 s), foi descartada: ela citava um commit, mas rodou com mudanças locais sem
+commit, então não representa nenhuma versão publicada.
 
-| Rota | Turnos | Chamadas de LLM | Tokens (entrada / saída) | Tempo (mediana) | Custo por turno* |
-|---|---|---|---|---|---|
-| Direto (conversa, fora de escopo) | 5 | 3 | 6,3 mil / 110 | 5s | US$ 0,0013 |
-| Produto | 6 | 16 | 45 mil / 890 | 38s | US$ 0,0092 |
-| Ingrediente | 3 | 16 | 38 mil / 1,1 mil | 58s | US$ 0,0078 |
-| Rotina | 2 | 11 | 23 mil / 370 | 15s | US$ 0,0047 |
-| FAQ | 2 | 13,5 | 23,5 mil / 870 | 29s | US$ 0,0048 |
-| Bloqueada pelo guardrail | 1 | 0 | 0 | 0s | US$ 0 |
-| **Média** | **19** | **11** | **26,8 mil / 615** | **21,6s (p95 58,5s)** | **US$ 0,0055** |
+| Rodada | Mediana | p95 | Chamadas de LLM por turno | Custo por turno* |
+|---|---|---|---|---|
+| 1 | 16,9 s | 41,3 s | 12,3 | US$ 0,0065 |
+| 2 | 17,1 s | 49,8 s | 12,6 | US$ 0,0066 |
+| 3 | 21,9 s | 53,4 s | 13,4 | US$ 0,0069 |
+| **Total** | **18,6 s** | **49,8 s** | **12,7** (8,2 com sucesso) | **US$ 0,0067** |
 
 \* Preço pago de cada provedor (tabela no fim). Nos planos gratuitos, o custo em
 dinheiro é zero, com limite de taxa.
 
-**Por nó (chamadas que deram certo):**
+### Por rota
+
+| Rota | Turnos | Chamadas de LLM | Tokens (entrada / saída) | Mediana | p95 | Custo por turno |
+|---|---|---|---|---|---|---|
+| Direto (conversa, fora de escopo) | 9 | 3,0 | 6,3 mil / 76 | 4,5 s | 21,0 s | US$ 0,0013 |
+| Produto | 22 | 15,8 | 46,3 mil / 907 | 23,5 s | 49,8 s | US$ 0,0093 |
+| Ingrediente | 8 | 21,6 | 56,8 mil / 1,4 mil | 42,3 s | 54,4 s | US$ 0,0115 |
+| Rotina | 9 | 11,1 | 24,8 mil / 494 | 11,7 s | 22,7 s | US$ 0,0050 |
+| FAQ | 6 | 13,2 | 23,2 mil / 763 | 15,4 s | 37,8 s | US$ 0,0047 |
+| Bloqueada pelo guardrail | 3 | 0 | 0 | 0 s | 0 s | US$ 0 |
+
+A mistura de assuntos foi escolhida para o teste. O p95 por rota tem poucos turnos e é
+só indicativo.
+
+### Por nó (chamadas que deram certo)
 
 | Nó | Chamadas | Entrada média | Saída média | Tempo médio |
 |---|---|---|---|---|
-| agente_produto | 29 | 6.500 | 143 | 5,0s |
-| guardrail_entrada | 18 | 301 | 5 | 1,0s |
-| roteador | 18 | 4.703 | 58 | 2,2s |
-| atualizar_memoria | 18 | 1.281 | 9 | 1,1s |
-| agente_juiz | 15 | 4.726 | 118 | 3,4s |
-| agente_ingrediente | 15 | 4.780 | 142 | 4,1s |
-| orquestrador | 9 | 3.291 | 103 | 4,1s |
-| agente_faq | 6 | 2.534 | 174 | 4,7s |
-| agente_rotina | 4 | 5.009 | 96 | 2,6s |
+| agente_produto | 116 | 6.283 | 129 | 2,8 s |
+| agente_ingrediente | 61 | 5.030 | 129 | 2,8 s |
+| agente_juiz | 55 | 4.866 | 125 | 2,0 s |
+| guardrail_entrada | 54 | 302 | 5 | 0,8 s |
+| roteador | 54 | 4.758 | 37 | 1,3 s |
+| atualizar_memoria | 54 | 1.263 | 4 | 0,7 s |
+| orquestrador | 33 | 3.072 | 113 | 1,8 s |
+| agente_rotina | 20 | 5.118 | 104 | 2,2 s |
+| agente_faq | 18 | 2.491 | 164 | 3,5 s |
 
 **O que a medição mostra:**
 - **98% dos tokens são de entrada.** Os prompts de sistema se repetem a cada passo
   ReAct e a cada nó.
-- **O modelo principal da cadeia nunca rodou.** As 77 chamadas que falharam (37% de
-  209) foram todas `RateLimitError` do `gpt-oss-120b` no Groq: o plano gratuito permite
-  8 mil tokens por minuto, e um prompt de especialista sozinho passa de 6 mil. Das 132
-  chamadas que deram certo, 131 rodaram no Ministral 14B, o elo seguinte.
-- **A lentidão vem da quantidade de chamadas.** As falhas custaram 24 dos 432 segundos.
-  O que pesa são cerca de 16 chamadas em sequência numa pergunta de produto, de 2 a 5
-  segundos cada.
+- **As reprovações do Juiz puxam o tempo.** Com 1 tentativa, a mediana é de 12,5 s; com 2,
+  de 27,8 s. A segunda tentativa refaz o loop ReAct inteiro do especialista.
+- **O modelo principal da cadeia quase nunca atende no plano gratuito.** O `gpt-oss-120b`
+  respondeu 43 chamadas e falhou por limite de taxa em 257. O Ministral 14B atendeu 421
+  das 465 chamadas que deram certo. Essas falhas custaram 29 dos 1.184 segundos medidos.
+- **Guardrail de entrada e memória pesam pouco:** somam cerca de 1,5 s por turno.
 
 ## Custo para 100 e 1.000 usuários semanais
 
@@ -77,20 +89,19 @@ dinheiro é zero, com limite de taxa.
 | | 100 usuários | 1.000 usuários |
 |---|---|---|
 | Turnos por mês | 4.330 | 43.300 |
-| LLM: medido (Ministral 14B) | US$ 23,73 | US$ 237,28 |
-| LLM: cadeia como desenhada (gpt-oss-120b nos especialistas) | US$ 20,18 | US$ 201,78 |
-| LLM: pior caso (tudo cai no Gemini 3.6 Flash) | US$ 194,03 | US$ 1.940,27 |
+| LLM: medido | US$ 28,92 | US$ 289,24 |
+| LLM: pior caso (tudo cai no Gemini 3.6 Flash) | US$ 239 | US$ 2.391 |
 | Infraestrutura | US$ 15,18 | US$ 85,37 |
-| **Total (medido)** | **US$ 38,91/mês** | **US$ 322,65/mês** |
-| **Por usuário ativo** | **US$ 0,39/mês** | **US$ 0,32/mês** |
+| **Total (medido)** | **US$ 44,10/mês** | **US$ 374,61/mês** |
+| **Por usuário ativo** | **US$ 0,44/mês** | **US$ 0,37/mês** |
 
 **Sensibilidade ao uso (LLM, medido):**
 
 | Turnos por usuário por semana | 100 usuários | 1.000 usuários |
 |---|---|---|
-| 5 | US$ 11,86 | US$ 118,64 |
-| 10 | US$ 23,73 | US$ 237,28 |
-| 20 | US$ 47,46 | US$ 474,57 |
+| 5 | US$ 14,46 | US$ 144,62 |
+| 10 | US$ 28,92 | US$ 289,24 |
+| 20 | US$ 57,85 | US$ 578,49 |
 
 **Infraestrutura:**
 - **100 usuários:** EC2 t3.small (US$ 15,18); MongoDB Atlas M0, Postgres (Aiven) e
@@ -100,14 +111,14 @@ dinheiro é zero, com limite de taxa.
   (o FAQ tem 7 documentos).
 - **Fora da conta:** Langfuse e tráfego de rede.
 
-**Plano gratuito:** com 1.000 usuários, a média seria de 22 chamadas e 54 mil tokens
-por minuto, perto do limite do Ministral 14B gratuito (30 requisições por minuto). Um
-turno de produto dispara 16 chamadas em cerca de 40 segundos, então os picos passam do
-limite. Com 100 usuários dá para operar no gratuito, com lentidão nos picos.
+**Plano gratuito:** com 1.000 usuários, a média seria de cerca de 25 chamadas e 66 mil
+tokens por minuto, perto do limite do Ministral 14B gratuito (30 requisições por minuto).
+Os picos passam do limite. Com 100 usuários dá para operar no gratuito, com lentidão nos
+picos.
 
 ## Latência
 
-- **Turno:** mediana de 21,6s e p95 de 58,5s; produto e ingrediente entre 38s e 58s.
+- **Turno:** mediana de 18,6 s e p95 de 49,8 s; o máximo medido foi 57,2 s.
 - **Entre agentes:** tempo médio por chamada na tabela por nó, acima. A latência de
   borda (HTTP) e a de cada nó em produção ficam no Langfuse e no middleware da API.
 
@@ -115,42 +126,45 @@ limite. Com 100 usuários dá para operar no gratuito, com lentidão nos picos.
 
 | Medida | Resultado |
 |---|---|
-| Turnos com erro técnico | 0 de 19 |
-| Chamadas de LLM com falha (absorvidas pelo fallback) | 37% (77 de 209), todas por limite de taxa |
-| Juiz esgotou as tentativas | 5 de 13 turnos de especialista (38%) |
-| Roteador respondeu sozinho a pergunta de seguimento | 2 de 19 |
+| Turnos com erro técnico | 0 de 57 |
+| Chamadas de LLM com falha (absorvidas pelo fallback) | 36% (261 de 726), quase todas por limite de taxa |
+| Juiz esgotou as tentativas | 14 de 45 turnos de especialista (31%) |
+| Juiz reprovou ao menos uma vez | 25 de 45 turnos de especialista (56%) |
 
-Quando o Juiz esgota as tentativas, a resposta é montada só com o retorno das tools, sem
-o texto reprovado. As 2 respostas diretas ("e de manhã?" e "quais os ingredientes
-dele?") não passaram por especialista nem pelo Juiz.
+Quando o Juiz esgota as tentativas nos domínios com dado no banco, a resposta é montada
+só com o retorno das tools, sem o texto reprovado. Por rota, o esgotamento foi de 7 em 22
+(Produto), 5 em 8 (Ingrediente), 2 em 6 (FAQ) e 0 em 9 (Rotina).
+
+Esta medição não separa as reprovações por regra em código das feitas pelo LLM. O script
+agora grava `juiz_decidiu_por`, então a próxima medição separa.
 
 ## Custo por resolução
 
-**Definição conservadora de "resolvido":** turno de especialista aprovado pelo Juiz, ou
-conversa e recusa corretas. Ficam de fora os 5 turnos em que o Juiz esgotou as
-tentativas e as 2 respostas diretas não verificadas.
+**Definição de "resolvido":** turno de especialista aprovado pelo Juiz, ou conversa e
+recusa diretas. Ficam de fora os 14 turnos em que o Juiz esgotou as tentativas. A
+qualidade das respostas não foi avaliada caso a caso.
 
-- **Resolvidos:** 12 de 19 (63%).
-- **Custo por resolução:** US$ 0,104 ÷ 12 = **US$ 0,0087**, contra US$ 0,0055 por turno.
-- **1.000 usuários:** cerca de 27 mil resoluções por mês, com os mesmos US$ 237 de LLM.
+- **Resolvidos:** 43 de 57 (75%).
+- **Custo por resolução:** US$ 0,38 ÷ 43 = **US$ 0,0089**, contra US$ 0,0067 por turno.
+- **1.000 usuários:** cerca de 32,7 mil resoluções por mês, com os mesmos US$ 289 de LLM.
 
 ## ROI
 
 O modelo de receita do Venus não está definido no projeto, então o cálculo parte do
 **ponto de equilíbrio**. As receitas abaixo são premissas para o grupo ajustar.
 
-- **Custo por usuário ativo:** US$ 0,32 a 0,39 por mês.
+- **Custo por usuário ativo:** US$ 0,37 a 0,44 por mês.
 - **ROI** = (receita por usuário − custo por usuário) ÷ custo por usuário.
-- **Exemplo:** com assinatura premium de US$ 2/mês, o equilíbrio exige que 16% a 19% dos
+- **Exemplo:** com assinatura premium de US$ 2/mês, o equilíbrio exige que 19% a 22% dos
   usuários ativos assinem. Com comissão de afiliado de US$ 1 por compra, seria preciso
-  cerca de 1 compra a cada 3 usuários por mês.
+  cerca de 37 a 44 compras por 100 usuários por mês.
 
 **Alavancas** (estimativas, não medidas):
 - **Cache de prompt:** como 98% dos tokens são de entrada repetida, é a maior alavanca.
   A Mistral cobra 10% do preço pelo token de entrada em cache.
 - **Menos chamadas por turno:** pular o Orquestrador e o Juiz quando a resposta só
   repassa o dado da tool, e pré-filtrar a memória.
-- **Plano pago no Groq:** a cadeia roda como foi desenhada e as 37% de falhas somem.
+- **Plano pago no Groq:** a cadeia roda como foi desenhada e as 36% de falhas por limite de taxa tendem a sumir.
 
 ## Preços usados
 

@@ -49,8 +49,8 @@ CONVERSAS: list[tuple[int, list[str]]] = [
 ]
 
 # US$ por 1 milhão de tokens (entrada, saída), preço pago de cada provedor.
-# Fontes e data em docs/custo-e-roi.md. Modelo fora da tabela custa 0 e é
-# listado no resumo como "sem preço".
+# Fontes e data em docs/custo-e-roi.md. Modelo fora da tabela aparece no
+# resumo como "sem preço".
 PRECOS: dict[str, tuple[float, float]] = {
     "ministral-14b": (0.20, 0.20),
     "ministral-8b": (0.15, 0.15),
@@ -141,7 +141,8 @@ async def medir() -> list[dict]:
                 turnos.append({
                     "conversa": numero, "mensagem": mensagem, "rota": final.get("rota") or "direto",
                     "bloqueada": bool(final.get("entrada_bloqueada")), "aprovado_juiz": final.get("aprovado_juiz"),
-                    "tentativas_juiz": final.get("tentativas_juiz", 0), "erro": erro,
+                    "tentativas_juiz": final.get("tentativas_juiz", 0), "juiz_decidiu_por": final.get("juiz_decidiu_por"),
+                    "alertas_alergia_anexados": final.get("alertas_alergia_anexados", 0), "erro": erro,
                     "segundos": round(time.perf_counter() - inicio, 2), "chamadas": medidor.chamadas,
                     "resposta": (final.get("resposta_final") or "")[:300],
                 })
