@@ -134,3 +134,12 @@ def test_faq_mostra_o_documento_com_a_fonte():
 
 def test_faq_sem_fonte_diz_que_nao_encontrou():
     assert no_orquestrador(_estado_faq([]))["resposta_final"] == "Não encontrei isso na documentação do Venus."
+
+
+def test_pergunta_de_saude_recebe_orientacao_fixa_e_nao_o_texto_do_llm():
+    estado = {"rota": "ingrediente", "aprovado_juiz": True, "pergunta_original": "retinol pode ser usado na gravidez?",
+              "evidencias_tools": [_ev("search_ingredient", [{"ingredient_id": 1, "common_name": "RETINOL"}])],
+              "resposta_especialista": {"dominio": "ingrediente", "intencao": "informar", "resposta": "invento"}}
+    texto = no_orquestrador(estado)["resposta_final"]
+    assert texto.startswith("Em gravidez, amamentação ou reação na pele, converse com um profissional de saúde.")
+    assert "Não tenho um dado cadastrado" in texto and "invento" not in texto

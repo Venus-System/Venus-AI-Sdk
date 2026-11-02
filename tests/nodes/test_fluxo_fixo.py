@@ -6,7 +6,11 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
-from venus_sdk.nodes.fluxo_fixo import evidencias_de_faq, evidencias_de_ingrediente, evidencias_de_produto
+from venus_sdk.nodes.fluxo_fixo import (
+    evidencias_de_faq,
+    evidencias_de_ingrediente,
+    evidencias_de_produto,
+)
 
 
 class ToolFalsa:
@@ -106,18 +110,12 @@ async def _faq(saida_llm: str, web: Any = None):
 async def test_faq_mostra_o_trecho_escolhido_sem_o_caminho_do_titulo():
     (evidencias, fontes), tools = await _faq("2")
     assert fontes == [{"texto": "Não. O Venus não vende.", "fonte": "privacidade.md"}]
-    assert tools["buscar_na_web"].chamadas == [] and [e["tool"] for e in evidencias] == ["faq_retriever"]
+    assert [e["tool"] for e in evidencias] == ["faq_retriever"]
 
 
-async def test_faq_sem_trecho_cai_na_web_com_a_url():
-    web = [{"titulo": "T", "trecho": "Da web.", "url": "https://x.org"}, {"titulo": "sem url", "trecho": "y"}]
-    (_, fontes), _ = await _faq("NENHUM", web)
-    assert fontes == [{"texto": "Da web.", "fonte": "https://x.org"}]
-
-
-async def test_faq_sem_nada_nao_tem_fonte_a_mostrar():
-    (_, fontes), _ = await _faq("NENHUM")
-    assert fontes == []
+async def test_faq_sem_trecho_nao_vai_para_a_web():
+    (_, fontes), tools = await _faq("NENHUM", [{"trecho": "Da web.", "url": "https://x.org"}])
+    assert fontes == [] and tools["buscar_na_web"].chamadas == []
 
 
 async def test_numero_fora_da_lista_nao_escolhe_trecho():

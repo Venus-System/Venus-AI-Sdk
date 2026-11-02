@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 _MAX_PRODUTOS_SUGERIDOS = 5
 _MAX_PALAVRAS_DO_INGREDIENTE = 3
-_MAX_RESULTADOS_WEB = 2
 _RE_SUGESTAO = re.compile(
     r"\b(indic\w*|sugir\w*|sugest\w*|recomend\w*|melhor(es)?|(bom|boa|bons|boas) (pra|para))\b", re.IGNORECASE
 )
@@ -29,7 +28,8 @@ _RE_REFERENCIA_AO_CONTEXTO = re.compile(
     r"[uú]ltimo|mesmo|outro|outra)\b",
     re.IGNORECASE,
 )
-_RE_CALCULO = re.compile(r"(%|\b(concentra\w*|limite|quantos?|quantas?|dias?|semanas?|mg|ml)\b)", re.IGNORECASE)
+# Conta com número dado pelo usuário: quem faz é a tool de cálculo, via agente.
+_RE_CALCULO = re.compile(r"\d")
 # Sozinhas, casam com centenas de ingredientes sem dizer qual é.
 _PALAVRAS_GENERICAS = {"acido", "oleo", "extrato", "pele", "cabelo", "vitamina", "mal", "serve", "faz", "pode", "usar"}
 
@@ -145,8 +145,8 @@ def _escolher_trecho(pergunta: str, trechos: list[str]) -> int | None:
 async def evidencias_de_faq(
     pergunta: str, tools: dict[str, Any]
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-    """`(evidências, fontes a mostrar)`: o trecho do FAQ que responde ou, sem nenhum,
-    o que a busca na web trouxer. Cada fonte tem `texto` e `fonte`."""
+    """`(evidências, fontes a mostrar)`: o trecho do FAQ que responde, ou nada. Sem web:
+    ela não sabe sobre o app ("quem criou o aplicativo?" trazia a página do WhatsApp)."""
     busca = await _chamar(tools, "faq_retriever", pergunta=pergunta)
     achados = _dados(busca)
     if isinstance(achados, list) and achados:
@@ -155,11 +155,4 @@ async def evidencias_de_faq(
             achado = achados[indice]
             corpo = str(achado.get("trecho")).split("\n\n", 1)[-1].strip()
             return [busca], [{"texto": corpo, "fonte": str(achado.get("fonte"))}]
-    web = await _chamar(tools, "buscar_na_web", consulta=pergunta)
-    resultados = _dados(web)
-    if not isinstance(resultados, list):
-        return [busca, web], []
-    return [busca, web], [
-        {"texto": str(r.get("trecho")), "fonte": str(r.get("url"))}
-        for r in resultados[:_MAX_RESULTADOS_WEB] if isinstance(r, dict) and r.get("trecho") and r.get("url")
-    ]
+    return [busca], []

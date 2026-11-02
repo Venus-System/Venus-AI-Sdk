@@ -678,6 +678,13 @@ _FICHA_RESPONDE_RE = re.compile(
     r"fale sobre|me fala|sobre o|sobre a|indica|sugir|sugest|recomend|bom pra|boa pra|bom para|boa para|alerg)",
     re.IGNORECASE,
 )
+# Orientação fixa, escrita aqui: não é fato sobre produto ou ingrediente.
+_PERGUNTA_DE_SAUDE_RE = re.compile(
+    r"\b(gravid\w*|gr[aá]vida|gestan\w*|amament\w*|lactan\w*|rea[cç][aã]o|rea[cç][oõ]es|irrit\w*|ard[eê]ncia|coceira|"
+    r"vermelh\w*)\b",
+    re.IGNORECASE,
+)
+_ORIENTACAO_DE_SAUDE = "Em gravidez, amamentação ou reação na pele, converse com um profissional de saúde."
 _SEM_DADO_PARA_A_PERGUNTA = "Não tenho um dado cadastrado que responda exatamente a isso. O que tenho é:"
 
 
@@ -698,11 +705,16 @@ def _resposta_sobre_ingrediente(pergunta: str, evidencias: list[dict] | None) ->
 def _resposta_das_tools(estado: EstadoVenus) -> str:
     """Texto final sem nenhum texto de LLM: a ficha das tools e, se a pergunta
     pede algo que a ficha não responde, o aviso de que esse dado não existe."""
-    evidencias = estado.get("evidencias_tools")
     pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
-    rota = estado.get("rota")
-    if rota == "faq":
+    if estado.get("rota") == "faq":
         return _parte_faq(estado.get("resposta_especialista"))
+    texto = _ficha_para_a_pergunta(estado, pergunta)
+    return f"{_ORIENTACAO_DE_SAUDE}\n\n{texto}" if _PERGUNTA_DE_SAUDE_RE.search(pergunta) else texto
+
+
+def _ficha_para_a_pergunta(estado: EstadoVenus, pergunta: str) -> str:
+    evidencias = estado.get("evidencias_tools")
+    rota = estado.get("rota")
     ficha = _resposta_segura_sem_aprovacao(estado)
     if rota == "rotina":
         return ficha
@@ -713,7 +725,7 @@ def _resposta_das_tools(estado: EstadoVenus) -> str:
 
 
 def _parte_faq(especialista: Any) -> str:
-    """O documento (ou a página da web) como está, com a fonte. Nada escrito por LLM."""
+    """O documento como está, com a fonte. Nada escrito por LLM."""
     fontes = especialista.get("fontes_a_mostrar") if isinstance(especialista, dict) else None
     if not fontes:
         return "Não encontrei isso na documentação do Venus."
