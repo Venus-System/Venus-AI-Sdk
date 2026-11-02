@@ -10,8 +10,7 @@ from langchain_core.tools import BaseTool, tool
 
 # Mesma regra de alergia do Juiz e do Orquestrador (antes havia uma cópia aqui,
 # que já tinha divergido: só esta pegava "álcool benzílico" como álcool).
-from venus_sdk.alergias import termo_bate as _bate_com_alergia
-from venus_sdk.alergias import termos_da_alergia as _termos_da_alergia
+from venus_sdk.alergias import termos_da_alergia, termos_em_conflito
 from venus_sdk.texto import remover_acentos
 from venus_sdk.tools._identidade import SEM_USUARIO_IDENTIFICADO, resolver_user_id
 from venus_sdk.tools._util import consultar, exigir_pool
@@ -77,10 +76,7 @@ def _separar_por_alergia(favoritos: list[dict], termos: list[str]) -> tuple[list
     excluidos: list[dict] = []
     candidatos: list[dict] = []
     for produto in favoritos:
-        ingredientes = [_minusculo_sem_acento(ingrediente) for ingrediente in produto["inci_names"]]
-        em_conflito = [
-            termo for termo in termos if any(_bate_com_alergia(termo, ingrediente) for ingrediente in ingredientes)
-        ]
+        em_conflito = termos_em_conflito(termos, produto["inci_names"])
         (excluidos if em_conflito else candidatos).append({**produto, "motivo": em_conflito})
     return excluidos, candidatos
 
@@ -203,8 +199,9 @@ async def montar_rotina_do_usuario(pool: Any, user_id: int, horario: str) -> dic
     termos: list[str] = []
     if isinstance(alergias, list):
         for linha in alergias:
-            termos += _termos_da_alergia(linha["nome"])
-    return _montar_rotina(favoritos, termos, horario)
+            termos += termos_da_alergia(linha["nome"])
+    # Fragrância, Parfum e Alérgenos da UE expandem para os mesmos sinônimos.
+    return _montar_rotina(favoritos, list(dict.fromkeys(termos)), horario)
 
 
 def montar_tools_rotina(pool: Any) -> list[BaseTool]:

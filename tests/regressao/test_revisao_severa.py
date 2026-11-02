@@ -109,7 +109,7 @@ def test_acido_hialuronico_serve_de_manha_e_glicolico_nao():
 
 
 def test_alergia_a_alcool_nao_exclui_alcool_graxo_mas_exclui_alcool_denat():
-    termos = rotina._termos_da_alergia("Álcool")
+    termos = rotina.termos_da_alergia("Álcool")
     graxo = {"product_id": 3, "name": "Creme Y", "category_name": "Hidratante", "inci_names": ["cetearyl alcohol"]}
     secante = {"product_id": 4, "name": "Tônico Z", "category_name": "Tônico", "inci_names": ["alcohol denat."]}
     excluidos, _ = rotina._separar_por_alergia([graxo, secante], termos)

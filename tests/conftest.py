@@ -1,8 +1,10 @@
 import sys
 from pathlib import Path
 
-# Permite `from _fakes import ...` em qualquer subpasta de tests/.
+# Permite `from _fakes import ...` e importar os scripts de tests/manual em
+# qualquer subpasta de tests/.
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent / "manual"))
 
 import os  # noqa: E402
 

@@ -7,10 +7,10 @@ import logging
 import re
 from typing import Any
 
-from venus_sdk.alergias import termo_bate, termos_da_alergia
+from venus_sdk.alergias import conflitos
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_orquestrador
 from venus_sdk.nodes._amarracao_produtos import mesmo_nome, nomes_por_id
-from venus_sdk.nodes._evidencias import argumentos_da_evidencia, dados_da_evidencia
+from venus_sdk.nodes._evidencias import alergias_declaradas, argumentos_da_evidencia, dados_da_evidencia
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO
 from venus_sdk.nodes.state import EstadoVenus
@@ -430,7 +430,7 @@ def _parte_alergias(evidencias: list[dict] | None, *, cruzar_com_produto: bool =
         return "Você não declarou nenhuma alergia no seu cadastro."
     if not isinstance(alergias, list) or not alergias:
         return None
-    nomes = [str(a.get("allergy_name")) for a in alergias if isinstance(a, dict) and a.get("allergy_name")]
+    nomes = alergias_declaradas(evidencias)
     if not nomes:
         return None
     ingredientes = _ingredientes_com_nomes(evidencias) if cruzar_com_produto else []
@@ -441,37 +441,22 @@ def _parte_alergias(evidencias: list[dict] | None, *, cruzar_com_produto: bool =
                 "— antes de usar algum, me peça para checar.")
     if not ingredientes:
         return f"Você declarou alergia a: {', '.join(nomes)}."
-    conflitos = []
-    for alergia in nomes:
-        termos = termos_da_alergia(alergia)
-        achado = next(
-            (exibicao for exibicao, variantes in ingredientes
-             if any(termo_bate(termo, variante) for termo in termos for variante in variantes)),
-            None,
-        )
-        if achado:
-            conflitos.append(f"{achado} (alergia a {alergia})")
-    if conflitos:
-        return f"Atenção: ele tem ingrediente que bate com o que você declarou: {'; '.join(conflitos)}."
+    pares = conflitos(ingredientes, nomes)
+    if pares:
+        lista = "; ".join(f"{ingrediente} (alergia a {alergia})" for ingrediente, alergia in pares)
+        return f"Atenção: ele tem ingrediente que bate com o que você declarou: {lista}."
     return f"Nenhum ingrediente cadastrado dele bate com as alergias que você declarou ({', '.join(nomes)})."
 
 
-def _ingredientes_com_nomes(evidencias: list[dict] | None) -> list[tuple[str, list[str]]]:
-    """`(nome para exibir, [INCI, nome comum])` de cada ingrediente do produto consultado."""
+def _ingredientes_com_nomes(evidencias: list[dict] | None) -> list[dict]:
+    """Ingredientes com nome do produto consultado."""
     product_id = _produto_consultado(evidencias)
     if product_id is None:
         return []
     ingredientes = dados_da_evidencia(evidencias, "get_product_ingredients", product_id=product_id)
     if not isinstance(ingredientes, list):
         return []
-    saida = []
-    for ingrediente in ingredientes:
-        if not isinstance(ingrediente, dict):
-            continue
-        variantes = [str(nome) for nome in (ingrediente.get("inci_name"), ingrediente.get("common_name")) if nome]
-        if variantes:
-            saida.append((str(ingrediente.get("common_name") or ingrediente.get("inci_name")), variantes))
-    return saida
+    return [i for i in ingredientes if isinstance(i, dict) and (i.get("inci_name") or i.get("common_name"))]
 
 
 def _avisos_de_horario(pergunta: str, evidencias: list[dict] | None = None) -> list[str]:
@@ -507,32 +492,6 @@ def _aviso_da_agenda(evidencias: list[dict] | None) -> str:
     return "Não consegui ver sua agenda agora, então não sei se você está livre nesse horário."
 
 
-def _par_em_conflito(ingredientes: list, alergias: list[str]) -> tuple[str, str] | None:
-    """`(ingrediente, alergia)` do primeiro ingrediente que bate com uma alergia."""
-    for alergia in alergias:
-        termos = termos_da_alergia(alergia)
-        for ingrediente in ingredientes:
-            if not isinstance(ingrediente, dict):
-                continue
-            variantes = [str(v) for v in (ingrediente.get("inci_name"), ingrediente.get("common_name")) if v]
-            if any(termo_bate(termo, variante) for termo in termos for variante in variantes):
-                return str(ingrediente.get("common_name") or ingrediente.get("inci_name")), alergia
-    return None
-
-
-def _conflito_com_alergias(ingredientes: list, alergias: list[str]) -> str | None:
-    """"Ácido salicílico (alergia a Ácido salicílico)" se algum ingrediente bate."""
-    par = _par_em_conflito(ingredientes, alergias)
-    return f"{par[0]} (alergia a {par[1]})" if par else None
-
-
-def _alergias_declaradas(evidencias: list[dict] | None) -> list[str]:
-    dados = dados_da_evidencia(evidencias, "get_user_allergies")
-    if not isinstance(dados, list):
-        return []
-    return [str(a.get("allergy_name")) for a in dados if isinstance(a, dict) and a.get("allergy_name")]
-
-
 def _alertas_de_alergia(texto: str, evidencias: list[dict] | None) -> list[str]:
     """Alertas que a resposta final PRECISA trazer, calculados pelo código a
     partir das tools (alergias do cadastro × ingredientes consultados), não pelo
@@ -542,7 +501,7 @@ def _alertas_de_alergia(texto: str, evidencias: list[dict] | None) -> list[str]:
     Vale para o produto consultado em detalhe, para os demais produtos com
     ingredientes consultados que o texto cita, e para o ingrediente buscado
     (um só resultado, ou citado no texto)."""
-    alergias = _alergias_declaradas(evidencias)
+    alergias = alergias_declaradas(evidencias)
     if not alergias:
         return []
     texto_compacto = _compactar(texto)
@@ -557,10 +516,10 @@ def _alertas_de_alergia(texto: str, evidencias: list[dict] | None) -> list[str]:
         if str(product_id) != str(principal) and not (nome and _compactar(nome) in texto_compacto):
             continue
         ingredientes = dados_da_evidencia([evidencia], "get_product_ingredients")
-        par = _par_em_conflito(ingredientes, alergias) if isinstance(ingredientes, list) else None
-        if par:
-            produto = nome or "Esse produto"
-            alertas.append(f"Atenção: {produto} tem {par[0]}, que bate com a sua alergia a {par[1]} "
+        pares = conflitos(ingredientes, alergias) if isinstance(ingredientes, list) else []
+        if pares:
+            achado, alergia = pares[0]
+            alertas.append(f"Atenção: {nome or 'Esse produto'} tem {achado}, que bate com a sua alergia a {alergia} "
                            "(conferido no seu cadastro).")
     buscados = dados_da_evidencia(evidencias, "search_ingredient")
     if isinstance(buscados, list):
@@ -570,9 +529,9 @@ def _alertas_de_alergia(texto: str, evidencias: list[dict] | None) -> list[str]:
             nome = str(ingrediente.get("common_name") or ingrediente.get("inci_name") or "")
             if len(buscados) > 1 and not (nome and _compactar(nome) in texto_compacto):
                 continue
-            par = _par_em_conflito([ingrediente], alergias)
-            if par:
-                alertas.append(f"Atenção: {par[0]} bate com a sua alergia a {par[1]} (conferido no seu cadastro).")
+            pares = conflitos([ingrediente], alergias)
+            if pares:
+                alertas.append(f"Atenção: {pares[0][0]} bate com a sua alergia a {pares[0][1]} (conferido no seu cadastro).")
     return [alerta for alerta in dict.fromkeys(alertas) if _compactar(alerta) not in texto_compacto]
 
 
@@ -581,10 +540,7 @@ def _parte_sugestao_com_alergia(evidencias: list[dict] | None, excluir: str | No
     ingredientes foram conferidos (sem conflito / com conflito) dos que não
     foram. Sem isso, a lista de reserva punha lado a lado um produto conferido e
     outro com o ácido salicílico da alergia (chatbot real, 2026-10-26)."""
-    alergias_dados = dados_da_evidencia(evidencias, "get_user_allergies")
-    alergias = [
-        str(a.get("allergy_name")) for a in alergias_dados if isinstance(a, dict) and a.get("allergy_name")
-    ] if isinstance(alergias_dados, list) else []
+    alergias = alergias_declaradas(evidencias)
     if not alergias:
         return None
     excluido = (excluir or "").strip().lower()
@@ -600,8 +556,8 @@ def _parte_sugestao_com_alergia(evidencias: list[dict] | None, excluir: str | No
         rotulo = f"{produto['name']} ({produto.get('brand_name')})"
         if not isinstance(ingredientes, list) or not ingredientes:
             nao_conferidos.append(rotulo)
-        elif conflito := _conflito_com_alergias(ingredientes, alergias):
-            com_conflito.append(f"{rotulo}: tem {conflito}")
+        elif pares := conflitos(ingredientes, alergias):
+            com_conflito.append(f"{rotulo}: tem {pares[0][0]} (alergia a {pares[0][1]})")
         else:
             seguros.append(f"- {rotulo}{_nota_listada(evidencias, produto)}")
     linhas = []

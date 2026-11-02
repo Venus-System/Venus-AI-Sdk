@@ -3,7 +3,8 @@ que já tinha divergido de `venus_sdk/alergias.py` (Juiz e Orquestrador): exclu�
 "benzyl alcohol" de quem declarou alergia a álcool e não pegava salicilatos.
 Agora a rotina usa a mesma regra (ver `docs/avaliacao-alergias.md`)."""
 
-from venus_sdk.tools.rotina import _montar_rotina, _termos_da_alergia
+from venus_sdk.alergias import termos_da_alergia
+from venus_sdk.tools.rotina import _montar_rotina
 
 
 def _favorito(product_id: int, nome: str, inci: list[str]) -> dict:
@@ -11,7 +12,7 @@ def _favorito(product_id: int, nome: str, inci: list[str]) -> dict:
 
 
 def _excluidos(favoritos: list[dict], alergia: str) -> list[int]:
-    rotina = _montar_rotina(favoritos, _termos_da_alergia(alergia), "noite")
+    rotina = _montar_rotina(favoritos, termos_da_alergia(alergia), "noite")
     return [produto["product_id"] for produto in rotina["excluidos_por_alergia"]]
 
 

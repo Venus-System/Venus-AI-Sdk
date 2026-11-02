@@ -15,9 +15,8 @@ Mede:
   da alergia, e a resposta final tem que trazer o alerta quando há conflito.
 
 Não usa LLM nem banco (o LLM do Orquestrador é simulado), então também roda no
-CI: `tests/nodes/test_avaliacao_alergias.py` falha se aparecer um erro fora das
-lacunas marcadas `"lacuna_conhecida": true`. Resultados em
-`docs/avaliacao-alergias.md`.
+CI: `tests/nodes/test_avaliacao_alergias.py` falha com qualquer erro. Resultados
+em `docs/avaliacao-alergias.md`.
 
     python tests/manual/avaliar_alergias.py
     python tests/manual/avaliar_alergias.py --saida-markdown resultado.md
@@ -87,11 +86,12 @@ def avaliar(casos: list[dict]) -> dict:
     }
 
 
-def intervalo(acertos: int, total: int, z: float = 1.96) -> tuple[float, float]:
+def intervalo(acertos: int, total: int) -> tuple[float, float]:
     """Intervalo de confiança de 95% (Wilson) para a proporção `acertos/total`.
     Com 0 erros em 47 casos, a taxa real de erro ainda pode chegar a uns 7%."""
     if not total:
         return 0.0, 1.0
+    z = 1.96
     p = acertos / total
     centro = (p + z * z / (2 * total)) / (1 + z * z / total)
     margem = z * math.sqrt(p * (1 - p) / total + z * z / (4 * total * total)) / (1 + z * z / total)
@@ -125,8 +125,7 @@ def avaliar_catalogo() -> dict:
 
 def _linha(caso: dict) -> str:
     nota = f" ({caso['nota']})" if caso.get("nota") else ""
-    lacuna = "" if caso.get("lacuna_conhecida") else " **— fora das lacunas conhecidas**"
-    return f"- {caso['alergia']} × {caso['comum']} ({caso['inci']}){nota}{lacuna}"
+    return f"- {caso['alergia']} × {caso['comum']} ({caso['inci']}){nota}"
 
 
 def main(argv: list[str] | None = None) -> int:

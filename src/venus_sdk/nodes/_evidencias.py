@@ -38,6 +38,14 @@ def argumentos_da_evidencia(evidencias: list[dict] | None, tool: str) -> dict[st
     return {}
 
 
+def alergias_declaradas(evidencias: list[dict] | None) -> list[str]:
+    """Nomes das alergias que `get_user_allergies` devolveu (`[]` se nenhuma)."""
+    dados = dados_da_evidencia(evidencias, "get_user_allergies")
+    if not isinstance(dados, list):
+        return []
+    return [str(a.get("allergy_name")) for a in dados if isinstance(a, dict) and a.get("allergy_name")]
+
+
 def _chamada_com(evidencia: dict, argumentos: dict[str, Any]) -> bool:
     if not argumentos:
         return True
