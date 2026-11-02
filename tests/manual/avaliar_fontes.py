@@ -49,7 +49,7 @@ def acertou_conhecida(caso: dict, resposta: str) -> bool | None:
     if caso["tipo"] == "fragrancia":
         # Só a 1ª frase: "tem fragrância. Se prefere sem fragrância..." afirma.
         primeira = re.split(r"[.\n]", resposta.strip(), maxsplit=1)[0]
-        nega = re.search(r"\b(não|nao|sem)\b.{0,40}\b(fragr|parfum|perfume)|^não\b", primeira, re.IGNORECASE) is not None
+        nega = re.search(r"\b(não|nao|sem)\b.{0,40}\b(fragr|parfum|perfume)", primeira, re.IGNORECASE) is not None
         afirma = re.search(r"\b(fragr|parfum)", primeira, re.IGNORECASE) is not None and not nega
         return afirma if caso["tem_fragrancia"] else nega
     return None
