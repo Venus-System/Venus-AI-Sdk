@@ -9,13 +9,37 @@ release" no README); cada tag tem a sua seção aqui, dividida em:
 - **Novidades:** o que passou a existir, sem quebrar quem já usava.
 - **Correções:** bugs corrigidos.
 
-## Não lançado
+## 0.5.0
 
-Entra na próxima tag; quem lançar sobe a versão no `pyproject.toml`.
+Alergias conferidas pelo código, perfil completo, governança da memória e
+resultado do turno para o trace. Tudo desde `v0.4.0`.
 
 ### Mudanças incompatíveis
-- Nenhuma mudança incompatível. Os campos novos no estado são opcionais para
-  quem lê.
+- **Memória de longo prazo com validade e sem alergia.** Antes, todo fato
+  ficava para sempre e a alergia dita no chat era guardada na memória. Agora:
+  - fato não reafirmado há mais de `VENUS_MEMORIA_TTL_DIAS` dias (variável
+    nova, padrão `180`; `0` desliga) deixa de valer. A data de cada campo fica
+    em `perfil_datas`; campo gravado antes da 0.5.0 não tem data e não expira;
+  - alergia não entra mais na memória (a fonte é o cadastro), e perfis antigos
+    perdem o campo ao serem lidos. "Sou alérgica a X" recebe uma resposta fixa
+    pedindo para atualizar a lista de alergias no app.
+- **`get_user_profile` mudou de módulo e lê mais tabelas.** Saiu de
+  `venus_sdk.tools.rotina` para `venus_sdk.tools.compartilhadas` (junto do
+  `get_user_allergies`), sem alias no caminho antigo, e passou a ser usado
+  também pelos agentes de produto e ingrediente. A consulta faz JOIN em
+  `venus.users` (campo `name`) e lê `venus.user_preferences` (campo
+  `preferences`): o usuário do Postgres da API precisa de `SELECT` nas duas.
+  - Antes: `from venus_sdk.tools.rotina import get_user_profile`
+  - Depois: `from venus_sdk.tools.compartilhadas import get_user_profile`
+- **Teto de chamadas de tool:** os especialistas de produto e de rotina param
+  em 6 chamadas por tentativa (`ToolCallLimitMiddleware`); as recusadas ficam
+  fora da evidência do Juiz.
+- **Tools MCP filtradas:** `get_mcp_tools` aplica `com_filtro_de_injecao`, que
+  descarta o retorno de tool externa que parece instrução ao sistema. A
+  pergunta enviada a um agente A2A externo passa por `anonimizar_entrada`.
+- Módulos movidos, com alias no caminho antigo (nada quebra):
+  `venus_sdk.state` -> `venus_sdk.nodes.state` e `venus_sdk.guardrail_rules`
+  -> `venus_sdk.prompts.guardrail_rules`.
 
 ### Novidades
 - **Resultado do turno no estado**, para a API gravar no trace do Langfuse:
@@ -24,11 +48,51 @@ Entra na próxima tag; quem lançar sobe a versão no `pyproject.toml`.
     `"falha_llm"` quando o LLM falhou e a resposta foi reprovada sem feedback;
   - `alertas_alergia_anexados`: quantos alertas de alergia o orquestrador
     anexou porque o texto do LLM não trazia.
+- **Alerta de alergia determinístico:** depois da reescrita do LLM, o
+  orquestrador cruza as alergias do cadastro com os ingredientes consultados
+  e anexa o alerta em texto fixo, para o LLM não omitir nem suavizar um
+  conflito. O casamento fica em `venus_sdk/alergias.py`, com sinônimos em
+  português e inglês para as 18 alergias do catálogo de produção, e é a mesma
+  regra do Juiz, do orquestrador e do `suggest_routine`.
+- **Perfil completo:** `get_user_profile` traz o nome do cadastro e as
+  preferências de valores do app (vegano, cruelty free, sem fragrância...).
+  Produto e ingrediente consultam o perfil em "serve pra mim?", sem afirmar
+  segurança na gestação sem dado de tool nem dizer que um produto atende a
+  uma preferência de valores.
+- **Governança da memória:** `{"remover": [...]}` apaga um fato que deixou de
+  valer; `apagar_memoria(store, usuario_id)` (`venus_sdk.nodes.memoria`) apaga
+  a memória inteira, para a exclusão de dados (LGPD); o log de auditoria diz
+  quais campos mudaram, sem os valores.
+- **Contexto da conversa:** o prefixo "Sobre <produto>: " vira
+  `produto_em_contexto` no estado, e especialistas e Juiz recebem o histórico
+  recente, para "sim, sugira" e "qual vc recomendaria?".
+- Avaliações de roteamento e de alergias (`docs/avaliacao-roteamento.md` e
+  `docs/avaliacao-alergias.md`) e o relatório de custo, latência e ROI
+  (`docs/custo-e-roi.md`).
 
 ### Correções
+- **Juiz:** a nota de cada produto é conferida em código contra as tools (id,
+  nome e nota); erro reprova sem LLM com feedback exato, e cópia homônima do
+  mesmo produto é aceita. Afirmar que um produto não tem o ingrediente da
+  alergia exige os ingredientes daquele produto. Antes, o Juiz esgotava as
+  tentativas na maioria dos turnos de produto.
+- **Alergias:** casamento corrigido (fragrância e seus alérgenos,
+  salicilatos, oleaginosas, sulfato só como surfactante, propilenoglicol, álcool
+  graxo que não é "Álcool"). Recall 53/71 -> 71/71 e falsos 5 -> 0 nos pares
+  do catálogo.
+- **Roteador:** perguntas sobre o próprio Venus (conta, metodologia da nota,
+  fonte dos dados, limites da IA) vão para o FAQ em vez de serem respondidas
+  direto; "sim" a uma oferta de sugestão vai para o especialista de produto.
+- A conversa não trava mais repetindo a ficha do produto em tela, e o
+  orquestrador não oferece adicionar aos favoritos (orienta a salvar pelo
+  app).
 - O guardrail de entrada zera `rota`, `juiz_decidiu_por` e
   `alertas_alergia_anexados` a cada turno. Antes, numa entrada bloqueada, a
   `rota` do turno anterior voltava pelo checkpointer.
+- O exemplo de chatbot segue com o histórico em memória quando o MongoDB não
+  responde.
+- `docs/neo4j.md`: a sincronização é manual (workflow "Sincronizar Neo4j" da
+  API), não toda noite.
 
 ## 0.4.0
 
