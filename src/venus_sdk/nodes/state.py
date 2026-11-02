@@ -13,6 +13,9 @@ Rota = Literal["produto", "ingrediente", "rotina", "faq"]
 # roteador marca com `REACAO=magoada`, ver `nodes/roteador.py`); o resto é
 # `neutra`.
 Expressao = Literal["neutra", "magoada"]
+# Quem deu o veredito do Juiz: uma regra escrita no código, o LLM do Juiz, ou
+# ninguém porque o LLM falhou (reprovação sem feedback). A API grava no trace.
+DecisorJuiz = Literal["regra", "llm", "falha_llm"]
 
 
 class EstadoVenus(TypedDict, total=False):
@@ -65,9 +68,13 @@ class EstadoVenus(TypedDict, total=False):
     tentativas_juiz: int
     aprovado_juiz: bool | None
     feedback_juiz: str | None
+    juiz_decidiu_por: DecisorJuiz | None
 
     # --- orquestrador ---
     resposta_final: str | None
+    # Alertas de alergia que o código anexou porque o texto do LLM não trazia
+    # (ver `nodes/orquestrador.py::_alertas_de_alergia`).
+    alertas_alergia_anexados: int
 
     # --- agendamento na agenda Google (ver nodes/agendamento.py) ---
     # Propostas preparadas neste turno e ainda não confirmadas. Só a próxima

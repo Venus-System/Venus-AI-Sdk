@@ -186,3 +186,41 @@ def test_erro_tecnico_do_especialista_nao_gasta_llm_nem_retry() -> None:
     llm.assert_not_called()
     assert saida["aprovado_juiz"] is False and saida["tentativas_juiz"] == MAX_TENTATIVAS_JUIZ
     assert decidir_pos_juiz({**estado, **saida}) == "esgotado"
+
+
+# --- Quem decidiu o veredito: vai para o trace do turno (na API) --------------
+
+
+def test_veredito_do_llm_marca_juiz_decidiu_por_llm() -> None:
+    with patch("venus_sdk.nodes.juiz.get_llm_juiz") as get_llm_mock:
+        get_llm_mock.return_value.invoke.return_value = _resposta_llm("RESULTADO=aprovado")
+        resultado = no_agente_juiz({"pergunta_original": "pergunta", "resposta_especialista": {"dominio": "produto"}})
+
+    assert resultado["juiz_decidiu_por"] == "llm"
+
+
+def test_veredito_escrito_no_codigo_marca_regra_sem_chamar_o_llm() -> None:
+    estado = {"resposta_especialista": {"dominio": "produto", "intencao": "nao_suportado", "resposta": "Não salvo favoritos."}}
+    with patch("venus_sdk.nodes.juiz.get_llm_juiz") as get_llm_mock:
+        resultado = no_agente_juiz(estado)
+
+    get_llm_mock.assert_not_called()
+    assert resultado["aprovado_juiz"] is True
+    assert resultado["juiz_decidiu_por"] == "regra"
+
+
+def test_erro_tecnico_do_especialista_marca_regra() -> None:
+    resultado = no_agente_juiz({"resposta_especialista": {"dominio": "produto", "intencao": "erro_tecnico"}})
+
+    assert resultado["juiz_decidiu_por"] == "regra"
+
+
+def test_falha_do_llm_do_juiz_marca_falha_llm() -> None:
+    """Separado de "llm": uma reprovação porque o provedor caiu não é o Juiz
+    achando erro na resposta."""
+    with patch("venus_sdk.nodes.juiz.get_llm_juiz") as get_llm_mock:
+        get_llm_mock.return_value.invoke.side_effect = RuntimeError("cota esgotada")
+        resultado = no_agente_juiz({"pergunta_original": "pergunta", "resposta_especialista": {"dominio": "produto"}})
+
+    assert resultado["aprovado_juiz"] is False
+    assert resultado["juiz_decidiu_por"] == "falha_llm"
