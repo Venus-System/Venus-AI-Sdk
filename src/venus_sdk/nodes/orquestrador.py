@@ -81,6 +81,13 @@ _PEDE_SUGESTAO_RE = re.compile(r"\b(recomend|sugir|sugest|indica)\w*", re.IGNORE
 _PERGUNTA_TARDE_RE = re.compile(r"\b(de|à|a|pela|na)\s+tarde\b", re.IGNORECASE)
 _PERGUNTA_AGENDA_RE = re.compile(r"\b(ocupad[oa]|livre|agenda|compromisso)s?\b", re.IGNORECASE)
 _PEDE_LISTAS_RE = re.compile(r"\blistas?\b", re.IGNORECASE)
+# Na resposta montada das tools, fórmula/CAS/massa molar e o "você não declarou
+# alergia" só entram quando a pergunta é sobre isso: "o que é niacinamida?"
+# virava um bloco com dado químico e alergia (chatbot real, 2026-10-29).
+_PEDE_QUIMICA_RE = re.compile(r"\b(f[oó]rmula|cas|massa molar|peso molecular|qu[ií]mic\w*|mol[eé]cul\w*)\b", re.IGNORECASE)
+_PERGUNTA_SOBRE_ALERGIA_RE = re.compile(
+    r"\b(alerg\w*|sensibilidade|posso usar|serve (pra|para) mim|seguro (pra|para) mim)\b", re.IGNORECASE
+)
 
 # Antes do "sim", nada foi gravado: o texto não pode afirmar o contrário.
 _AFIRMA_AGENDAMENTO_RE = re.compile(
@@ -307,7 +314,7 @@ def _nota_listada(evidencias: list[dict] | None, produto: dict) -> str:
     return ""
 
 
-def _propriedades_legiveis(propriedades: list) -> list[str]:
+def _propriedades_legiveis(propriedades: list, *, com_quimica: bool) -> list[str]:
     valores = {
         p.get("property_name"): p.get("property_value")
         for p in propriedades if isinstance(p, dict)
@@ -325,12 +332,12 @@ def _propriedades_legiveis(propriedades: list) -> list[str]:
         )
         if valores.get(chave)
     ]
-    if quimica:
+    if quimica and com_quimica:
         linhas.append(f"Dados químicos: {', '.join(quimica)}.")
     return linhas
 
 
-def _detalhe_do_ingrediente(evidencias: list[dict] | None, ingrediente: dict) -> str | None:
+def _detalhe_do_ingrediente(evidencias: list[dict] | None, ingrediente: dict, pergunta: str) -> str | None:
     """Tudo o que as tools de detalhe trouxeram sobre o ingrediente, ou `None`
     se nenhuma delas foi consultada PARA ESSE `ingredient_id`."""
     ingredient_id = ingrediente.get("ingredient_id")
@@ -345,7 +352,7 @@ def _detalhe_do_ingrediente(evidencias: list[dict] | None, ingrediente: dict) ->
     inci = f" (INCI: {ingrediente['inci_name']})" if ingrediente.get("inci_name") else ""
     linhas = [f"{ingrediente.get('common_name')}{inci}."]
     if isinstance(propriedades, list):
-        linhas += _propriedades_legiveis(propriedades)
+        linhas += _propriedades_legiveis(propriedades, com_quimica=bool(_PEDE_QUIMICA_RE.search(pergunta)))
     if isinstance(regulacoes, list) and regulacoes:
         restricoes = "; ".join(
             f"{_TIPOS_DE_RESTRICAO.get(r.get('restriction_type'), r.get('restriction_type'))} "
@@ -356,20 +363,21 @@ def _detalhe_do_ingrediente(evidencias: list[dict] | None, ingrediente: dict) ->
     elif isinstance(regulacoes, dict) and regulacoes.get("encontrado") is False:
         linhas.append("Não há restrição regulatória cadastrada para ele aqui.")
     if isinstance(efeitos, list) and efeitos:
-        nomes = ", ".join(str(e.get("effect_name")) for e in efeitos if isinstance(e, dict))
+        # A tool devolve um efeito por fonte: o mesmo nome vinha repetido 3 vezes.
+        nomes = ", ".join(dict.fromkeys(str(e.get("effect_name")) for e in efeitos if isinstance(e, dict)))
         linhas.append(f"Efeitos cadastrados: {nomes}.")
     elif isinstance(efeitos, dict) and efeitos.get("encontrado") is False:
         linhas.append("Os efeitos e benefícios dele ainda não estão cadastrados nas fontes do Venus.")
     return "\n".join(linhas)
 
 
-def _parte_ingredientes(evidencias: list[dict] | None) -> str | None:
+def _parte_ingredientes(evidencias: list[dict] | None, pergunta: str) -> str | None:
     ingredientes = dados_da_evidencia(evidencias, "search_ingredient")
     if not isinstance(ingredientes, list) or not ingredientes:
         return None
     primeiro = ingredientes[0]
     if len(ingredientes) == 1 and isinstance(primeiro, dict):
-        detalhe = _detalhe_do_ingrediente(evidencias, primeiro)
+        detalhe = _detalhe_do_ingrediente(evidencias, primeiro, pergunta)
         if detalhe:
             return detalhe
     nomes = ", ".join(
@@ -425,14 +433,14 @@ def _parte_perfil(evidencias: list[dict] | None) -> str | None:
     return f"No seu perfil: {'; '.join(campos)}." if campos else None
 
 
-def _parte_alergias(evidencias: list[dict] | None, *, cruzar_com_produto: bool = True) -> str | None:
+def _parte_alergias(evidencias: list[dict] | None, *, cruzar_com_produto: bool, citar_ausencia: bool) -> str | None:
     """Alergias declaradas — cruzadas com os ingredientes do produto consultado,
     quando houver (mesma regra de `suggest_routine`, ver `venus_sdk/alergias.py`).
     Só listar as alergias, sem dizer se o produto bate com elas, não respondia
     nada (conversa real de 2026-10-20)."""
     alergias = dados_da_evidencia(evidencias, "get_user_allergies")
     if isinstance(alergias, dict) and alergias.get("encontrado") is False and "alergias" in alergias:
-        return "Você não declarou nenhuma alergia no seu cadastro."
+        return "Você não declarou nenhuma alergia no seu cadastro." if citar_ausencia else None
     if not isinstance(alergias, list) or not alergias:
         return None
     nomes = alergias_declaradas(evidencias)
@@ -624,8 +632,11 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     candidatas = [
         *dados_da_conta,
         texto_produtos,
-        _parte_ingredientes(evidencias),
-        None if sugestao_com_alergia else _parte_alergias(evidencias, cruzar_com_produto=not sugestao),
+        _parte_ingredientes(evidencias, pergunta),
+        None if sugestao_com_alergia else _parte_alergias(
+            evidencias, cruzar_com_produto=not sugestao,
+            citar_ausencia=estado.get("rota") == "rotina" or bool(_PERGUNTA_SOBRE_ALERGIA_RE.search(pergunta)),
+        ),
     ]
     partes = [parte for parte in candidatas if parte]
     if estado.get("rota") == "rotina" and partes:

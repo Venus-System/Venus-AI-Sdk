@@ -40,9 +40,10 @@ def argumentos_da_evidencia(evidencias: list[dict] | None, tool: str) -> dict[st
 
 
 def rota_so_com_tools(rota: str | None) -> bool:
-    """`VENUS_RESPOSTA_SO_DAS_TOOLS` (rotas separadas por vírgula; padrão: nenhuma):
-    nessas rotas o texto final é montado pelo código, só com o retorno das tools."""
-    return bool(rota) and rota in os.getenv("VENUS_RESPOSTA_SO_DAS_TOOLS", "").split(",")
+    """`VENUS_RESPOSTA_SO_DAS_TOOLS` (rotas separadas por vírgula; vazia desliga):
+    nessas rotas o texto final é montado pelo código, só com o retorno das tools,
+    para não haver afirmação sem fonte."""
+    return bool(rota) and rota in os.getenv("VENUS_RESPOSTA_SO_DAS_TOOLS", "produto,ingrediente").split(",")
 
 
 def alergias_declaradas(evidencias: list[dict] | None) -> list[str]:

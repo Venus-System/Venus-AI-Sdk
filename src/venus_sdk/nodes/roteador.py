@@ -151,7 +151,9 @@ _LINHA_DE_CONTEXTO_RE = re.compile(
 )
 # "Ingredientes/composição DO [produto]": pergunta de produto, não de ingrediente
 # isolado (só o agente de produto tem `get_product_ingredients`).
-_RE_COMPOSICAO_DE = re.compile(r"\b(ingredientes|composi[cç][aã]o|f[oó]rmula)\s+d[oa]s?\b", re.IGNORECASE)
+_RE_COMPOSICAO_DE = re.compile(
+    r"\b(ingredientes|composi[cç][aã]o|f[oó]rmula)\s+d[oa]s?\b|\b(tem|cont[eé]m|possui)\b", re.IGNORECASE
+)
 
 
 # Rede de segurança contra alucinação na resposta DIRETA do roteador (sem tools, sem juiz): se ela

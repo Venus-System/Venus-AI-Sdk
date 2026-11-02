@@ -68,3 +68,18 @@ def test_rota_fora_da_lista_nao_muda(monkeypatch):
         estado = {"rota": "produto", "aprovado_juiz": True, "pergunta_original": "oi",
                   "resposta_especialista": {"dominio": "produto", "resposta": "x", "recomendacao": ""}}
         assert no_orquestrador(estado)["resposta_final"].startswith("Texto do LLM")
+
+
+def test_padrao_cobre_produto_e_ingrediente_e_nao_rotina_nem_faq(monkeypatch):
+    from venus_sdk.nodes._evidencias import rota_so_com_tools
+
+    monkeypatch.delenv("VENUS_RESPOSTA_SO_DAS_TOOLS")
+    assert rota_so_com_tools("produto") and rota_so_com_tools("ingrediente")
+    assert not rota_so_com_tools("rotina") and not rota_so_com_tools("faq") and not rota_so_com_tools(None)
+
+
+def test_pergunta_de_produto_nao_vai_para_ingrediente_por_causa_do_nome():
+    from venus_sdk.nodes.roteador import _rota_obrigatoria
+
+    assert _rota_obrigatoria("ingrediente", "o Sérum Hidratante com Ácido Hialurônico tem fragrância?") == "produto"
+    assert _rota_obrigatoria("ingrediente", "o ácido hialurônico faz mal?") is None
