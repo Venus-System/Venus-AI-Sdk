@@ -21,6 +21,10 @@ logger = logging.getLogger(__name__)
 # O mesmo número que o Orquestrador lista: produto fora daqui saía sem nota.
 _MAX_PRODUTOS_SUGERIDOS = 6
 _MAX_PALAVRAS_DO_INGREDIENTE = 3
+_TOOLS_DO_FAQ = {"faq_retriever", "buscar_na_web"}
+_PARAMETROS_DE_PERGUNTA = ("pergunta", "consulta", "query", "question")
+_TEMPO_MAXIMO_INTEGRACAO = 15
+_TAMANHO_MAXIMO_TRECHO_EXTERNO = 700
 _RE_SUGESTAO = re.compile(
     r"\b(indic\w*|sugir\w*|sugest\w*|recomend\w*|melhor(es)?|(bom|boa|bons|boas) (pra|para))\b", re.IGNORECASE
 )
@@ -157,4 +161,46 @@ async def evidencias_de_faq(
             achado = achados[indice]
             corpo = str(achado.get("trecho")).split("\n\n", 1)[-1].strip()
             return [busca], [{"texto": corpo, "fonte": str(achado.get("fonte"))}]
-    return [busca], []
+    externas, fontes = await _consultar_integracoes(pergunta, tools)
+    return [busca, *externas], fontes
+
+
+async def _chamada_externa(tool: Any, argumentos: dict[str, Any], rotulo: str) -> dict[str, Any] | None:
+    """`{tool, argumentos, resultado, texto, fonte}` da integração, ou `None` se ela falhar."""
+    try:
+        saida = await asyncio.wait_for(tool.ainvoke(argumentos), _TEMPO_MAXIMO_INTEGRACAO)
+    except Exception:  # noqa: BLE001 — integração fora do ar não derruba a resposta
+        logger.warning("Integração %s falhou", rotulo, exc_info=True)
+        return None
+    if isinstance(saida, dict) and saida.get("erro"):
+        return None
+    texto = saida.get("resposta") if isinstance(saida, dict) else saida
+    texto = texto if isinstance(texto, str) else json.dumps(texto, ensure_ascii=False)
+    return {"tool": tool.name, "argumentos": argumentos, "resultado": texto,
+            "texto": texto[:_TAMANHO_MAXIMO_TRECHO_EXTERNO], "fonte": rotulo}
+
+
+async def _consultar_integracoes(
+    pergunta: str, tools: dict[str, Any]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """MCP e A2A configurados, para o que os documentos não responderam. A web fica
+    fora: ela não sabe sobre o app. O LLM só aponta o resultado que responde."""
+    chamadas = []
+    for nome, tool in tools.items():
+        if nome in _TOOLS_DO_FAQ:
+            continue
+        agentes = (getattr(tool, "metadata", None) or {}).get("agentes")
+        if agentes:
+            chamadas += [_chamada_externa(tool, {"agente": a, "pergunta": pergunta}, f"agente {a} (A2A)") for a in agentes]
+            continue
+        parametro = next((p for p in _PARAMETROS_DE_PERGUNTA if p in (getattr(tool, "args", None) or {})), None)
+        if parametro:
+            chamadas.append(_chamada_externa(tool, {parametro: pergunta}, f"{nome} (MCP)"))
+    achados = [a for a in await asyncio.gather(*chamadas) if a]
+    evidencias = [{k: a[k] for k in ("tool", "argumentos", "resultado")} for a in achados]
+    if not achados:
+        return evidencias, []
+    indice = await asyncio.to_thread(_escolher_trecho, pergunta, [a["texto"] for a in achados])
+    if indice is None:
+        return evidencias, []
+    return evidencias, [{"texto": achados[indice]["texto"], "fonte": achados[indice]["fonte"], "externa": True}]

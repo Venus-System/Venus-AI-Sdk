@@ -171,6 +171,11 @@ _RE_PERGUNTA_SOBRE_CONVERSA = re.compile(
     r"|\b(prompt|mensagem|pergunta|resposta) anterior\b",
     re.IGNORECASE,
 )
+_RE_PERGUNTA_DE_DOMINIO = re.compile(
+    r"(?=.*(\?|^\s*(o que|oq|como|qual|quais|quem|por que|pq|onde|quando|pode|posso|voc[eê]s)\b))"
+    r".*\b(venus|v[eê]nus|voc[eê]s|score|notas?|peles?|cabelos?|produtos?|ingredientes?|aplicativo|app|dados|ia)\b",
+    re.IGNORECASE,
+)
 _RESPOSTA_DIRETA_SEGURA = (
     "Anotei! Posso te ajudar com produtos, ingredientes ou a sua rotina de skincare e haircare "
     "— o que você quer saber?"
@@ -352,6 +357,17 @@ def _aplicar_redes_de_seguranca(
             logger.warning("Roteador não devolveu ROUTE=; rota %s inferida por palavras-chave", sugerida)
             rota = sugerida
             texto = _encaminhar(sugerida, mensagem_usuario)
+
+    if (
+        rota not in _ROTAS_VALIDAS
+        and not eh_small_talk
+        and _RE_PERGUNTA_DE_DOMINIO.search(mensagem_usuario)
+        and not _RE_PERGUNTA_SOBRE_CONVERSA.search(mensagem_usuario)
+    ):
+        # A resposta direta é só conversa: pergunta de fato vai para quem tem fonte.
+        logger.warning("Roteador respondeu direto a uma pergunta sobre o assunto; vai para o FAQ")
+        rota = "faq"
+        texto = _encaminhar("faq", mensagem_usuario)
 
     if rota in _ROTAS_VALIDAS and eh_small_talk:
         # LLM roteou uma saudação pura para um especialista — descarta a rota

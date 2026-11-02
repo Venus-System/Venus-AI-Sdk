@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from typing import Any
 
@@ -17,7 +18,8 @@ from venus_sdk.nodes._evidencias import (
     rota_so_com_tools,
 )
 from venus_sdk.prompts.comum import com_data_atual
-from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO
+from venus_sdk.nodes.juiz import conferir_reescrita
+from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO, TOM_PROMPT
 from venus_sdk.nodes.state import EstadoVenus
 from venus_sdk.texto import remover_acentos
 
@@ -690,7 +692,16 @@ _AVISO_DA_BUSCA = (
     "Busquei as palavras do seu pedido no nome, na marca, na categoria e na descrição dos produtos. "
     "Isso não confirma que cada um seja indicado para o seu caso."
 )
+_NAO_ENCONTRADO_NO_FAQ = "Não encontrei isso na documentação do Venus."
+_FONTE_EXTERNA = "Encontrei isto em uma fonte externa, que o Venus não conferiu:"
+# Texto longo (lista de ingredientes, manual) perde mais do que ganha ao ser reescrito.
+_TAMANHO_MAXIMO_PARA_TOM = 900
 _SEM_DADO_PARA_A_PERGUNTA = "Não tenho um dado cadastrado que responda exatamente a isso. O que tenho é:"
+
+_FRASES_FIXAS = (
+    _ORIENTACAO_DE_SAUDE, _AVISO_DA_BUSCA, "Não tenho um dado cadastrado que responda exatamente a isso",
+)
+
 
 
 def _resposta_sobre_ingrediente(pergunta: str, evidencias: list[dict] | None) -> str | None:
@@ -737,8 +748,57 @@ def _parte_faq(especialista: Any) -> str:
     """O documento como está, com a fonte. Nada escrito por LLM."""
     fontes = especialista.get("fontes_a_mostrar") if isinstance(especialista, dict) else None
     if not fontes:
-        return "Não encontrei isso na documentação do Venus."
-    return "\n\n".join(f"{item['texto']}\n\nFonte: {item['fonte']}" for item in fontes)
+        return _NAO_ENCONTRADO_NO_FAQ
+    externa = _FONTE_EXTERNA if any(item.get("externa") for item in fontes) else ""
+    corpo = "\n\n".join(f"{item['texto']}\n\nFonte: {item['fonte']}" for item in fontes)
+    return f"{externa}\n\n{corpo}" if externa else corpo
+
+
+def _com_tom_da_venus(texto: str, estado: EstadoVenus) -> str:
+    """Reescreve no tom da Venus o texto já montado das fontes. Se a reescrita não
+    passar pelas conferências, vai o texto original: nenhum fato vem só do LLM."""
+    if (
+        os.getenv("VENUS_TOM_LLM", "1") == "0"
+        or not texto
+        or len(texto) > _TAMANHO_MAXIMO_PARA_TOM
+        or "Atenção:" in texto
+        or texto.startswith(_FONTE_EXTERNA)
+        or texto == _NAO_ENCONTRADO_NO_FAQ
+        or estado.get("agendamento_pendente")
+    ):
+        return texto
+    pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
+    mensagens = [("system", TOM_PROMPT), ("human", f"PERGUNTA={pergunta}\n\nTEXTO_BASE:\n{texto}")]
+    try:
+        reescrita = extrair_texto_resposta(get_llm_orquestrador().invoke(mensagens)).strip()
+    except Exception:
+        logger.exception("Falha ao reescrever no tom da Venus; usando o texto original")
+        return texto
+    if not _reescrita_fiel(texto, reescrita, estado) or not conferir_reescrita(texto, reescrita):
+        logger.info("Reescrita de tom reprovada; usando o texto original")
+        return texto
+    return _sem_ids_internos(reescrita)
+
+
+def _reescrita_fiel(original: str, reescrita: str, estado: EstadoVenus) -> bool:
+    """Conferência sem LLM: mesmos números, frases fixas e nomes de produtos."""
+    if not reescrita or _numeros(original) != _numeros(reescrita):
+        return False
+    fixas = [linha for linha in original.splitlines() if linha.startswith("Fonte:")]
+    fixas += [frase for frase in _FRASES_FIXAS if frase in original]
+    if not all(frase in reescrita for frase in fixas):
+        return False
+    compacta = _compactar(reescrita)
+    original_compacto = _compactar(original)
+    produtos = dados_da_evidencia(estado.get("evidencias_tools"), "search_product")
+    nomes = [str(p["name"]) for p in produtos if isinstance(p, dict) and p.get("name")] if isinstance(produtos, list) else []
+    nomes += _itens_obrigatorios(estado.get("evidencias_tools"), estado.get("pergunta_original") or "")
+    return all(_compactar(nome) in compacta for nome in nomes if _compactar(nome) in original_compacto)
+
+
+def _numeros(texto: str) -> set[str]:
+    """Números do texto, sem a numeração de passos ("1)")."""
+    return set(re.findall(r"\d+(?:[.,]\d+)?", re.sub(r"\b\d+\)", "", texto)))
 
 
 # --- nó ---
@@ -798,7 +858,7 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
         return {"resposta_final": _resposta_segura_sem_aprovacao(estado)}
 
     if rota_so_com_tools(estado.get("rota")):
-        texto = _sem_ids_internos(_resposta_das_tools(estado))
+        texto = _com_tom_da_venus(_sem_ids_internos(_resposta_das_tools(estado)), estado)
         alertas = [] if "Atenção:" in texto else _alertas_de_alergia(texto, estado.get("evidencias_tools"))
         texto = "\n\n".join([texto, *alertas])
         # O "sim" confirma exatamente o que o código mostra (ver abaixo).

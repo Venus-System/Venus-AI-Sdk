@@ -17,6 +17,7 @@ from venus_sdk.nodes._amarracao_produtos import (
 )
 from venus_sdk.nodes._evidencias import dados_da_evidencia, rota_so_com_tools
 from venus_sdk.nodes._historico import historico_recente
+from venus_sdk.prompts.orquestrador import CONFERENCIA_DO_TOM_PROMPT
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
 from venus_sdk.nodes.state import DecisorJuiz, EstadoVenus
@@ -430,3 +431,15 @@ def decidir_pos_juiz(estado: EstadoVenus) -> ResultadoJuiz:
     if estado.get("tentativas_juiz", 0) >= MAX_TENTATIVAS_JUIZ:
         return "esgotado"
     return f"reprovado_{estado.get('rota')}"  # type: ignore[return-value]
+
+
+def conferir_reescrita(texto_base: str, reescrita: str) -> bool:
+    """O LLM do Juiz confere se a reescrita de tom só mudou o jeito de dizer.
+    Sem veredito claro, ou com o LLM fora do ar, não aprova."""
+    entrada = f"TEXTO_BASE:\n{texto_base}\n\nREESCRITA:\n{reescrita}"
+    try:
+        resposta = get_llm_juiz().invoke([("system", CONFERENCIA_DO_TOM_PROMPT), ("human", entrada)])
+    except Exception:
+        logger.exception("Falha ao conferir a reescrita de tom")
+        return False
+    return (resposta.content or "").strip().upper().startswith("APROVADO")
