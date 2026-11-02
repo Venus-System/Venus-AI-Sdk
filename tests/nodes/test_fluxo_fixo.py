@@ -96,6 +96,18 @@ async def test_calculo_vai_para_o_agente():
     assert await evidencias_de_ingrediente("qual o limite de 2% de ácido salicílico?", 1, _tools()) is None
 
 
+async def test_numero_no_nome_do_produto_nao_e_calculo():
+    fps = {"product_id": 7, "name": "Hidratante FPS30", "brand_name": "M", "relevancia": 2}
+    saida = await evidencias_de_produto("qual a nota do Hidratante FPS30?", None, 1, _tools(search_product=[fps]))
+    assert saida is not None and saida[1] == "informar"
+
+
+async def test_pergunta_sem_valor_nao_vai_para_o_agente():
+    achado = [{"ingredient_id": 9, "common_name": "Ácido salicílico"}]
+    saida = await evidencias_de_ingrediente("qual a concentração ideal de ácido salicílico?", 1, _tools(search_ingredient=achado))
+    assert saida is not None
+
+
 TRECHOS = [{"trecho": "Limites > X\n\nOutro assunto.", "fonte": "limites.md"},
            {"trecho": "Privacidade > Vende?\n\nNão. O Venus não vende.", "fonte": "privacidade.md"}]
 

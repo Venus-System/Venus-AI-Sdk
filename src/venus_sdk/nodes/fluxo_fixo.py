@@ -28,8 +28,9 @@ _RE_REFERENCIA_AO_CONTEXTO = re.compile(
     r"[uú]ltimo|mesmo|outro|outra)\b",
     re.IGNORECASE,
 )
-# Conta com número dado pelo usuário: quem faz é a tool de cálculo, via agente.
-_RE_CALCULO = re.compile(r"\d")
+# Conta com valor dado pelo usuário: quem faz é a tool de cálculo, via agente. Só
+# dígito não basta: "FPS30" é parte do nome do produto.
+_RE_CALCULO = re.compile(r"\d\s*(%|(mg|ppm|ml|g)\b)", re.IGNORECASE)
 # Sozinhas, casam com centenas de ingredientes sem dizer qual é.
 _PALAVRAS_GENERICAS = {"acido", "oleo", "extrato", "pele", "cabelo", "vitamina", "mal", "serve", "faz", "pode", "usar"}
 
