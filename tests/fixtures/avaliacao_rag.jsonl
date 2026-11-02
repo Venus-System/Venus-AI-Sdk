@@ -10,11 +10,9 @@
 {"pergunta": "A IA pode inventar informações sobre os produtos?", "fontes": ["limites_da_ia.md"]}
 {"pergunta": "Como cadastro minhas alergias?", "fontes": ["alergias_e_limites.md"]}
 {"pergunta": "O Venus recomenda produto com ingrediente que me dá alergia?", "fontes": ["alergias_e_limites.md", "sobre_o_venus.md"]}
-{"pergunta": "Como funciona o score dos produtos?", "fontes": ["como_funciona_o_score.md", "sobre_o_venus.md", "api_de_classificacao.md"]}
+{"pergunta": "Como funciona o score dos produtos?", "fontes": ["como_funciona_o_score.md", "sobre_o_venus.md"]}
 {"pergunta": "Qual a diferença entre o score geral e o personalizado?", "fontes": ["como_funciona_o_score.md", "sobre_o_venus.md"]}
-{"pergunta": "Como a nota de 0 a 100 é dividida?", "fontes": ["api_de_classificacao.md"]}
-{"pergunta": "O que é o baseScore?", "fontes": ["api_de_classificacao.md"]}
-{"pergunta": "Como a embalagem entra na nota ambiental?", "fontes": ["api_de_classificacao.md"]}
+{"pergunta": "Como a nota de 0 a 100 é dividida?", "fontes": ["como_funciona_o_score.md"]}
 {"pergunta": "O que significam os selos do app?", "fontes": ["sobre_o_venus.md"]}
 {"pergunta": "Como funciona o scan de um produto?", "fontes": ["sobre_o_venus.md"]}
 {"pergunta": "O que é o filtro duro na recomendação?", "fontes": ["sobre_o_venus.md"]}

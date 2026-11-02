@@ -9,6 +9,31 @@ release" no README); cada tag tem a sua seção aqui, dividida em:
 - **Novidades:** o que passou a existir, sem quebrar quem já usava.
 - **Correções:** bugs corrigidos.
 
+## Não lançado
+
+### Mudanças incompatíveis
+- **Texto final sem LLM em produto, ingrediente, rotina e FAQ.** Antes, o
+  especialista redigia, o Juiz conferia e o Orquestrador reescrevia. Agora, o
+  código monta a resposta só com tools e documentos, sem o tom da Venus. Para
+  voltar, defina `VENUS_RESPOSTA_SO_DAS_TOOLS=` (vazia) ou liste só as rotas
+  desejadas.
+- **Documento técnico fora do FAQ.** `api_de_classificacao.md` foi para `docs/`,
+  e a divisão da nota foi para `como_funciona_o_score.md`, sem nomes de campos.
+  Com Qdrant, rode `python -m venus_sdk.rag.faq_ingest` para atualizar o índice.
+- **FAQ padrão sem web.** Pergunta que os documentos não respondem recebe "Não
+  encontrei isso na documentação do Venus.". `busca_web_faq` e `buscar_na_web`
+  só valem com `faq` fora de `VENUS_RESPOSTA_SO_DAS_TOOLS`.
+
+### Novidades
+- `nodes/fluxo_fixo.py`: consulta as tools sem ReAct quando o roteiro é sempre o
+  mesmo, com o agente de reserva.
+- `VENUS_CACHE_DE_PROMPT` (padrão ligado) e data no fim do prompt, para o Mistral
+  reaproveitar o prefixo.
+- `VENUS_JUIZ_LLM_ROTAS`: rotas em que o Juiz usa LLM.
+- Orientação fixa de procurar um profissional em pergunta sobre gravidez,
+  amamentação ou reação na pele.
+- `tests/manual/avaliar_fontes.py`: mede nota, fragrância e afirmações sem fonte.
+
 ## 0.5.0
 
 Alergias conferidas pelo código, perfil completo, governança da memória e

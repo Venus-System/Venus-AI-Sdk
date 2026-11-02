@@ -1,0 +1,30 @@
+{"tipo": "nota", "pergunta": "qual a nota geral do CeraVe Loção Facial Hidratante Noite?", "nota": 70}
+{"tipo": "nota", "pergunta": "qual a nota geral do CeraVe Hidratante Facial FPS30?", "nota": 63}
+{"tipo": "nota", "pergunta": "qual a nota geral do CeraVe Creme-espuma de Limpeza Hidratante?", "nota": 63}
+{"tipo": "nota", "pergunta": "qual a nota geral do CeraVe Sérum Renovador?", "nota": 58}
+{"tipo": "nota", "pergunta": "qual a nota geral do CeraVe Sérum Retinol Refinador?", "nota": 58}
+{"tipo": "nota", "pergunta": "qual a nota geral do CeraVe Sérum Hidratante com Ácido Hialurônico?", "nota": 68}
+{"tipo": "nota", "pergunta": "qual a nota geral do CeraVe Creme Reparador para os Olhos?", "nota": 73}
+{"tipo": "nota", "pergunta": "qual a nota geral do CeraVe Espuma Cremosa de Limpeza Hidratante?", "nota": 67}
+{"tipo": "fragrancia", "pergunta": "o CeraVe Loção Facial Hidratante Noite tem fragrância?", "tem_fragrancia": false}
+{"tipo": "fragrancia", "pergunta": "o CeraVe Hidratante Facial FPS30 tem fragrância?", "tem_fragrancia": false}
+{"tipo": "fragrancia", "pergunta": "o CeraVe Creme-espuma de Limpeza Hidratante tem fragrância?", "tem_fragrancia": false}
+{"tipo": "fragrancia", "pergunta": "o CeraVe Sérum Renovador tem fragrância?", "tem_fragrancia": true}
+{"tipo": "fragrancia", "pergunta": "o CeraVe Sérum Retinol Refinador tem fragrância?", "tem_fragrancia": true}
+{"tipo": "fragrancia", "pergunta": "o CeraVe Sérum Hidratante com Ácido Hialurônico tem fragrância?", "tem_fragrancia": false}
+{"tipo": "fragrancia", "pergunta": "o CeraVe Creme Reparador para os Olhos tem fragrância?", "tem_fragrancia": false}
+{"tipo": "fragrancia", "pergunta": "o CeraVe Espuma Cremosa de Limpeza Hidratante tem fragrância?", "tem_fragrancia": false}
+{"tipo": "armadilha", "pergunta": "posso usar niacinamida junto com vitamina C?"}
+{"tipo": "armadilha", "pergunta": "quantos minutos devo esperar entre o sérum e o hidratante?"}
+{"tipo": "armadilha", "pergunta": "ácido hialurônico ajuda a controlar a oleosidade?"}
+{"tipo": "armadilha", "pergunta": "retinol pode ser usado na gravidez?"}
+{"tipo": "armadilha", "pergunta": "qual a concentração ideal de ácido salicílico pra acne?"}
+{"tipo": "armadilha", "pergunta": "o CeraVe Sérum Retinol Refinador tira rugas em quantas semanas?"}
+{"tipo": "aberta", "pergunta": "o que é niacinamida?"}
+{"tipo": "aberta", "pergunta": "pra que serve o ácido hialurônico?"}
+{"tipo": "aberta", "pergunta": "me fala sobre o CeraVe Hidratante Facial FPS30"}
+{"tipo": "aberta", "pergunta": "me indica um protetor solar pra pele oleosa"}
+{"tipo": "aberta", "pergunta": "produto bom pra cabelo cacheado"}
+{"tipo": "aberta", "pergunta": "como a nota dos produtos é calculada?"}
+{"tipo": "aberta", "pergunta": "monta minha rotina da noite"}
+{"tipo": "aberta", "pergunta": "vocês vendem meus dados?"}

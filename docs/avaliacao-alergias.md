@@ -17,8 +17,7 @@ Resultado de `tests/manual/avaliar_alergias.py` sobre duas bases:
   quando há conflito, e só nesse caso.
 
 Não usa LLM nem banco, então roda no `pytest` (`tests/nodes/test_avaliacao_alergias.py`).
-O teste falha se aparecer um erro nos casos fora das lacunas marcadas
-`"lacuna_conhecida": true`, ou qualquer erro no catálogo.
+O teste falha com qualquer erro, nos casos escritos à mão ou no catálogo.
 
 Cada taxa vem com o intervalo de confiança de 95% (Wilson). Com amostra pequena, 100%
 de acerto não quer dizer erro zero: com 47 de 47, a taxa real de erro ainda pode

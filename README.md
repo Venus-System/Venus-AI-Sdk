@@ -49,11 +49,11 @@ tag do Git.
 | Capacidade | Como |
 | --- | --- |
 | Conversa multiagente | Um roteador classifica a mensagem e entrega a um especialista (produto, ingrediente, rotina ou FAQ). |
-| Dados reais, não inventados | Os especialistas consultam o Postgres por tools; o juiz confere a resposta contra o retorno bruto dessas tools. |
+| Dados reais, não inventados | O texto de produto, ingrediente, rotina e FAQ é montado pelo código, só com o retorno das tools e os documentos; sem dado, a resposta diz que não tem. |
 | Personalização | Alergias, perfil, favoritos e listas do usuário entram na resposta quando o app informa quem é ele. |
 | Sessões | Histórico da conversa por `thread_id` (checkpointer do LangGraph, em memória ou MongoDB). |
 | Memória de longo prazo | Fatos sobre o usuário que sobrevivem à troca de conversa, por `usuario_id` (store em memória ou MongoDB). |
-| RAG | FAQ institucional no Qdrant (ou índice local), com busca na web de reserva e citação das fontes. |
+| RAG | FAQ institucional no Qdrant (ou índice local), com o trecho do documento e a citação da fonte. |
 | Segurança | Guardrails de entrada (regex + classificador LLM contra injeção) e de saída (dados sensíveis). |
 | Integrações | Google Calendar (agendar a rotina), Neo4j (check-up da rotina), MCP e A2A. |
 
@@ -65,9 +65,9 @@ tag do Git.
 | **Produto** | Busca produtos, notas, ingredientes e a nota personalizada para o usuário. | `search_product`, `get_product`, `get_product_score`, `get_personalized_score`, `get_product_ingredients`, `get_user_allergies`, `get_user_profile` |
 | **Ingrediente** | Explica o que um ingrediente faz, suas propriedades, efeitos e regulação. | `search_ingredient`, `get_ingredient_summary`, `get_ingredient_properties`, `get_ingredient_effects`, `get_ingredient_regulations`, `get_user_allergies`, `get_user_profile`, `converter_concentracao`, `comparar_concentracao_com_limite` |
 | **Rotina** | Monta a rotina de manhã e de noite a partir dos favoritos, excluindo o que bate com as alergias. | `get_user_profile`, `get_user_favorites`, `get_user_lists`, `suggest_routine`, `get_user_allergies`, `calcular_tempo_de_uso`, `calcular_datas_de_aplicacao` e, se configurados, as tools do Google Calendar e o `check_routine_health` (Neo4j) |
-| **FAQ** | Responde perguntas institucionais (score, privacidade, LGPD, limites da IA) por RAG. | `faq_retriever`, `buscar_na_web` e tools MCP/A2A extras |
-| **Juiz** | Confere a resposta do especialista contra o que as tools devolveram; reprova o que não tem lastro. | — |
-| **Orquestrador** | Transforma a resposta aprovada no texto final, no tom da Venus. | — |
+| **FAQ** | Responde perguntas institucionais (score, privacidade, LGPD, limites da IA) por RAG: mostra o trecho do documento e a fonte. | `faq_retriever`; com `VENUS_RESPOSTA_SO_DAS_TOOLS` sem `faq`, também `buscar_na_web` e tools MCP/A2A extras |
+| **Juiz** | Nas rotas fora de `VENUS_RESPOSTA_SO_DAS_TOOLS`, confere a resposta do especialista contra o que as tools devolveram; nas demais, aprova sem LLM, pois o texto do especialista não é usado. | — |
+| **Orquestrador** | Monta o texto final em código nas rotas de `VENUS_RESPOSTA_SO_DAS_TOOLS`, com alertas de alergia e a orientação fixa de saúde; nas demais, reescreve no tom da Venus com LLM. | — |
 | **Memória** | Carrega o perfil do usuário no início do turno e grava fatos novos no fim. | — |
 
 As tools de produto, ingrediente e rotina são **consultas estruturadas a um catálogo
@@ -296,7 +296,8 @@ admite que não conseguiu checar alergias ou personalizar, em vez de inventar.
 ### 6. Integrações opcionais
 
 Entram no agente de Rotina por `tools_rotina_extras`, e no FAQ por
-`tools_faq_extras` e `busca_web_faq`:
+`tools_faq_extras` e `busca_web_faq` (no FAQ, só com o agente, ou seja, com
+`VENUS_RESPOSTA_SO_DAS_TOOLS` sem `faq`):
 
 ```python
 from venus_sdk.tools.calendario import montar_tools_calendario
@@ -417,7 +418,10 @@ Copie [`.env.example`](.env.example) para `.env`. **Nunca** faça commit do `.en
 | `MONGODB_URI` | não | Checkpointer e store persistentes (extra `mongo`). |
 | `FAQ_DIR` | não | Pasta dos `.md` do FAQ; padrão: o FAQ empacotado no SDK. |
 | `QDRANT_URL`, `QDRANT_API_KEY` | não | FAQ no Qdrant (extra `rag`). |
-| `TAVILY_API_KEY` | não | Busca na web; sem ela, usa DuckDuckGo. |
+| `TAVILY_API_KEY` | não | Busca na web do FAQ com agente (fora do padrão); sem ela, usa DuckDuckGo. |
+| `VENUS_RESPOSTA_SO_DAS_TOOLS` | não | Rotas cujo texto é montado pelo código, só com tools e documentos (padrão: `produto,ingrediente,rotina,faq`; vazia desliga). |
+| `VENUS_JUIZ_LLM_ROTAS` | não | Rotas em que o Juiz usa LLM (padrão: todas; as da variável acima nunca usam). |
+| `VENUS_CACHE_DE_PROMPT` | não | `0` desliga o cache de prompt do Mistral (padrão: ligado). |
 | `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | não | Check-up da rotina (extra `neo4j`). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENCRYPTION_KEY` | não | Google Calendar (extra `google_calendar`). A chave é Fernet. |
 | `MCP_SERVERS` | não | JSON com os servidores MCP que o FAQ consome. |
@@ -504,7 +508,7 @@ src/venus_sdk/
 ├── tools/          # tools LangChain: produto, ingrediente, rotina, cálculos, FAQ, calendário, check-up
 ├── llm/            # cadeias de modelos com fallback entre Groq, Mistral e Gemini
 ├── memory/         # checkpointer e store, em memória ou MongoDB
-├── rag/            # índice do FAQ (Qdrant ou local), ingestão e busca na web
+├── rag/            # índice do FAQ (Qdrant ou local), ingestão e busca na web (só FAQ com agente)
 ├── integrations/   # Google Calendar e Neo4j
 ├── checkup/        # consultas e sincronização do check-up da rotina
 ├── mcp/            # servidor MCP e cliente das tools MCP

@@ -31,6 +31,8 @@ from venus_sdk.prompts.ingrediente import ESP_INGREDIENTE_PROMPT_COMPLETO
 from venus_sdk.prompts.produto import ESP_PRODUTO_PROMPT_COMPLETO
 from venus_sdk.prompts.rotina import ROTINA_PROMPT_COMPLETO
 from venus_sdk.nodes.state import EstadoVenus
+from venus_sdk.nodes._evidencias import rota_so_com_tools
+from venus_sdk.nodes.fluxo_fixo import evidencias_de_faq, evidencias_de_ingrediente, evidencias_de_produto
 from venus_sdk.tools.calculos import montar_tools_calculo_ingrediente, montar_tools_calculo_rotina
 from venus_sdk.tools.compartilhadas import montar_tools_compartilhadas
 from venus_sdk.tools.faq import montar_tools_faq
@@ -313,6 +315,42 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
     return {"resposta_especialista": resposta_json, "evidencias_tools": evidencias}
 
 
+_FLUXO_FIXO = {"produto", "ingrediente", "faq"}
+
+
+async def _responder_com_fluxo_fixo(
+    estado: EstadoVenus, nome: str, pergunta: str, montar_tools: Callable[[], list[Any]]
+) -> EstadoVenus | None:
+    """Consulta as tools sem LLM (`nodes/fluxo_fixo.py`). `None` cai no agente ReAct,
+    inclusive em qualquer falha: é só um atalho."""
+    usuario = estado.get("usuario_id_postgres")
+    try:
+        tools = {tool.name: tool for tool in montar_tools()}
+        with usuario_da_conversa(usuario):
+            if nome == "faq":
+                evidencias, fontes = await evidencias_de_faq(pergunta, tools)
+                return {
+                    "resposta_especialista": {"dominio": nome, "intencao": "informar", "resposta": "",
+                                              "recomendacao": "", "fontes_a_mostrar": fontes},
+                    "evidencias_tools": evidencias,
+                }
+            if nome == "produto":
+                saida = await evidencias_de_produto(pergunta, estado.get("produto_em_contexto"), usuario, tools)
+            else:
+                saida = await evidencias_de_ingrediente(pergunta, usuario, tools)
+    except Exception:
+        logger.exception("Fluxo fixo de %s falhou; usando o agente", nome)
+        return None
+    if saida is None:
+        return None
+    evidencias, intencao = saida
+    return {
+        "resposta_especialista": {"dominio": nome, "intencao": intencao, "resposta": "", "recomendacao": "",
+                                  "fontes_usadas": sorted({e["tool"] for e in evidencias})},
+        "evidencias_tools": evidencias,
+    }
+
+
 # --- fábricas dos nós ---
 
 
@@ -353,6 +391,10 @@ def _montar_no_especialista(
             confirmacao = _resposta_de_falha(nome, INTENCAO_CONFIRMAR, _RESPOSTA_CONFIRMACAO)
             confirmacao["acompanhamento"] = _ACOMPANHAMENTO_CONFIRMACAO
             return {"resposta_especialista": confirmacao, "evidencias_tools": None}
+        if nome in _FLUXO_FIXO and rota_so_com_tools(nome):
+            resposta = await _responder_com_fluxo_fixo(estado, nome, pergunta, montar_tools)
+            if resposta is not None:
+                return resposta
         try:
             agente_pronto = _agente()
         except Exception:

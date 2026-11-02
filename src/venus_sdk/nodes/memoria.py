@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from langgraph.store.base import BaseStore
@@ -58,32 +58,25 @@ def _ttl_dias() -> int:
         return _TTL_PADRAO_DIAS
 
 
-def _perfil_vigente(perfil: dict[str, Any], datas: dict[str, str], hoje: date) -> dict[str, Any]:
+def _perfil_vigente(perfil: dict[str, Any], datas: dict[str, str]) -> dict[str, Any]:
     """`perfil` sem os campos que não são memória e sem os expirados. Campo sem
     data (gravado antes de existir `CHAVE_DATAS`) não expira."""
     ttl = _ttl_dias()
-    vigente = {}
-    for campo, valor in perfil.items():
-        if campo in _CAMPOS_FORA_DA_MEMORIA:
-            continue
-        try:
-            idade = (hoje - date.fromisoformat(datas[campo])).days if campo in datas else 0
-        except (TypeError, ValueError):
-            idade = 0
-        if ttl and idade > ttl:
-            continue
-        vigente[campo] = valor
-    return vigente
+    limite = (date.today() - timedelta(days=ttl)).isoformat() if ttl else ""
+    return {
+        campo: valor for campo, valor in perfil.items()
+        if campo not in _CAMPOS_FORA_DA_MEMORIA and datas.get(campo, limite) >= limite
+    }
 
 
-def _ler_perfil(store: BaseStore, usuario_id: str, hoje: date) -> tuple[dict[str, Any] | None, dict[str, str]]:
+def _ler_perfil(store: BaseStore, usuario_id: str) -> tuple[dict[str, Any] | None, dict[str, str]]:
     """Perfil vigente salvo (`None` se o usuário ainda não tem perfil) e as datas."""
     item = store.get(_namespace(usuario_id), CHAVE_PERFIL)
-    if item is None or not isinstance(item.value, dict):
+    if item is None:
         return None, {}
     datas_item = store.get(_namespace(usuario_id), CHAVE_DATAS)
-    datas = datas_item.value if datas_item and isinstance(datas_item.value, dict) else {}
-    return _perfil_vigente(item.value, datas, hoje), datas
+    datas = datas_item.value if datas_item else {}
+    return _perfil_vigente(item.value, datas), datas
 
 
 def apagar_memoria(store: BaseStore, usuario_id: str) -> None:
@@ -110,7 +103,7 @@ def no_carregar_memoria(estado: EstadoVenus, *, store: BaseStore) -> EstadoVenus
         return {}
 
     try:
-        perfil, _ = _ler_perfil(store, usuario_id, date.today())
+        perfil, _ = _ler_perfil(store, usuario_id)
     except Exception:
         # Store fora do ar/lento: o turno segue sem memória de longo prazo em
         # vez de a requisição inteira virar erro.
@@ -157,20 +150,19 @@ def no_atualizar_memoria(estado: EstadoVenus, *, store: BaseStore) -> EstadoVenu
     if not fatos_novos:
         return {}
 
-    hoje = date.today()
+    remover = fatos_novos.pop(CAMPO_REMOVER, [])
     try:
         # Relê o perfil: outra conversa do mesmo usuário pode ter gravado
         # fatos depois que este turno carregou a memória.
-        perfil_salvo, datas = _ler_perfil(store, usuario_id, hoje)
-        perfil_atualizado = _mesclar_perfil(perfil_atual if perfil_salvo is None else perfil_salvo, fatos_novos)
+        perfil_salvo, datas = _ler_perfil(store, usuario_id)
+        perfil_atualizado = _mesclar_perfil(perfil_atual if perfil_salvo is None else perfil_salvo, fatos_novos, remover)
         datas = {campo: data for campo, data in datas.items() if campo in perfil_atualizado}
-        datas.update({campo: hoje.isoformat() for campo in fatos_novos if campo in perfil_atualizado})
+        datas.update(dict.fromkeys(fatos_novos, date.today().isoformat()))
         store.put(_namespace(usuario_id), CHAVE_PERFIL, perfil_atualizado)
         store.put(_namespace(usuario_id), CHAVE_DATAS, datas)
         # Auditoria: quais campos mudaram, nunca os valores.
         logger.info(
-            "Memória atualizada (usuario_id=%s): gravados=%s removidos=%s", usuario_id,
-            sorted(c for c in fatos_novos if c != CAMPO_REMOVER), fatos_novos.get(CAMPO_REMOVER) or [],
+            "Memória atualizada (usuario_id=%s): gravados=%s removidos=%s", usuario_id, sorted(fatos_novos), remover
         )
     except Exception:
         # A resposta já foi validada e está indo pro usuário: falha ao gravar
@@ -194,33 +186,19 @@ def _extrair_fatos_novos(texto: str) -> dict[str, Any] | None:
         logger.warning("Fatos de memória descartados: parecem instrução ao sistema")
         return None
     fatos = {campo: valor for campo, valor in fatos.items() if campo not in _CAMPOS_FORA_DA_MEMORIA}
-    remover = fatos.get(CAMPO_REMOVER)
-    if CAMPO_REMOVER in fatos:
-        remover = [remover] if isinstance(remover, str) else remover
-        remover = [str(campo) for campo in remover if campo] if isinstance(remover, list) else []
-        if remover:
-            fatos[CAMPO_REMOVER] = remover
-        else:
-            del fatos[CAMPO_REMOVER]
+    remover = fatos.pop(CAMPO_REMOVER, None)
+    remover = [remover] if isinstance(remover, str) else remover
+    if isinstance(remover, list) and any(remover):
+        fatos[CAMPO_REMOVER] = [str(campo) for campo in remover if campo]
     return fatos or None
 
 
-def _mesclar_perfil(atual: dict[str, Any], novos: dict[str, Any]) -> dict[str, Any]:
-    """Funde `novos` (fatos desta troca) em `atual` (perfil salvo).
-
-    Quando o mesmo campo já existe nos dois lados como LISTA (ex.:
-    "alergias" — ver `prompts/memoria.py`), concatena e deduplica em vez de
-    sobrescrever: um `{**atual, **novos}` simples perdia a alergia
-    mencionada num turno anterior sempre que uma alergia NOVA era declarada
-    num turno seguinte. Campo escalar (ex.: "tipo_pele") continua
-    sobrescrevendo — ali a atualização/correção é o comportamento certo.
-
-    `novos["remover"]` (lista de campos) apaga esses campos: é como o usuário
-    corrige um fato que deixou de valer ("não quero mais tratar acne")."""
-    mesclado = {campo: valor for campo, valor in atual.items() if campo not in novos.get(CAMPO_REMOVER, [])}
+def _mesclar_perfil(atual: dict[str, Any], novos: dict[str, Any], remover: list[str]) -> dict[str, Any]:
+    """Funde os fatos desta troca no perfil salvo: apaga os campos de `remover`,
+    concatena listas sem repetir (um valor novo não apaga os anteriores) e
+    sobrescreve o resto."""
+    mesclado = {campo: valor for campo, valor in atual.items() if campo not in remover}
     for chave, valor_novo in novos.items():
-        if chave == CAMPO_REMOVER:
-            continue
         valor_atual = mesclado.get(chave)
         if isinstance(valor_atual, list) and isinstance(valor_novo, list):
             mesclado[chave] = valor_atual + [v for v in valor_novo if v not in valor_atual]

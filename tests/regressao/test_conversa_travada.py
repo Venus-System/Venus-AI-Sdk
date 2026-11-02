@@ -26,7 +26,7 @@ from venus_sdk.nodes.roteador import (
     separar_produto_em_contexto,
 )
 from venus_sdk.tools.produto import _sem_duplicatas
-from venus_sdk.tools.rotina import _montar_rotina, _termos_da_alergia
+from venus_sdk.tools.rotina import _montar_rotina
 
 PREFIXO = "Sobre CeraVe Creme Hidratante: "
 
@@ -137,7 +137,7 @@ def test_rotina_nao_exclui_creme_com_alcool_graxo() -> None:
          "inci_names": ["cetearyl alcohol", "álcool cetearílico", "glycerin"]},
         {"product_id": 11, "name": "Tônico X", "category_name": "Tônico", "inci_names": ["alcohol denat."]},
     ]
-    rotina = _montar_rotina(favoritos, _termos_da_alergia("Álcool"), "noite")
+    rotina = _montar_rotina(favoritos, termos_da_alergia("Álcool"), "noite")
     assert [p["product_id"] for p in rotina["passos"]] == [10]
     assert [p["product_id"] for p in rotina["excluidos_por_alergia"]] == [11]
 

@@ -120,6 +120,9 @@ _RE_FAQ = re.compile(
     # Metodologia e fontes:
     r"\bcomo\b.{0,25}\b(notas?|scores?|pontua\w*)\b.{0,25}\b(calcul|funcion|defin)\w*|"
     r"\bcomo\b.{0,10}\b(calcul|funcion|defin)\w*\b.{0,15}\b(notas?|scores?|pontua\w*)\b|"
+    r"\bnotas?\b.{0,20}\b0 a 100\b|\b(base|profile|final)score\b|\bscore (geral|personalizado)\b|"
+    r"\bdiferen[cç]a\b.{0,30}\b(scores?|notas?)\b|\bo que acontece com a nota\b|"
+    r"\bvoc[eê]s\b.{0,30}\b(propaganda|an[uú]nci\w*|anunciantes?)\b|\bvenus\b.{0,20}\bdiagnostic\w*|"
     r"\bde onde v[eê]m\b.{0,12}\b(dados|informa\w*|notas?|scores?|fontes?)\b|\bfontes? (dos|de) dados\b|"
     # Limites da IA:
     r"\bsubstitu\w*\b.{0,20}\b(dermatologista|m[eé]dic\w*|profissional)\b|"
@@ -151,7 +154,9 @@ _LINHA_DE_CONTEXTO_RE = re.compile(
 )
 # "Ingredientes/composição DO [produto]": pergunta de produto, não de ingrediente
 # isolado (só o agente de produto tem `get_product_ingredients`).
-_RE_COMPOSICAO_DE = re.compile(r"\b(ingredientes|composi[cç][aã]o|f[oó]rmula)\s+d[oa]s?\b", re.IGNORECASE)
+_RE_COMPOSICAO_DE = re.compile(
+    r"\b(ingredientes|composi[cç][aã]o|f[oó]rmula)\s+d[oa]s?\b|\b(tem|cont[eé]m|possui)\b", re.IGNORECASE
+)
 
 
 # Rede de segurança contra alucinação na resposta DIRETA do roteador (sem tools, sem juiz): se ela
@@ -341,6 +346,9 @@ def _aplicar_redes_de_seguranca(
     if rota not in _ROTAS_VALIDAS and not eh_small_talk:
         sugerida = rota_por_palavras(mensagem_usuario)
         if sugerida:
+            # As palavras-chave testam "fragrância" antes de "hidratante": "o X
+            # Hidratante tem fragrância?" é pergunta de produto mesmo assim.
+            sugerida = _rota_obrigatoria(sugerida, mensagem_usuario) or sugerida
             logger.warning("Roteador não devolveu ROUTE=; rota %s inferida por palavras-chave", sugerida)
             rota = sugerida
             texto = _encaminhar(sugerida, mensagem_usuario)

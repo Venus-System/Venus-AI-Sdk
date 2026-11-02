@@ -4,6 +4,7 @@ pelos nós que precisam do retorno bruto de uma tool específica."""
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 
@@ -36,6 +37,21 @@ def argumentos_da_evidencia(evidencias: list[dict] | None, tool: str) -> dict[st
         if evidencia.get("tool") == tool:
             return evidencia.get("argumentos") or {}
     return {}
+
+
+def rota_so_com_tools(rota: str | None) -> bool:
+    """`VENUS_RESPOSTA_SO_DAS_TOOLS` (rotas separadas por vírgula; vazia desliga):
+    nessas rotas o texto final é montado pelo código, só com o retorno das tools,
+    para não haver afirmação sem fonte."""
+    return bool(rota) and rota in os.getenv("VENUS_RESPOSTA_SO_DAS_TOOLS", "produto,ingrediente,rotina,faq").split(",")
+
+
+def alergias_declaradas(evidencias: list[dict] | None) -> list[str]:
+    """Nomes das alergias que `get_user_allergies` devolveu (`[]` se nenhuma)."""
+    dados = dados_da_evidencia(evidencias, "get_user_allergies")
+    if not isinstance(dados, list):
+        return []
+    return [str(a.get("allergy_name")) for a in dados if isinstance(a, dict) and a.get("allergy_name")]
 
 
 def _chamada_com(evidencia: dict, argumentos: dict[str, Any]) -> bool:

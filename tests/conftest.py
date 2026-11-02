@@ -1,8 +1,10 @@
 import sys
 from pathlib import Path
 
-# Permite `from _fakes import ...` em qualquer subpasta de tests/.
+# Permite `from _fakes import ...` e importar os scripts de tests/manual em
+# qualquer subpasta de tests/.
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent / "manual"))
 
 import os  # noqa: E402
 
@@ -10,6 +12,9 @@ import os  # noqa: E402
 # baixar o modelo do FastEmbed (vale também para os subprocessos, ex.: o
 # servidor MCP por stdio). Os testes do caminho semântico trocam a função.
 os.environ.setdefault("VENUS_EMBEDDINGS_LOCAIS", "hash")
+# O caminho com LLM segue valendo para Rotina e FAQ e é o que estes testes cobrem;
+# `tests/nodes/test_resposta_so_das_tools.py` cobre o padrão.
+os.environ.setdefault("VENUS_RESPOSTA_SO_DAS_TOOLS", "")
 # O classificador LLM do guardrail fica ligado por padrão em produção; na
 # suíte ele consumiria as respostas roteirizadas dos LLMs falsos. Os testes
 # dele (tests/guardrails/test_classificador_llm.py) ligam explicitamente.
