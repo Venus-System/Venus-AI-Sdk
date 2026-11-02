@@ -15,7 +15,7 @@ from venus_sdk.nodes._amarracao_produtos import (
     mesmo_nome,
     nomes_por_id,
 )
-from venus_sdk.nodes._evidencias import dados_da_evidencia
+from venus_sdk.nodes._evidencias import dados_da_evidencia, rota_so_com_tools
 from venus_sdk.nodes._historico import historico_recente
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
@@ -358,6 +358,9 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         return _veredito(False, None, MAX_TENTATIVAS_JUIZ)
 
     proxima_tentativa = estado.get("tentativas_juiz", 0) + 1
+    if rota_so_com_tools(estado.get("rota")):
+        # O texto do especialista não chega ao usuário: não há o que conferir.
+        return _veredito(True, None, proxima_tentativa)
     if especialista.get("intencao") in ("nao_suportado", "agendamento"):
         # Recusa fixa escrita no código (ex.: a IA não salva favoritos) — não
         # há dado para auditar.

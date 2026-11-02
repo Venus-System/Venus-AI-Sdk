@@ -10,7 +10,12 @@ from typing import Any
 from venus_sdk.alergias import conflitos
 from venus_sdk.llm.models import extrair_texto_resposta, get_llm_orquestrador
 from venus_sdk.nodes._amarracao_produtos import mesmo_nome, nomes_por_id
-from venus_sdk.nodes._evidencias import alergias_declaradas, argumentos_da_evidencia, dados_da_evidencia
+from venus_sdk.nodes._evidencias import (
+    alergias_declaradas,
+    argumentos_da_evidencia,
+    dados_da_evidencia,
+    rota_so_com_tools,
+)
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.orquestrador import ORQUESTRADOR_PROMPT_COMPLETO
 from venus_sdk.nodes.state import EstadoVenus
@@ -632,6 +637,47 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     return "\n\n".join(partes)
 
 
+_PERGUNTA_TEM_RE = re.compile(r"\b(?:tem|cont[eé]m|possui)\s+(?:algum[a]?\s+)?([^?.,!]{3,40})", re.IGNORECASE)
+# O que a ficha montada das tools responde. O resto recebe o aviso abaixo.
+_FICHA_RESPONDE_RE = re.compile(
+    r"\b(o que [eé]|oq [eé]|pra que serve|para que serve|nota|score|ingredientes?|composi[cç][aã]o|fala sobre|"
+    r"fale sobre|me fala|sobre o|sobre a|indica|sugir|sugest|recomend|bom pra|boa pra|bom para|boa para|alerg)",
+    re.IGNORECASE,
+)
+_SEM_DADO_PARA_A_PERGUNTA = "Não tenho um dado cadastrado que responda exatamente a isso. O que tenho é:"
+
+
+def _resposta_sobre_ingrediente(pergunta: str, evidencias: list[dict] | None) -> str | None:
+    """"O X tem fragrância?": confere na lista de ingredientes consultada, com a
+    mesma regra das alergias (`venus_sdk/alergias.py`)."""
+    achado = _PERGUNTA_TEM_RE.search(pergunta)
+    ingredientes = _ingredientes_com_nomes(evidencias)
+    if not achado or not ingredientes:
+        return None
+    termo = achado.group(1).strip()
+    pares = conflitos(ingredientes, [termo])
+    if pares:
+        return f"Sim: {pares[0][0]} está na lista de ingredientes cadastrados."
+    return f"Não: {termo} não aparece nos {len(ingredientes)} ingredientes cadastrados."
+
+
+def _resposta_das_tools(estado: EstadoVenus) -> str:
+    """Texto final sem nenhum texto de LLM: a ficha das tools e, se a pergunta
+    pede algo que a ficha não responde, o aviso de que esse dado não existe."""
+    evidencias = estado.get("evidencias_tools")
+    pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
+    ficha = _resposta_segura_sem_aprovacao(estado)
+    direta = _resposta_sobre_ingrediente(pergunta, evidencias)
+    if direta:
+        texto = f"{direta}\n\n{ficha}"
+    elif _FICHA_RESPONDE_RE.search(pergunta):
+        texto = ficha
+    else:
+        texto = f"{_SEM_DADO_PARA_A_PERGUNTA}\n\n{ficha}"
+    alertas = [] if "Atenção:" in texto else _alertas_de_alergia(texto, evidencias)
+    return "\n\n".join([texto, *alertas])
+
+
 # --- nó ---
 
 
@@ -687,6 +733,9 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
     # reprovado (ele costuma conter invenção); usa só a evidência das tools.
     if not aprovado and _dominio_com_dado_no_banco(estado, especialista_json):
         return {"resposta_final": _resposta_segura_sem_aprovacao(estado)}
+
+    if rota_so_com_tools(estado.get("rota")):
+        return {"resposta_final": _resposta_das_tools(estado)}
 
     pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
     entrada = _montar_entrada_orquestrador(especialista_json, aprovado, pergunta)
