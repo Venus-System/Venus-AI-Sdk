@@ -130,7 +130,7 @@ US$ 44,10 e US$ 374,61 por mês.
   Qdrant Cloud nos planos gratuitos.
 - **1.000 usuários:** EC2 t3.medium (US$ 30,37); Atlas Flex no teto (US$ 30); Postgres
   pago estimado em **US$ 25 (premissa: conferir o plano da Aiven)**; Qdrant gratuito
-  (o FAQ tem 7 documentos).
+  (o FAQ tem 6 documentos).
 - **Fora da conta:** Langfuse e tráfego de rede.
 
 **Plano gratuito:** com 1.000 usuários distribuídos por igual no mês, a média seria de

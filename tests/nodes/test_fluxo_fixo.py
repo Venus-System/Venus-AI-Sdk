@@ -133,3 +133,10 @@ async def test_faq_sem_trecho_nao_vai_para_a_web():
 async def test_numero_fora_da_lista_nao_escolhe_trecho():
     (_, fontes), _ = await _faq("7")
     assert fontes == []
+
+
+async def test_sugestao_consulta_a_nota_de_todos_os_produtos_listados():
+    candidatos = [{**SERUM_X, "product_id": i, "name": f"Sérum {i}"} for i in range(1, 8)]
+    saida = await evidencias_de_produto("me indica um sérum", None, 1, _tools(search_product=candidatos))
+    assert _nomes(saida).count("get_product_score") == 6
+

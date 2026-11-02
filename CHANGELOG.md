@@ -17,6 +17,9 @@ release" no README); cada tag tem a sua seção aqui, dividida em:
   código monta a resposta só com tools e documentos, sem o tom da Venus. Para
   voltar, defina `VENUS_RESPOSTA_SO_DAS_TOOLS=` (vazia) ou liste só as rotas
   desejadas.
+- **Documento técnico fora do FAQ.** `api_de_classificacao.md` foi para `docs/`,
+  e a divisão da nota foi para `como_funciona_o_score.md`, sem nomes de campos.
+  Com Qdrant, rode `python -m venus_sdk.rag.faq_ingest` para atualizar o índice.
 - **FAQ padrão sem web.** Pergunta que os documentos não respondem recebe "Não
   encontrei isso na documentação do Venus.". `busca_web_faq` e `buscar_na_web`
   só valem com `faq` fora de `VENUS_RESPOSTA_SO_DAS_TOOLS`.

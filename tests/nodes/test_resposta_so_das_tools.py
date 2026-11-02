@@ -143,3 +143,15 @@ def test_pergunta_de_saude_recebe_orientacao_fixa_e_nao_o_texto_do_llm():
     texto = no_orquestrador(estado)["resposta_final"]
     assert texto.startswith("Em gravidez, amamentação ou reação na pele, converse com um profissional de saúde.")
     assert "Não tenho um dado cadastrado" in texto and "invento" not in texto
+
+
+def test_sugestao_avisa_que_a_busca_e_por_palavras():
+    estado = {"rota": "produto", "aprovado_juiz": True, "pergunta_original": "me indica um protetor pra pele oleosa",
+              "evidencias_tools": EVIDENCIAS,
+              "resposta_especialista": {"dominio": "produto", "intencao": "sugerir", "resposta": "invento"}}
+    texto = no_orquestrador(estado)["resposta_final"]
+    assert texto.startswith("Busquei as palavras do seu pedido") and "Sérum X" in texto and "invento" not in texto
+
+
+def test_pergunta_sobre_um_produto_nao_recebe_o_aviso_da_busca():
+    assert "Busquei as palavras" not in _responder("qual a nota do Sérum X?")

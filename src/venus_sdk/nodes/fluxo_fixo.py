@@ -18,7 +18,8 @@ from venus_sdk.tools._util import palavras_de_busca
 
 logger = logging.getLogger(__name__)
 
-_MAX_PRODUTOS_SUGERIDOS = 5
+# O mesmo número que o Orquestrador lista: produto fora daqui saía sem nota.
+_MAX_PRODUTOS_SUGERIDOS = 6
 _MAX_PALAVRAS_DO_INGREDIENTE = 3
 _RE_SUGESTAO = re.compile(
     r"\b(indic\w*|sugir\w*|sugest\w*|recomend\w*|melhor(es)?|(bom|boa|bons|boas) (pra|para))\b", re.IGNORECASE

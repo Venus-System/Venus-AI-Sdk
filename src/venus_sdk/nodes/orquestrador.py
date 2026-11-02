@@ -685,6 +685,11 @@ _PERGUNTA_DE_SAUDE_RE = re.compile(
     re.IGNORECASE,
 )
 _ORIENTACAO_DE_SAUDE = "Em gravidez, amamentação ou reação na pele, converse com um profissional de saúde."
+# `search_product` procura palavras: não sabe se o produto é indicado para o caso.
+_AVISO_DA_BUSCA = (
+    "Busquei as palavras do seu pedido no nome, na marca, na categoria e na descrição dos produtos. "
+    "Isso não confirma que cada um seja indicado para o seu caso."
+)
 _SEM_DADO_PARA_A_PERGUNTA = "Não tenho um dado cadastrado que responda exatamente a isso. O que tenho é:"
 
 
@@ -721,6 +726,10 @@ def _ficha_para_a_pergunta(estado: EstadoVenus, pergunta: str) -> str:
     direta = _resposta_sobre_ingrediente(pergunta, evidencias)
     if direta:
         return f"{direta}\n\n{ficha}"
+    especialista = estado.get("resposta_especialista")
+    sugestao = isinstance(especialista, dict) and especialista.get("intencao") == "sugerir"
+    if rota == "produto" and sugestao and isinstance(dados_da_evidencia(evidencias, "search_product"), list):
+        return f"{_AVISO_DA_BUSCA}\n\n{ficha}"
     return ficha if _FICHA_RESPONDE_RE.search(pergunta) else f"{_SEM_DADO_PARA_A_PERGUNTA}\n\n{ficha}"
 
 

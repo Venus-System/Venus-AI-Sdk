@@ -50,6 +50,9 @@ resposta no FAQ e 7 sem. Inclui as 3 da revisão técnica 2:
 
 ## Antes: trechos de 700 caracteres sem olhar as seções
 
+As medições abaixo são anteriores à saída do `api_de_classificacao.md` do FAQ. Ele
+agora fica em `docs/`, e o conjunto de avaliação tem 2 perguntas a menos.
+
 A divisão antiga do `rag/carregador.py` usava só `RecursiveCharacterTextSplitter`
 com 700 caracteres. O `api_de_classificacao.md`, com 739 linhas de tabelas e
 código, virava dezenas de pedaços sem contexto que ganhavam de documentos de
