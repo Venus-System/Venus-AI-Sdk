@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from typing import Literal
 
@@ -396,6 +397,12 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
             return _veredito(False, _feedback_da_amarracao(problemas), proxima_tentativa)
         if amarracao_verificada and _so_nomes_e_notas_conferidos(especialista):
             return _veredito(True, None, proxima_tentativa)
+
+    # `VENUS_JUIZ_LLM_ROTAS` (rotas separadas por vírgula; padrão: todas): fora
+    # dessas rotas, valem só as regras em código acima.
+    rotas_com_llm = os.getenv("VENUS_JUIZ_LLM_ROTAS")
+    if rotas_com_llm is not None and estado.get("rota") not in rotas_com_llm.split(","):
+        return _veredito(True, None, proxima_tentativa)
 
     entrada = _montar_entrada_juiz(estado, amarracao_verificada)
     mensagens = [("system", com_data_atual(JUIZ_PROMPT_COMPLETO)), ("human", entrada)]
