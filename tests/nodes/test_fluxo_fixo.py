@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import patch
 
-from venus_sdk.nodes.fluxo_fixo import evidencias_de_ingrediente, evidencias_de_produto
+from venus_sdk.nodes.fluxo_fixo import evidencias_de_faq, evidencias_de_ingrediente, evidencias_de_produto
 
 
 class ToolFalsa:
@@ -88,3 +90,36 @@ async def test_varios_ingredientes_nao_escolhe_um():
 
 async def test_calculo_vai_para_o_agente():
     assert await evidencias_de_ingrediente("qual o limite de 2% de ácido salicílico?", 1, _tools()) is None
+
+
+TRECHOS = [{"trecho": "Limites > X\n\nOutro assunto.", "fonte": "limites.md"},
+           {"trecho": "Privacidade > Vende?\n\nNão. O Venus não vende.", "fonte": "privacidade.md"}]
+
+
+async def _faq(saida_llm: str, web: Any = None):
+    tools = _tools(faq_retriever=TRECHOS, buscar_na_web=web or {"encontrado": False})
+    with patch("venus_sdk.nodes.fluxo_fixo.get_llm_rapido") as get_llm:
+        get_llm.return_value.invoke.return_value = SimpleNamespace(content=saida_llm)
+        return await evidencias_de_faq("vocês vendem meus dados?", tools), tools
+
+
+async def test_faq_mostra_o_trecho_escolhido_sem_o_caminho_do_titulo():
+    (evidencias, fontes), tools = await _faq("2")
+    assert fontes == [{"texto": "Não. O Venus não vende.", "fonte": "privacidade.md"}]
+    assert tools["buscar_na_web"].chamadas == [] and [e["tool"] for e in evidencias] == ["faq_retriever"]
+
+
+async def test_faq_sem_trecho_cai_na_web_com_a_url():
+    web = [{"titulo": "T", "trecho": "Da web.", "url": "https://x.org"}, {"titulo": "sem url", "trecho": "y"}]
+    (_, fontes), _ = await _faq("NENHUM", web)
+    assert fontes == [{"texto": "Da web.", "fonte": "https://x.org"}]
+
+
+async def test_faq_sem_nada_nao_tem_fonte_a_mostrar():
+    (_, fontes), _ = await _faq("NENHUM")
+    assert fontes == []
+
+
+async def test_numero_fora_da_lista_nao_escolhe_trecho():
+    (_, fontes), _ = await _faq("7")
+    assert fontes == []

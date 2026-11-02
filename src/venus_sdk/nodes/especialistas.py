@@ -32,7 +32,7 @@ from venus_sdk.prompts.produto import ESP_PRODUTO_PROMPT_COMPLETO
 from venus_sdk.prompts.rotina import ROTINA_PROMPT_COMPLETO
 from venus_sdk.nodes.state import EstadoVenus
 from venus_sdk.nodes._evidencias import rota_so_com_tools
-from venus_sdk.nodes.fluxo_fixo import evidencias_de_ingrediente, evidencias_de_produto
+from venus_sdk.nodes.fluxo_fixo import evidencias_de_faq, evidencias_de_ingrediente, evidencias_de_produto
 from venus_sdk.tools.calculos import montar_tools_calculo_ingrediente, montar_tools_calculo_rotina
 from venus_sdk.tools.compartilhadas import montar_tools_compartilhadas
 from venus_sdk.tools.faq import montar_tools_faq
@@ -315,7 +315,7 @@ async def _executar_especialista(estado: EstadoVenus, nome: str, agente: Any) ->
     return {"resposta_especialista": resposta_json, "evidencias_tools": evidencias}
 
 
-_FLUXO_FIXO = {"produto", "ingrediente"}
+_FLUXO_FIXO = {"produto", "ingrediente", "faq"}
 
 
 async def _responder_com_fluxo_fixo(
@@ -327,6 +327,13 @@ async def _responder_com_fluxo_fixo(
     try:
         tools = {tool.name: tool for tool in montar_tools()}
         with usuario_da_conversa(usuario):
+            if nome == "faq":
+                evidencias, fontes = await evidencias_de_faq(pergunta, tools)
+                return {
+                    "resposta_especialista": {"dominio": nome, "intencao": "informar", "resposta": "",
+                                              "recomendacao": "", "fontes_a_mostrar": fontes},
+                    "evidencias_tools": evidencias,
+                }
             if nome == "produto":
                 saida = await evidencias_de_produto(pergunta, estado.get("produto_em_contexto"), usuario, tools)
             else:

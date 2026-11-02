@@ -588,6 +588,27 @@ def _parte_sugestao_com_alergia(evidencias: list[dict] | None, excluir: str | No
     return "\n\n".join(linhas)
 
 
+def _parte_checkup(evidencias: list[dict] | None) -> str | None:
+    """Avisos do check-up da rotina (`check_routine_health`), com o motivo cadastrado."""
+    dados = dados_da_evidencia(evidencias, "check_routine_health")
+    if not isinstance(dados, dict) or not dados.get("checado"):
+        return None
+    motivos = [str(a.get("motivo")) for a in dados.get("avisos") or [] if isinstance(a, dict) and a.get("motivo")]
+    if not motivos:
+        return "O check-up da rotina não encontrou nenhum aviso."
+    return "No check-up da rotina:\n" + "\n".join(f"- {motivo}" for motivo in dict.fromkeys(motivos))
+
+
+def _parte_calculos(evidencias: list[dict] | None) -> str | None:
+    """Resultados das tools de cálculo, no texto exato que elas mandam citar."""
+    valores = []
+    for evidencia in evidencias or []:
+        dados = dados_da_evidencia([evidencia], str(evidencia.get("tool")))
+        if isinstance(dados, dict) and dados.get("valor_para_citar"):
+            valores.append(str(dados["valor_para_citar"]))
+    return f"Resultado do cálculo: {'; '.join(dict.fromkeys(valores))}." if valores else None
+
+
 def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
     """Quando o Juiz esgota as tentativas em produto/ingrediente/rotina, o texto do especialista
     (reprovado por inventar dado) NÃO chega ao usuário. Monta uma resposta só com o que as
@@ -631,6 +652,8 @@ def _resposta_segura_sem_aprovacao(estado: EstadoVenus) -> str:
         )
     candidatas = [
         *dados_da_conta,
+        _parte_checkup(evidencias),
+        _parte_calculos(evidencias),
         texto_produtos,
         _parte_ingredientes(evidencias, pergunta),
         None if sugestao_com_alergia else _parte_alergias(
@@ -677,16 +700,24 @@ def _resposta_das_tools(estado: EstadoVenus) -> str:
     pede algo que a ficha não responde, o aviso de que esse dado não existe."""
     evidencias = estado.get("evidencias_tools")
     pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
+    rota = estado.get("rota")
+    if rota == "faq":
+        return _parte_faq(estado.get("resposta_especialista"))
     ficha = _resposta_segura_sem_aprovacao(estado)
+    if rota == "rotina":
+        return ficha
     direta = _resposta_sobre_ingrediente(pergunta, evidencias)
     if direta:
-        texto = f"{direta}\n\n{ficha}"
-    elif _FICHA_RESPONDE_RE.search(pergunta):
-        texto = ficha
-    else:
-        texto = f"{_SEM_DADO_PARA_A_PERGUNTA}\n\n{ficha}"
-    alertas = [] if "Atenção:" in texto else _alertas_de_alergia(texto, evidencias)
-    return "\n\n".join([texto, *alertas])
+        return f"{direta}\n\n{ficha}"
+    return ficha if _FICHA_RESPONDE_RE.search(pergunta) else f"{_SEM_DADO_PARA_A_PERGUNTA}\n\n{ficha}"
+
+
+def _parte_faq(especialista: Any) -> str:
+    """O documento (ou a página da web) como está, com a fonte. Nada escrito por LLM."""
+    fontes = especialista.get("fontes_a_mostrar") if isinstance(especialista, dict) else None
+    if not fontes:
+        return "Não encontrei isso na documentação do Venus."
+    return "\n\n".join(f"{item['texto']}\n\nFonte: {item['fonte']}" for item in fontes)
 
 
 # --- nó ---
@@ -746,7 +777,13 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
         return {"resposta_final": _resposta_segura_sem_aprovacao(estado)}
 
     if rota_so_com_tools(estado.get("rota")):
-        return {"resposta_final": _resposta_das_tools(estado)}
+        texto = _sem_ids_internos(_resposta_das_tools(estado))
+        alertas = [] if "Atenção:" in texto else _alertas_de_alergia(texto, estado.get("evidencias_tools"))
+        texto = "\n\n".join([texto, *alertas])
+        # O "sim" confirma exatamente o que o código mostra (ver abaixo).
+        if estado.get("agendamento_pendente"):
+            texto = f"{texto}\n\n{_pedido_de_confirmacao(estado['agendamento_pendente'])}"
+        return {"resposta_final": texto, "alertas_alergia_anexados": len(alertas)}
 
     pergunta = estado.get("pergunta_original") or estado.get("mensagem_usuario") or ""
     entrada = _montar_entrada_orquestrador(especialista_json, aprovado, pergunta)

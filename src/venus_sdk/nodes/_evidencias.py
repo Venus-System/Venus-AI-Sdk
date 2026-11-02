@@ -43,7 +43,7 @@ def rota_so_com_tools(rota: str | None) -> bool:
     """`VENUS_RESPOSTA_SO_DAS_TOOLS` (rotas separadas por vírgula; vazia desliga):
     nessas rotas o texto final é montado pelo código, só com o retorno das tools,
     para não haver afirmação sem fonte."""
-    return bool(rota) and rota in os.getenv("VENUS_RESPOSTA_SO_DAS_TOOLS", "produto,ingrediente").split(",")
+    return bool(rota) and rota in os.getenv("VENUS_RESPOSTA_SO_DAS_TOOLS", "produto,ingrediente,rotina,faq").split(",")
 
 
 def alergias_declaradas(evidencias: list[dict] | None) -> list[str]:

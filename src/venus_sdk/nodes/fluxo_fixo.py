@@ -8,13 +8,19 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from typing import Any
 
+from venus_sdk.llm.models import extrair_texto_resposta, get_llm_rapido
+from venus_sdk.prompts.faq import ESCOLHA_DE_TRECHO_PROMPT
 from venus_sdk.tools._util import palavras_de_busca
+
+logger = logging.getLogger(__name__)
 
 _MAX_PRODUTOS_SUGERIDOS = 5
 _MAX_PALAVRAS_DO_INGREDIENTE = 3
+_MAX_RESULTADOS_WEB = 2
 _RE_SUGESTAO = re.compile(
     r"\b(indic\w*|sugir\w*|sugest\w*|recomend\w*|melhor(es)?|(bom|boa|bons|boas) (pra|para))\b", re.IGNORECASE
 )
@@ -120,3 +126,40 @@ async def evidencias_de_ingrediente(
                      "get_ingredient_regulations")
     ))
     return [busca, *detalhes, *await _do_usuario(tools, usuario)], "informar"
+
+
+def _escolher_trecho(pergunta: str, trechos: list[str]) -> int | None:
+    """Índice do trecho que responde à pergunta, segundo o LLM rápido, ou `None`."""
+    numerados = "\n\n".join(f"[{numero}] {trecho}" for numero, trecho in enumerate(trechos, start=1))
+    mensagens = [("system", ESCOLHA_DE_TRECHO_PROMPT), ("human", f"PERGUNTA={pergunta}\n\nTRECHOS:\n{numerados}")]
+    try:
+        saida = extrair_texto_resposta(get_llm_rapido().invoke(mensagens))
+    except Exception:  # noqa: BLE001 — sem a escolha, a resposta é dizer que não encontrou
+        logger.exception("Falha ao escolher o trecho do FAQ")
+        return None
+    achado = re.search(r"\d+", saida)
+    indice = int(achado.group()) - 1 if achado else -1
+    return indice if 0 <= indice < len(trechos) else None
+
+
+async def evidencias_de_faq(
+    pergunta: str, tools: dict[str, Any]
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    """`(evidências, fontes a mostrar)`: o trecho do FAQ que responde ou, sem nenhum,
+    o que a busca na web trouxer. Cada fonte tem `texto` e `fonte`."""
+    busca = await _chamar(tools, "faq_retriever", pergunta=pergunta)
+    achados = _dados(busca)
+    if isinstance(achados, list) and achados:
+        indice = await asyncio.to_thread(_escolher_trecho, pergunta, [str(a.get("trecho")) for a in achados])
+        if indice is not None:
+            achado = achados[indice]
+            corpo = str(achado.get("trecho")).split("\n\n", 1)[-1].strip()
+            return [busca], [{"texto": corpo, "fonte": str(achado.get("fonte"))}]
+    web = await _chamar(tools, "buscar_na_web", consulta=pergunta)
+    resultados = _dados(web)
+    if not isinstance(resultados, list):
+        return [busca, web], []
+    return [busca, web], [
+        {"texto": str(r.get("trecho")), "fonte": str(r.get("url"))}
+        for r in resultados[:_MAX_RESULTADOS_WEB] if isinstance(r, dict) and r.get("trecho") and r.get("url")
+    ]
