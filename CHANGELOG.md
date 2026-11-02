@@ -9,6 +9,27 @@ release" no README); cada tag tem a sua seção aqui, dividida em:
 - **Novidades:** o que passou a existir, sem quebrar quem já usava.
 - **Correções:** bugs corrigidos.
 
+## Não lançado
+
+Entra na próxima tag; quem lançar sobe a versão no `pyproject.toml`.
+
+### Mudanças incompatíveis
+- Nenhuma mudança incompatível. Os campos novos no estado são opcionais para
+  quem lê.
+
+### Novidades
+- **Resultado do turno no estado**, para a API gravar no trace do Langfuse:
+  - `juiz_decidiu_por` (tipo `DecisorJuiz`): `"regra"` quando o código deu o
+    veredito sem chamar o LLM do Juiz, `"llm"` quando o veredito veio do LLM e
+    `"falha_llm"` quando o LLM falhou e a resposta foi reprovada sem feedback;
+  - `alertas_alergia_anexados`: quantos alertas de alergia o orquestrador
+    anexou porque o texto do LLM não trazia.
+
+### Correções
+- O guardrail de entrada zera `rota`, `juiz_decidiu_por` e
+  `alertas_alergia_anexados` a cada turno. Antes, numa entrada bloqueada, a
+  `rota` do turno anterior voltava pelo checkpointer.
+
 ## 0.4.0
 
 Expressão da Venus para a web. Tudo desde `v0.3.0`.

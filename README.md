@@ -543,14 +543,15 @@ anti-alucinação, guardrails, Google Calendar e check-up da rotina.
 **Observabilidade:** fica na API (`venus_api`), não no SDK. O Langfuse rastreia cada
 mensagem, com o tempo de cada nó do grafo e os tokens e custo de cada chamada de LLM,
 marcados por usuário e conversa. Um middleware grava a duração e o status de cada
-requisição no Mongo, de onde sai a taxa de erro.
+requisição no Mongo, de onde sai a taxa de erro. O resultado de cada turno também vai
+para o trace: rota, veredito do Juiz e quem o deu (`juiz_decidiu_por`: regra, LLM ou
+falha do LLM), tentativas, bloqueios dos guardrails e alertas de alergia anexados pelo
+código (`alertas_alergia_anexados`). O SDK deixa esses campos no estado final do
+grafo e a API os grava.
 
 **Custo e ROI:** custo para 100 e 1.000 usuários semanais, latência, índice de erros,
 custo por resolução e ROI em [`docs/custo-e-roi.md`](docs/custo-e-roi.md), a partir de
 uma medição com conversas reais.
-
-**Pendente:** o resultado de cada turno no trace (rota, se o Juiz aprovou por regra ou
-por LLM, tentativas, alerta de alergia anexado).
 
 ## Licença
 

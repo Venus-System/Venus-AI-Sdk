@@ -18,7 +18,7 @@ from venus_sdk.nodes._evidencias import dados_da_evidencia
 from venus_sdk.nodes._historico import historico_recente
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
-from venus_sdk.nodes.state import EstadoVenus
+from venus_sdk.nodes.state import DecisorJuiz, EstadoVenus
 from venus_sdk.texto import remover_acentos
 from venus_sdk.tools.calculos import TOOLS_COM_NUMERO_A_CITAR, formatar_numero
 
@@ -301,8 +301,8 @@ def _pedido_de_esclarecimento_honesto(estado: EstadoVenus) -> bool:
     return not _RE_AFIRMA_DADO.search(texto)
 
 
-def _veredito(aprovado: bool, feedback: str | None, tentativas: int) -> EstadoVenus:
-    return {"aprovado_juiz": aprovado, "feedback_juiz": feedback, "tentativas_juiz": tentativas}
+def _veredito(aprovado: bool, feedback: str | None, tentativas: int, *, por: DecisorJuiz = "regra") -> EstadoVenus:
+    return {"aprovado_juiz": aprovado, "feedback_juiz": feedback, "tentativas_juiz": tentativas, "juiz_decidiu_por": por}
 
 
 def _montar_entrada_juiz(estado: EstadoVenus, amarracao_verificada: str | None = None) -> str:
@@ -405,10 +405,10 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         # LLM do Juiz fora do ar: reprovação sem feedback, que segue o fluxo
         # normal de retry/"esgotado" em vez de derrubar a conversa.
         logger.exception("Falha ao chamar o LLM do Agente Juiz")
-        return _veredito(False, None, proxima_tentativa)
+        return _veredito(False, None, proxima_tentativa, por="falha_llm")
 
     aprovado, feedback = _ler_veredito_do_llm((resposta.content or "").strip())
-    return _veredito(aprovado, feedback, proxima_tentativa)
+    return _veredito(aprovado, feedback, proxima_tentativa, por="llm")
 
 
 def decidir_pos_juiz(estado: EstadoVenus) -> ResultadoJuiz:

@@ -763,11 +763,12 @@ def no_orquestrador(estado: EstadoVenus) -> EstadoVenus:
     if pendentes and _AFIRMA_AGENDAMENTO_RE.search(texto):
         logger.warning("Orquestrador afirmou um agendamento ainda não confirmado; texto substituído")
         texto = _RESPOSTA_ANTES_DA_CONFIRMACAO
+        alertas = []  # foram junto com o texto trocado
     if pendentes:
         # O que será gravado é mostrado pelo código, não pelo LLM: o "sim"
         # confirma exatamente este texto.
         texto = f"{texto}\n\n{_pedido_de_confirmacao(pendentes)}"
-    return {"resposta_final": texto}
+    return {"resposta_final": texto, "alertas_alergia_anexados": len(alertas)}
 
 
 def _pedido_de_confirmacao(propostas: list[dict]) -> str:
