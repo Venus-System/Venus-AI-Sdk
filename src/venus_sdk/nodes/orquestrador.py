@@ -311,7 +311,7 @@ def _nota_listada(evidencias: list[dict] | None, produto: dict) -> str:
     score = dados_da_evidencia(evidencias, "get_product_score", product_id=produto.get("product_id"))
     if isinstance(score, dict) and score.get("overall_score") is not None:
         return f" — nota geral {score['overall_score']}/100"
-    return ""
+    return " — sem nota cadastrada" if isinstance(score, dict) else ""
 
 
 def _propriedades_legiveis(propriedades: list, *, com_quimica: bool) -> list[str]:

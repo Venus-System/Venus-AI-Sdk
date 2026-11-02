@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
@@ -139,4 +141,21 @@ async def test_sugestao_consulta_a_nota_de_todos_os_produtos_listados():
     candidatos = [{**SERUM_X, "product_id": i, "name": f"Sérum {i}"} for i in range(1, 8)]
     saida = await evidencias_de_produto("me indica um sérum", None, 1, _tools(search_product=candidatos))
     assert _nomes(saida).count("get_product_score") == 6
+
+
+@pytest.mark.parametrize("pergunta", [
+    "como a nota de 0 a 100 é dividida?", "o que é o baseScore?", "qual a diferença entre o score geral e o personalizado?",
+    "o que acontece com a nota quando a fórmula de um produto muda?", "vocês usam o que eu falo aqui pra propaganda?",
+    "a venus consegue diagnosticar acne?",
+])
+def test_pergunta_sobre_o_venus_nao_fica_com_a_resposta_direta_do_llm(pergunta):
+    from venus_sdk.nodes.roteador import _RE_FAQ
+
+    assert _RE_FAQ.search(pergunta)
+
+
+def test_nota_de_produto_nao_vira_pergunta_de_faq():
+    from venus_sdk.nodes.roteador import _RE_FAQ
+
+    assert not _RE_FAQ.search("qual a nota do CeraVe Sérum Renovador?")
 

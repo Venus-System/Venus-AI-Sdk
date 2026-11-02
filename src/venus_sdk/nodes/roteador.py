@@ -120,6 +120,9 @@ _RE_FAQ = re.compile(
     # Metodologia e fontes:
     r"\bcomo\b.{0,25}\b(notas?|scores?|pontua\w*)\b.{0,25}\b(calcul|funcion|defin)\w*|"
     r"\bcomo\b.{0,10}\b(calcul|funcion|defin)\w*\b.{0,15}\b(notas?|scores?|pontua\w*)\b|"
+    r"\bnotas?\b.{0,20}\b0 a 100\b|\b(base|profile|final)score\b|\bscore (geral|personalizado)\b|"
+    r"\bdiferen[cç]a\b.{0,30}\b(scores?|notas?)\b|\bo que acontece com a nota\b|"
+    r"\bvoc[eê]s\b.{0,30}\b(propaganda|an[uú]nci\w*|anunciantes?)\b|\bvenus\b.{0,20}\bdiagnostic\w*|"
     r"\bde onde v[eê]m\b.{0,12}\b(dados|informa\w*|notas?|scores?|fontes?)\b|\bfontes? (dos|de) dados\b|"
     # Limites da IA:
     r"\bsubstitu\w*\b.{0,20}\b(dermatologista|m[eé]dic\w*|profissional)\b|"
