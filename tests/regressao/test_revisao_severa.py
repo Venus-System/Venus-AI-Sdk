@@ -271,10 +271,10 @@ def test_prompt_recebe_a_data_da_chamada_em_portugues():
     assert comum.data_hora_atual(datetime(2026, 9, 29, 17, 5, tzinfo=timezone.utc)) == (
         "terça-feira, 29 de setembro de 2026 — 14:05 (horário de Brasília)"
     )
-    assert comum.MARCADOR_DATA_HORA in ROUTER_PROMPT_COMPLETO
     with patch.object(comum, "data_hora_atual", return_value="AGORA-TESTE"):
         mensagens = roteador._mensagens_para_o_roteador({"mensagem_usuario": "oi"})
-    assert "AGORA-TESTE" in mensagens[0][1] and comum.MARCADOR_DATA_HORA not in mensagens[0][1]
+    # No fim do prompt: o cache de prompt só reaproveita o começo idêntico.
+    assert mensagens[0][1].startswith(ROUTER_PROMPT_COMPLETO) and mensagens[0][1].endswith("AGORA-TESTE")
 
 
 # --- [13/14] orquestrador ---

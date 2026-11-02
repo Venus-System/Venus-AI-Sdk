@@ -89,12 +89,17 @@ class Medidor(BaseCallbackHandler):
     def on_llm_end(self, response, *, run_id, **kwargs):
         uso: dict[str, Any] = {}
         modelo = None
+        cache = 0
         for geracoes in response.generations:
             for geracao in geracoes:
                 mensagem = getattr(geracao, "message", None)
                 uso = dict(getattr(mensagem, "usage_metadata", None) or uso)
-                modelo = (getattr(mensagem, "response_metadata", None) or {}).get("model_name") or modelo
-        extra = {"entrada": uso.get("input_tokens", 0), "saida": uso.get("output_tokens", 0), "erro": None}
+                metadados = getattr(mensagem, "response_metadata", None) or {}
+                modelo = metadados.get("model_name") or modelo
+                detalhes = (metadados.get("token_usage") or {}).get("prompt_tokens_details") or {}
+                cache = detalhes.get("cached_tokens") or cache
+        extra = {"entrada": uso.get("input_tokens", 0), "saida": uso.get("output_tokens", 0),
+                 "cache": cache, "erro": None}
         if modelo:
             extra["modelo"] = modelo
         self._fechar(run_id, **extra)
@@ -107,7 +112,9 @@ def preco_da_chamada(chamada: dict) -> float | None:
     preco = next((p for nome, p in PRECOS.items() if nome in str(chamada["modelo"])), None)
     if preco is None:
         return None
-    return chamada["entrada"] / 1e6 * preco[0] + chamada["saida"] / 1e6 * preco[1]
+    # O Mistral cobra 10% do preço de entrada pelos tokens em cache.
+    em_cache = chamada.get("cache", 0) if "ministral" in str(chamada["modelo"]) else 0
+    return ((chamada["entrada"] - em_cache) + em_cache * 0.1) / 1e6 * preco[0] + chamada["saida"] / 1e6 * preco[1]
 
 
 async def medir() -> list[dict]:
@@ -171,6 +178,7 @@ def resumo(turnos: list[dict]) -> str:
         f"Turnos: {n} em {len({t['conversa'] for t in turnos})} conversas",
         f"Chamadas de LLM por turno: {len(chamadas) / n:.1f} ({len(chamadas) - len(ok)} falharam e passaram ao próximo elo)",
         f"Tokens por turno: {sum(c['entrada'] for c in ok) / n:.0f} de entrada, {sum(c['saida'] for c in ok) / n:.0f} de saída",
+        f"Tokens de entrada em cache: {sum(c.get('cache', 0) for c in ok) / max(1, sum(c['entrada'] for c in ok)):.0%}",
         f"Tempo do turno: mediana {statistics.median(t['segundos'] for t in turnos):.1f}s, "
         f"p95 {_p([t['segundos'] for t in turnos], 0.95):.1f}s",
         "", "| Nó | Chamadas | Entrada média | Saída média | Tempo médio |", "|---|---|---|---|---|",
