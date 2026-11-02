@@ -152,7 +152,7 @@ Em outro projeto, instale sempre **por tag**, nunca por branch, para que todo de
 use exatamente o mesmo código:
 
 ```bash
-pip install "venus-ai-sdk[mongo,a2a,rag] @ git+https://github.com/Venus-System/Venus-AI-Sdk.git@v0.4.0"
+pip install "venus-ai-sdk[mongo,a2a,rag] @ git+https://github.com/Venus-System/Venus-AI-Sdk.git@v0.5.0"
 ```
 
 Para desenvolver no próprio SDK:
@@ -470,8 +470,8 @@ Scripts manuais, que usam LLM e banco de verdade e por isso gastam cota:
 ## Versões e release
 
 O SDK segue versionamento semântico, e cada versão tem uma tag no Git e uma seção
-no [`CHANGELOG.md`](CHANGELOG.md). Tags publicadas: `v0.1.0`, `v0.2.0`, `v0.3.0` e
-`v0.4.0`.
+no [`CHANGELOG.md`](CHANGELOG.md). Tags publicadas: `v0.1.0`, `v0.2.0`, `v0.3.0`,
+`v0.4.0` e `v0.5.0`.
 
 Para lançar uma versão:
 
