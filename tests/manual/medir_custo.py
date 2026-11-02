@@ -139,13 +139,24 @@ async def medir() -> list[dict]:
                 config = {"configurable": {"thread_id": thread}, "callbacks": [medidor], "recursion_limit": 40}
                 inicio = time.perf_counter()
                 erro = None
+                final: dict[str, Any] = {}
+                vereditos: list[dict] = []
+                entrada = {"mensagem_usuario": mensagem, "usuario_id": f"custo-{user_id}", "usuario_id_postgres": user_id}
+
+                async def rodar() -> None:
+                    async for passo in grafo.astream(entrada, config=config, stream_mode="updates"):
+                        for no, saida in passo.items():
+                            final.update(saida or {})
+                            if no == "agente_juiz":
+                                vereditos.append({campo: (saida or {}).get(campo) for campo in
+                                                  ("aprovado_juiz", "juiz_decidiu_por", "feedback_juiz")})
+
                 try:
-                    final = await asyncio.wait_for(grafo.ainvoke(
-                        {"mensagem_usuario": mensagem, "usuario_id": f"custo-{user_id}",
-                         "usuario_id_postgres": user_id}, config=config), 240)
+                    await asyncio.wait_for(rodar(), 240)
                 except Exception as exc:  # noqa: BLE001 — o turno com erro também entra na conta
-                    final, erro = {}, type(exc).__name__
+                    erro = type(exc).__name__
                 turnos.append({
+                    "vereditos": vereditos,
                     "conversa": numero, "mensagem": mensagem, "rota": final.get("rota") or "direto",
                     "bloqueada": bool(final.get("entrada_bloqueada")), "aprovado_juiz": final.get("aprovado_juiz"),
                     "tentativas_juiz": final.get("tentativas_juiz", 0), "juiz_decidiu_por": final.get("juiz_decidiu_por"),
