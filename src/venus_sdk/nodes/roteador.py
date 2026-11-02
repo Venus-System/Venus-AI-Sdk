@@ -343,6 +343,9 @@ def _aplicar_redes_de_seguranca(
     if rota not in _ROTAS_VALIDAS and not eh_small_talk:
         sugerida = rota_por_palavras(mensagem_usuario)
         if sugerida:
+            # As palavras-chave testam "fragrância" antes de "hidratante": "o X
+            # Hidratante tem fragrância?" é pergunta de produto mesmo assim.
+            sugerida = _rota_obrigatoria(sugerida, mensagem_usuario) or sugerida
             logger.warning("Roteador não devolveu ROUTE=; rota %s inferida por palavras-chave", sugerida)
             rota = sugerida
             texto = _encaminhar(sugerida, mensagem_usuario)

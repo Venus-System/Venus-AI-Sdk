@@ -83,3 +83,10 @@ def test_pergunta_de_produto_nao_vai_para_ingrediente_por_causa_do_nome():
 
     assert _rota_obrigatoria("ingrediente", "o Sérum Hidratante com Ácido Hialurônico tem fragrância?") == "produto"
     assert _rota_obrigatoria("ingrediente", "o ácido hialurônico faz mal?") is None
+
+
+def test_rota_inferida_por_palavras_tambem_respeita_a_pergunta_de_produto():
+    from venus_sdk.nodes.roteador import _aplicar_redes_de_seguranca
+
+    rota, _ = _aplicar_redes_de_seguranca(None, "texto direto", "o CeraVe Hidratante Noite tem fragrância?")
+    assert rota == "produto"
