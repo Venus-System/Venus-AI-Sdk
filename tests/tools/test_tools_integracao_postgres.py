@@ -44,7 +44,6 @@ async def test_produto_sem_ingrediente_nao_inventa(t) -> None:
 async def test_todas_as_tools_de_leitura(t) -> None:
     assert (await t["get_product"].ainvoke({"product_id": 2}))["brand_name"] == "DermaClara"
     assert (await t["get_product_score"].ainvoke({"product_id": 2}))["overall_score"] == 88.0
-    assert (await t["get_personalized_score"].ainvoke({"product_id": 2, "user_id": 1}))["risk_level"] == "baixo"
     assert len(await t["get_product_ingredients"].ainvoke({"product_id": 2})) == 4
     assert (await t["get_ingredient_summary"].ainvoke({"ingredient_id": 1}))["source_reference"] == "CosIng"
     assert (await t["get_ingredient_properties"].ainvoke({"ingredient_id": 1}))[0]["unit"] == "g/mol"

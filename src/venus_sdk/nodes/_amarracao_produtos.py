@@ -25,7 +25,6 @@ _NOTAS_POR_TOOL = {
         "overall_score", "health_score", "environmental_score", "ethical_score",
         "performance_score", "transparency_score", "confidence_score",
     ),
-    "get_personalized_score": ("final_score", "compatibility_percentage"),
 }
 _TOOLS_DE_DETALHE = ("get_product", "get_product_ingredients", *_NOTAS_POR_TOOL)
 
@@ -100,7 +99,7 @@ def _retorno_valido(evidencia: dict) -> bool:
 
 def _notas_reais(evidencias: list[dict] | None, product_id: Any) -> dict[str, Any]:
     """Campos que as tools de score devolveram para ESSE `product_id` (só as
-    consultadas) — notas e também `risk_level`/`recommendation_level`."""
+    consultadas)."""
     notas: dict[str, Any] = {}
     for tool in _NOTAS_POR_TOOL:
         dados = dados_da_evidencia(evidencias, tool, product_id=product_id)
@@ -162,7 +161,7 @@ def _problemas_do_item(
             continue
         if campo not in reais:
             problemas.append(
-                f"{campo}={valor} do product_id {product_id} não veio de get_product_score/get_personalized_score "
+                f"{campo}={valor} do product_id {product_id} não veio de get_product_score "
                 "chamada para esse id"
             )
         elif not _mesmo_valor(valor, reais[campo]):

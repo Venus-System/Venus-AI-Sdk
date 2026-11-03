@@ -147,7 +147,7 @@ _RE_DISSE_O_NOME = re.compile(r"\b(meu nome [ée]|me chamo|pode me chamar de)\b"
 # Linhas de contexto que o roteador recebe e às vezes ecoa na resposta direta
 # ("MEMORIA_USUARIO={}" chegou ao usuário no chatbot real, 2026-10-28).
 _LINHA_DE_CONTEXTO_RE = re.compile(
-    r"^[ \t]*(MEMORIA_USUARIO|PRODUTO_EM_TELA|USER_ID_POSTGRES)[ \t]*=.*(?:\n|$)", re.MULTILINE
+    r"^[ \t]*(MEMORIA_USUARIO|NOME_USUARIO|PRODUTO_EM_TELA|USER_ID_POSTGRES)[ \t]*=.*(?:\n|$)", re.MULTILINE
 )
 # "Ingredientes/composição DO [produto]": pergunta de produto, não de ingrediente
 # isolado (só o agente de produto tem `get_product_ingredients`).
@@ -270,15 +270,27 @@ def _invocar_roteador(mensagens: list) -> str:
     return ""
 
 
+def nome_do_usuario(estado: EstadoVenus) -> str:
+    """Como chamar a pessoa: o nome que ela disse no chat (memória de longo
+    prazo) vale mais que o primeiro nome do cadastro; "" se nenhum dos dois."""
+    nome_dito = (estado.get("memorias_usuario") or {}).get("nome")
+    if isinstance(nome_dito, str) and nome_dito.strip():
+        return nome_dito.strip()
+    return estado.get("nome_usuario") or ""
+
+
 def _mensagens_para_o_roteador(estado: EstadoVenus) -> list:
     """Prompt do roteador + histórico da conversa + a mensagem deste turno."""
     mensagem = estado.get("mensagem_anonimizada") or estado.get("mensagem_usuario", "")
     produto, pergunta = separar_produto_em_contexto(mensagem)
     if produto:
         mensagem = f"PRODUTO_EM_TELA={produto}\n{pergunta}"
-    memorias = estado.get("memorias_usuario")
-    if memorias:
-        mensagem = f"MEMORIA_USUARIO={json.dumps(memorias, ensure_ascii=False)}\n{mensagem}"
+    # Da memória de longo prazo, o roteador só recebe o nome: pele, alergias e
+    # objetivo são dos especialistas. Com o JSON inteiro, o "oi" de uma conversa
+    # nova voltava falando do que a pessoa tinha contado em outras conversas.
+    nome = nome_do_usuario(estado)
+    if nome:
+        mensagem = f"NOME_USUARIO={nome}\n{mensagem}"
 
     # O guardrail de entrada já pôs a mensagem deste turno no fim do
     # histórico; ela sai daqui para não aparecer duas vezes no prompt.
@@ -410,11 +422,12 @@ def _recapitulacao(estado: EstadoVenus) -> str | None:
 
 
 def _pergunta_o_nome_do_cadastro(pergunta: str, estado: EstadoVenus) -> bool:
-    """"Qual é meu nome?" quando o nome não foi dito nesta conversa nem está na
-    memória: quem responde é o perfil (`get_user_profile`)."""
+    """"Qual é meu nome?" quando o nome não foi dito nesta conversa, não está
+    na memória nem veio do cadastro (`nome_usuario`, que falha só se o banco
+    falhou): quem responde é o perfil (`get_user_profile`)."""
     if not _RE_PERGUNTA_NOME.search(pergunta) or not estado.get("usuario_id_postgres"):
         return False
-    if (estado.get("memorias_usuario") or {}).get("nome"):
+    if nome_do_usuario(estado):
         return False
     anteriores = list(estado.get("historico") or [])[:-1]
     return not any(

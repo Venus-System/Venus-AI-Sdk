@@ -12,7 +12,6 @@ from typing import Any
 
 from langchain_core.tools import BaseTool, tool
 
-from venus_sdk.tools._identidade import SEM_USUARIO_IDENTIFICADO, resolver_user_id
 from venus_sdk.tools._util import (
     LIMITE_BUSCA,
     consultar,
@@ -74,20 +73,6 @@ _SQL_SCORE_PRODUTO = """
 """
 
 
-_SQL_SCORE_PERSONALIZADO = """
-    SELECT ps.final_score, ps.compatibility_percentage, ps.risk_level,
-           ps.recommendation_level, ps.summary
-    FROM venus.personalized_scores ps
-    JOIN venus.product_versions pv
-        ON pv.product_version_id = ps.fk_product_version_id
-    WHERE pv.fk_product_id = $1
-      AND pv.is_current = true
-      AND ps.fk_user_id = $2
-    ORDER BY ps.created_at DESC
-    LIMIT 1
-"""
-
-
 _SQL_INGREDIENTES_DO_PRODUTO = """
     SELECT pi.position, i.common_name, i.inci_name
     FROM venus.product_ingredients pi
@@ -125,7 +110,7 @@ def _sem_duplicatas(resultado: Any) -> Any:
 
 
 def montar_tools_produto(pool: Any) -> list[BaseTool]:
-    """Monta as 5 tools do agente Produto, com o `pool` capturado por closure.
+    """Monta as 4 tools do agente Produto, com o `pool` capturado por closure.
 
     Levanta `ValueError` se `pool` for `None` — só na hora em que o
     especialista tentar de fato usá-las, nunca na montagem do grafo (ver
@@ -173,17 +158,6 @@ def montar_tools_produto(pool: Any) -> list[BaseTool]:
         return resultado
 
     @tool
-    async def get_personalized_score(product_id: int, user_id: int) -> dict:
-        """Traz a nota calculada especificamente para este usuário sobre
-        este produto — o que justifica por que foi recomendado pra ele."""
-        user_id = resolver_user_id(user_id)
-        if user_id is None:
-            return SEM_USUARIO_IDENTIFICADO
-        return await consultar(pool, "get_personalized_score", _SQL_SCORE_PERSONALIZADO, product_id, user_id,
-                               uma_linha=True,
-                               vazio="score personalizado não encontrado para este usuário/produto")
-
-    @tool
     async def get_product_ingredients(product_id: int) -> list[dict]:
         """Lista os ingredientes que compõem o produto, na ordem do rótulo
         (versão atual da fórmula)."""
@@ -196,6 +170,5 @@ def montar_tools_produto(pool: Any) -> list[BaseTool]:
         search_product,
         get_product,
         get_product_score,
-        get_personalized_score,
         get_product_ingredients,
     ]

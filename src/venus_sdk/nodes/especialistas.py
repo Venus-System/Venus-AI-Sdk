@@ -57,7 +57,7 @@ _LIMITE_PASSOS_AGENTE = 24
 # Teto de chamadas de tool do especialista de Produto, aplicado no código (ver
 # `flows/agente_mcp.py::_limitar_chamadas`): só no prompt ("no máximo 5"), o
 # agente fazia 8 a 11 (conversa real de 2026-10-20). 6 cobre o caso mais longo
-# (busca + produto + nota + nota personalizada + ingredientes + alergias).
+# (busca + produto + nota + ingredientes + perfil + alergias).
 MAX_CHAMADAS_TOOLS_PRODUTO = 6
 # Rotina: `suggest_routine` já cruza favoritos e alergias; no chatbot real o
 # agente ainda chamava perfil + favoritos + alergias + 3x `suggest_routine`

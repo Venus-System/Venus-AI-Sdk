@@ -41,10 +41,10 @@ ESP_PRODUTO_PROMPT = f"""
 
 
 ### OBJETIVO
-Interpretar a PERGUNTA_ORIGINAL sobre um produto e responder com base na
-análise/score já calculado para o usuário, usando as tools disponíveis:
-`search_product`, `get_product`, `get_product_score`,
-`get_personalized_score` e `get_product_ingredients`, mais os dados do
+Interpretar a PERGUNTA_ORIGINAL sobre um produto e responder com base nos
+dados do catálogo, usando as tools disponíveis:
+`search_product`, `get_product`, `get_product_score` e
+`get_product_ingredients`, mais os dados do
 usuário em `get_user_allergies` e `get_user_profile`. A saída SEMPRE é JSON
 para o Orquestrador.
 
@@ -95,9 +95,8 @@ para o Orquestrador.
   não sugira nada novo: `intencao` "confirmar", `resposta` com uma
   confirmação curta e o próximo passo em `acompanhamento` (ex.: montar a
   rotina com eles). Uma contestação ("você acabou de contraindicar esse
-  produto") NÃO é afirmação: chame `get_personalized_score` do produto — é
-  o `recommendation_level`/`risk_level` dele que diz se é contraindicado
-  para o usuário — e responda o que o dado mostra, com a nota. Se o
+  produto") NÃO é afirmação: chame `get_product_ingredients` do produto e
+  `get_user_allergies`, e responda o que o dado mostra. Se o
   HISTORICO_RECENTE mostra que a contraindicação era de OUTRO produto, diga
   isso (buscando o id dele com `search_product` para citar a nota).
 - Na nova tentativa depois de uma OBSERVAÇÃO do Agente Juiz, mantenha os
@@ -173,7 +172,7 @@ Campos mínimos obrigatórios:
                     "notas": {{"<campo da tool>": <valor>}}}}. Em `notas` vai
                     TODA nota que o texto cita desse produto, com o nome do
                     campo exatamente como a tool devolveu (`overall_score`,
-                    `final_score`...) e só de tool chamada para ESSE
+                    `health_score`...) e só de tool chamada para ESSE
                     product_id; `{{}}` se não cita nota. O sistema confere cada
                     número contra as tools: nota de um produto citada no outro
                     reprova a resposta. No texto, escreva cada nota na mesma
@@ -199,7 +198,7 @@ ESP_PRODUTO_SHOTS_OPEN = (
 ESP_PRODUTO_SHOT_1 = """
 Roteador: ROUTE=produto
 PERGUNTA_ORIGINAL=[pergunta sobre por que um produto foi recomendado]
-Produto: {"dominio":"produto","intencao":"explicar_recomendacao","resposta":"O produto [nome] foi recomendado porque [motivo baseado no score/perfil].","recomendacao":"[sugestão de uso ou observação]","fontes_usadas":["personalized_scores","product_ingredients"]}"""
+Produto: {"dominio":"produto","intencao":"explicar_recomendacao","resposta":"O produto [nome] foi recomendado porque [motivo baseado no score/perfil].","recomendacao":"[sugestão de uso ou observação]","fontes_usadas":["get_product_score","product_ingredients"]}"""
 
 ESP_PRODUTO_SHOT_2 = """
 Roteador: ROUTE=produto

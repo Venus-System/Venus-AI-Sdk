@@ -27,8 +27,8 @@ EVIDENCIAS = [
     {"tool": "search_product", "argumentos": {"termo": "hidratante"}, "resultado": json.dumps(_BUSCA)},
     {"tool": "get_product_score", "argumentos": {"product_id": 1},
      "resultado": json.dumps({"overall_score": 76, "performance_score": None})},
-    {"tool": "get_personalized_score", "argumentos": {"product_id": 17, "user_id": 142},
-     "resultado": json.dumps({"final_score": 63, "recommendation_level": "acceptable"})},
+    {"tool": "get_product_score", "argumentos": {"product_id": 17},
+     "resultado": json.dumps({"health_score": 63, "recommendation_level": "acceptable"})},
 ]
 
 
@@ -69,15 +69,15 @@ def test_nota_de_outro_produto_com_o_nome_errado_reprova() -> None:
 def test_nota_que_nao_bate_com_a_tool_reprova() -> None:
     problemas, _ = conferir_amarracao(_especialista(
         "O CeraVe Creme Hidratante tem nota 70/100 pra você.",
-        [{"product_id": 17, "nome": "CeraVe Creme Hidratante", "notas": {"final_score": 70}}],
+        [{"product_id": 17, "nome": "CeraVe Creme Hidratante", "notas": {"health_score": 70}}],
     ), EVIDENCIAS)
-    assert any("final_score do product_id 17 é 63" in p for p in problemas)
+    assert any("health_score do product_id 17 é 63" in p for p in problemas)
 
 
 def test_nota_de_um_produto_citada_na_frase_do_outro_reprova() -> None:
     problemas, _ = conferir_amarracao(_especialista(
         "O CeraVe Creme Hidratante tem nota 76/100. A CeraVe Loção Facial Hidratante Noite fica com 63/100.",
-        [{"product_id": 17, "nome": "CeraVe Creme Hidratante", "notas": {"final_score": 63}},
+        [{"product_id": 17, "nome": "CeraVe Creme Hidratante", "notas": {"health_score": 63}},
          {"product_id": 1, "nome": "CeraVe Loção Facial Hidratante Noite", "notas": {"overall_score": 76}}],
     ), EVIDENCIAS)
     assert len(problemas) == 2
@@ -112,7 +112,7 @@ def test_id_so_com_nota_consultada_e_campo_textual_da_tool_sao_aceitos() -> None
 
 
 def test_score_nao_encontrado_nao_valida_id() -> None:
-    evidencias = [{"tool": "get_personalized_score", "argumentos": {"product_id": 18, "user_id": 142},
+    evidencias = [{"tool": "get_product_score", "argumentos": {"product_id": 18},
                    "resultado": json.dumps({"encontrado": False, "mensagem": "não encontrado"})}]
     problemas, _ = conferir_amarracao(_especialista("Sugiro a Loção Noite.",
                                                     [{"product_id": 18, "nome": "Loção Noite", "notas": {}}]),
@@ -145,7 +145,7 @@ def test_amarracao_errada_reprova_sem_llm_com_feedback_exato() -> None:
 def test_so_nomes_e_notas_conferidos_aprova_sem_llm() -> None:
     resultado, invoke = _julgar(_especialista(
         "Pra você, o CeraVe Creme Hidratante tem nota 63/100. A CeraVe Loção Facial Hidratante Noite tem nota geral 76/100.",
-        [{"product_id": 17, "nome": "CeraVe Creme Hidratante", "notas": {"final_score": 63}},
+        [{"product_id": 17, "nome": "CeraVe Creme Hidratante", "notas": {"health_score": 63}},
          {"product_id": 1, "nome": "CeraVe Loção Facial Hidratante Noite", "notas": {"overall_score": 76}}],
     ))
     assert resultado["aprovado_juiz"] is True
@@ -158,11 +158,11 @@ def test_so_nomes_e_notas_conferidos_aprova_sem_llm() -> None:
 def test_amarracao_conferida_com_afirmacao_alem_da_nota_ainda_vai_ao_llm(afirmacao: str) -> None:
     resultado, invoke = _julgar(_especialista(
         f"O CeraVe Creme Hidratante tem nota 63/100 {afirmacao}.",
-        [{"product_id": 17, "nome": "CeraVe Creme Hidratante", "notas": {"final_score": 63}}],
+        [{"product_id": 17, "nome": "CeraVe Creme Hidratante", "notas": {"health_score": 63}}],
     ))
     assert resultado["aprovado_juiz"] is True
     entrada = invoke.call_args[0][0][1][1]
-    assert "AMARRACAO_VERIFICADA=product_id 17 = CeraVe Creme Hidratante (notas: final_score=63)" in entrada
+    assert "AMARRACAO_VERIFICADA=product_id 17 = CeraVe Creme Hidratante (notas: health_score=63)" in entrada
 
 
 def test_confirmacao_curta_de_afirmacao_aprova_sem_llm() -> None:
@@ -401,35 +401,6 @@ def test_rotina_com_enfeite_de_uso_aprova_sem_llm_mas_alergia_vai_ao_llm() -> No
     invoke.assert_called_once()
 
 
-def test_reserva_do_juiz_esgotado_traz_nota_personalizada_do_produto_em_tela() -> None:
-    from venus_sdk.nodes.orquestrador import _resposta_segura_sem_aprovacao
-
-    evidencias = [
-        *EVIDENCIAS[:2],
-        {"tool": "get_personalized_score", "argumentos": {"product_id": 1, "user_id": 142},
-         "resultado": json.dumps({"final_score": 20, "summary": "Nota 20 de 100 - Contraindicado."})},
-        {"tool": "get_personalized_score", "argumentos": {"product_id": 17, "user_id": 142},
-         "resultado": json.dumps({"final_score": 63, "summary": "Nota 63 de 100 - Aceitável."})},
-    ]
-    texto = _resposta_segura_sem_aprovacao({
-        "rota": "produto", "pergunta_original": "vc acabou de contraindicar esse produto",
-        "produto_em_contexto": "CeraVe Creme Hidratante", "evidencias_tools": evidencias,
-        "resposta_especialista": {"intencao": "explicar_recomendacao"}})
-    assert "CeraVe Creme Hidratante" in texto
-    assert "Pra você: Nota 63 de 100 - Aceitável." in texto
-    assert "Contraindicado" not in texto
-
-
-def test_reserva_sem_summary_mostra_o_nivel_de_recomendacao() -> None:
-    from venus_sdk.nodes.orquestrador import _resposta_segura_sem_aprovacao
-
-    texto = _resposta_segura_sem_aprovacao({
-        "rota": "produto", "pergunta_original": "vc acabou de contraindicar esse produto",
-        "produto_em_contexto": "CeraVe Creme Hidratante", "evidencias_tools": EVIDENCIAS,
-        "resposta_especialista": {"intencao": "explicar_recomendacao"}})
-    assert "Nota pra você: 63/100 (aceitável)." in texto
-
-
 def test_reserva_de_pedido_de_recomendacao_lista_opcoes_em_vez_da_ficha_de_um_produto() -> None:
     from venus_sdk.nodes.orquestrador import _resposta_segura_sem_aprovacao
 
@@ -538,11 +509,11 @@ def test_reserva_usa_o_resultado_da_agenda_quando_ela_foi_consultada(agenda: dic
 
 
 def test_nota_de_copia_homonima_do_produto_e_aceita_mas_de_outro_produto_nao() -> None:
-    """Chatbot real: a busca trouxe o id 59 e a nota personalizada era do 17 —
+    """Chatbot real: a busca trouxe o id 59 e a nota era do 17 —
     as duas cópias são o "CeraVe Creme Hidratante"."""
     evidencias = [*EVIDENCIAS, {"tool": "search_product", "argumentos": {"termo": "creme"},
                                 "resultado": json.dumps([{"product_id": 59, "name": "CeraVe Creme Hidratante"}])}]
-    item = {"product_id": 59, "nome": "CeraVe Creme Hidratante", "notas": {"final_score": 63}}
+    item = {"product_id": 59, "nome": "CeraVe Creme Hidratante", "notas": {"health_score": 63}}
     problemas, _ = conferir_amarracao(_especialista("O CeraVe Creme Hidratante tem nota 63/100 pra você.", [item]),
                                       evidencias)
     assert problemas == []

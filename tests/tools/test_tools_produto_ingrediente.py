@@ -82,13 +82,12 @@ def test_montar_tools_sem_pool_levanta_value_error(montar) -> None:
 # --- produto ---
 
 
-def test_tools_produto_tem_os_5_nomes_esperados() -> None:
+def test_tools_produto_tem_os_4_nomes_esperados() -> None:
     nomes = {t.name for t in montar_tools_produto(_PoolFalso(_ConexaoFalsa()))}
     assert nomes == {
         "search_product",
         "get_product",
         "get_product_score",
-        "get_personalized_score",
         "get_product_ingredients",
     }
 
@@ -120,18 +119,6 @@ def test_get_product_nao_encontrado() -> None:
     resultado = _rodar(_tool(tools, "get_product").ainvoke({"product_id": 999}))
 
     assert resultado == {"encontrado": False, "mensagem": "produto não encontrado"}
-
-
-def test_get_personalized_score_passa_product_id_e_user_id() -> None:
-    conexao = _ConexaoFalsa(fetchrow_result={"final_score": 87})
-    tools = montar_tools_produto(_PoolFalso(conexao))
-
-    resultado = _rodar(
-        _tool(tools, "get_personalized_score").ainvoke({"product_id": 1, "user_id": 42})
-    )
-
-    assert resultado == {"final_score": 87}
-    assert conexao.chamadas[0][1] == (1, 42)
 
 
 def test_get_product_ingredients_devolve_lista() -> None:

@@ -43,6 +43,10 @@ class EstadoVenus(TypedDict, total=False):
     # novo ou não há `store`/`usuario_id`); pode ser atualizado no fim do
     # turno com fatos novos extraídos desta troca.
     memorias_usuario: dict[str, Any] | None
+    # Primeiro nome do cadastro (`venus.users.name`), buscado uma vez por
+    # conversa (ver `nodes/memoria.py::montar_no_carregar_nome`); "" quando a
+    # conta não tem nome, None enquanto não foi buscado.
+    nome_usuario: str | None
 
     # --- roteador ---
     rota: Rota | None

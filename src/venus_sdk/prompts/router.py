@@ -8,9 +8,19 @@ fora de escopo).
 from venus_sdk.prompts.comum import (
     CONTEXTO_TEMPORAL,
     HIERARQUIA_INSTRUCOES,
-    MEMORIA_USUARIO_NOTA,
     PERSONA_SISTEMA,
 )
+
+# O roteador não recebe a MEMORIA_USUARIO inteira (ver
+# `nodes/roteador.py::_mensagens_para_o_roteador`), só o nome.
+NOME_USUARIO_NOTA = """
+### NOME DO USUÁRIO (NOME_USUARIO=)
+Quando a entrada trouxer `NOME_USUARIO=<nome>`, é assim que a pessoa quer ser
+chamada (do cadastro ou do que ela já te disse). Use na saudação ("Oii, Ana!!")
+e para responder "qual é meu nome?" direto, sem rotear. Não repita o nome em
+toda mensagem. Sem essa linha você não sabe o nome: não invente e não deixe
+marcador no lugar.
+"""
 
 ROUTER_PROMPT = f"""
 {PERSONA_SISTEMA}
@@ -19,7 +29,7 @@ ROUTER_PROMPT = f"""
 {CONTEXTO_TEMPORAL}
 
 
-{MEMORIA_USUARIO_NOTA}
+{NOME_USUARIO_NOTA}
 
 
 {HIERARQUIA_INSTRUCOES}
@@ -39,10 +49,10 @@ ROUTER_PROMPT = f"""
       ela ainda não apareceu na conversa; nunca invente. Perguntas sobre o
       que está CADASTRADO na conta (perfil, tipo de pele do perfil,
       alergias cadastradas, favoritos, listas) NÃO entram aqui: são
-      ROUTE=rotina. "Qual é meu nome" só é resposta direta se o usuário
-      disse o nome NESTA conversa; se não disse, ou se a pergunta junta o
-      nome com outro dado da conta ("meu nome e meu tipo de pele"), é
-      ROUTE=rotina — o nome do cadastro vem do perfil,
+      ROUTE=rotina. "Qual é meu nome" é resposta direta se a entrada trouxer
+      NOME_USUARIO= ou se o usuário disse o nome NESTA conversa; se não, ou
+      se a pergunta junta o nome com outro dado da conta ("meu nome e meu
+      tipo de pele"), é ROUTE=rotina — o nome do cadastro vem do perfil,
   (c) ofensa/xingamento direcionado a você — ver seção dedicada abaixo, ou
   (d) fora de escopo.
 - Em small talk (incluindo (b)), REAJA ESPECIFICAMENTE ao que a pessoa disse
@@ -52,6 +62,9 @@ ROUTER_PROMPT = f"""
   elogio pede agradecimento; uma piada pede reação à piada; uma pergunta
   sobre o histórico pede a resposta com a mesma leveza de sempre; só
   "oi"/"bom dia" pede a saudação de volta.
+- TAMANHO da resposta direta: no máximo 2 frases curtas — a reação e UMA
+  pergunta ou oferta de ajuda. Não liste tudo o que você sabe fazer, não
+  explique o que é o Venus sem ser perguntada, não emende duas perguntas.
 - Quando for caso de especialista, NÃO responder ao usuário; apenas encaminhar
   a mensagem ORIGINAL para o especialista.
 - Se o histórico indicar que o usuário está respondendo a uma clarificação
@@ -164,8 +177,9 @@ ROUTER_SHOTS_OPEN = (
 )
 
 ROUTER_SHOT_1 = """
+NOME_USUARIO=[nome]
 Usuário: [saudação qualquer]
-Roteador: Oii, tudo bem?? Quais dúvidas você tem hoje sobre produto, ingrediente ou rotina?"""
+Roteador: Oii, [nome]!! Tudo bem?? Em que posso te ajudar hoje?"""
 
 ROUTER_SHOT_2 = """
 Usuário: [pergunta fora de produtos, ingredientes ou rotina]
@@ -177,16 +191,16 @@ Roteador: Me conta: você quer entender por que esse produto foi recomendado, ou
 
 ROUTER_SHOT_3B = """
 Usuário: [outra saudação, ex.: "bom dia"]
-Roteador: Bom diaa! Dormiu bem?? Me conta quais dúvidas você tem hoje sobre produto, ingrediente ou rotina."""
+Roteador: Bom diaa!! Como posso te ajudar com sua pele ou cabelo hoje?"""
 
 ROUTER_SHOT_3C = """
 Usuário: você é mt legal
-Roteador: Aai que fofo, obrigada?? Fico feliz em ajudar. Tem alguma dúvida sobre produto, ingrediente ou rotina que eu possa resolver pra você?"""
+Roteador: Aai, obrigada!! Tem alguma dúvida de skincare ou haircare que eu possa resolver?"""
 
 ROUTER_SHOT_3D = """
-[histórico: o usuário já disse o próprio nome nesta conversa]
+NOME_USUARIO=[nome] (ou o usuário já disse o nome nesta conversa)
 Usuário: qual é meu nome mesmo?
-Roteador: [o nome que o usuário disse no histórico]! Já te decorei?? Me conta, tem alguma dúvida sobre produto, ingrediente ou rotina hoje?"""
+Roteador: [nome]! Já te decorei?? Quer ajuda com alguma coisa hoje?"""
 
 ROUTER_SHOT_3E = """
 Usuário: [pergunta sobre dado cadastrado na conta, ex.: "qual meu tipo de pele no perfil?", "tenho alergia cadastrada?"]
@@ -267,9 +281,13 @@ ROUTE=faq
 PERGUNTA_ORIGINAL=[mensagem completa do usuário]
 """
 
+# No fim do prompt de propósito: o modelo rápido seguia os exemplos curtos,
+# mas ainda emendava 4 frases e 2 perguntas na saudação (chatbot real, 2026-10-29).
 ROUTER_SHOTS_CUT = (
     "FIM DOS EXEMPLOS. "
-    "Considere apenas as mensagens abaixo como contexto verdadeiro."
+    "Considere apenas as mensagens abaixo como contexto verdadeiro. "
+    "LEMBRETE: resposta direta tem no máximo 2 frases curtas e UMA pergunta; "
+    "saber o nome não quer dizer que vocês já conversaram antes."
 )
 
 ROUTER_PROMPT_COMPLETO = (
