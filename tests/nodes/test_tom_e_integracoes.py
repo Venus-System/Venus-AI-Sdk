@@ -101,3 +101,23 @@ def test_pergunta_do_assunto_nao_fica_na_resposta_direta(mensagem):
 @pytest.mark.parametrize("mensagem", ["oi, tudo bem?", "qual a capital da França?", "conta uma piada"])
 def test_conversa_continua_na_resposta_direta(mensagem):
     assert _aplicar_redes_de_seguranca(None, "Oi!", mensagem)[0] is None
+
+
+def test_faq_nao_passa_pela_reescrita():
+    estado = {"rota": "faq", "aprovado_juiz": True, "pergunta_original": "p", "evidencias_tools": [],
+              "resposta_especialista": {"dominio": "faq", "intencao": "informar", "resposta": "",
+                                        "fontes_a_mostrar": [{"texto": "Doc.", "fonte": "a.md"}]}}
+    with patch.dict("os.environ", {"VENUS_TOM_LLM": "1", "VENUS_RESPOSTA_SO_DAS_TOOLS": "faq"}), \
+            patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador") as tom:
+        texto = no_orquestrador(estado)["resposta_final"]
+    tom.assert_not_called()
+    assert texto.endswith("Doc.\n\nFonte: a.md")
+
+
+def test_frase_sobre_alergia_precisa_ficar_igual():
+    from venus_sdk.nodes.orquestrador import _reescrita_fiel
+
+    original = "Sua rotina: A.\n\nVocê não declarou nenhuma alergia no seu cadastro."
+    assert not _reescrita_fiel(original, "Sua rotina: A. Nada de alergia pra se preocupar!", {})
+    assert _reescrita_fiel(original, "Oii! Sua rotina: A.\n\nVocê não declarou nenhuma alergia no seu cadastro.", {})
+

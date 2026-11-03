@@ -692,6 +692,8 @@ _AVISO_DA_BUSCA = (
     "Busquei as palavras do seu pedido no nome, na marca, na categoria e na descrição dos produtos. "
     "Isso não confirma que cada um seja indicado para o seu caso."
 )
+# O FAQ não passa pela reescrita: nela, o LLM acrescentava fatos que o Juiz aprovava.
+_ABERTURA_DO_FAQ = "Olha o que a documentação do Venus diz sobre isso:"
 _NAO_ENCONTRADO_NO_FAQ = "Não encontrei isso na documentação do Venus."
 _FONTE_EXTERNA = "Encontrei isto em uma fonte externa, que o Venus não conferiu:"
 # Texto longo (lista de ingredientes, manual) perde mais do que ganha ao ser reescrito.
@@ -751,7 +753,7 @@ def _parte_faq(especialista: Any) -> str:
         return _NAO_ENCONTRADO_NO_FAQ
     externa = _FONTE_EXTERNA if any(item.get("externa") for item in fontes) else ""
     corpo = "\n\n".join(f"{item['texto']}\n\nFonte: {item['fonte']}" for item in fontes)
-    return f"{externa}\n\n{corpo}" if externa else corpo
+    return f"{externa or _ABERTURA_DO_FAQ}\n\n{corpo}"
 
 
 def _com_tom_da_venus(texto: str, estado: EstadoVenus) -> str:
@@ -762,8 +764,7 @@ def _com_tom_da_venus(texto: str, estado: EstadoVenus) -> str:
         or not texto
         or len(texto) > _TAMANHO_MAXIMO_PARA_TOM
         or "Atenção:" in texto
-        or texto.startswith(_FONTE_EXTERNA)
-        or texto == _NAO_ENCONTRADO_NO_FAQ
+        or estado.get("rota") == "faq"
         or estado.get("agendamento_pendente")
     ):
         return texto
@@ -784,7 +785,7 @@ def _reescrita_fiel(original: str, reescrita: str, estado: EstadoVenus) -> bool:
     """Conferência sem LLM: mesmos números, frases fixas e nomes de produtos."""
     if not reescrita or _numeros(original) != _numeros(reescrita):
         return False
-    fixas = [linha for linha in original.splitlines() if linha.startswith("Fonte:")]
+    fixas = [linha for linha in original.splitlines() if "alergia" in linha.lower()]
     fixas += [frase for frase in _FRASES_FIXAS if frase in original]
     if not all(frase in reescrita for frase in fixas):
         return False
