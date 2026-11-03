@@ -33,3 +33,5 @@ def _classificador_do_guardrail_zerado():
     guardrails._reiniciar_classificador()
     yield
     guardrails._reiniciar_classificador()
+
+os.environ.setdefault("VENUS_TOM_LLM", "0")

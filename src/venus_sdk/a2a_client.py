@@ -93,4 +93,5 @@ def montar_tool_a2a(agentes: dict[str, str] | None = None, *, httpx_client: Any 
         return {"agente": agente, "url": agentes[agente], "resposta": resposta or "(sem resposta)"}
 
     _consultar.description += f" Agentes disponíveis: {nomes_disponiveis}."
+    _consultar.metadata = {"agentes": list(agentes)}
     return [_consultar]
