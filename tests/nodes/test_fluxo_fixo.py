@@ -24,7 +24,7 @@ class ToolFalsa:
         return self.retorno(argumentos) if callable(self.retorno) else self.retorno
 
 
-NOMES = ("get_product", "get_product_score", "get_personalized_score", "get_product_ingredients",
+NOMES = ("get_product", "get_product_score", "get_product_ingredients",
          "get_user_allergies", "get_user_profile", "get_ingredient_summary", "get_ingredient_properties",
          "get_ingredient_effects", "get_ingredient_regulations")
 
@@ -76,7 +76,7 @@ async def test_nada_achado_vai_para_o_agente():
 
 async def test_sem_usuario_nao_consulta_dados_da_conta():
     saida = await evidencias_de_produto("qual a nota do Sérum Retinol X?", None, None, _tools(search_product=[SERUM_X]))
-    assert not {"get_user_allergies", "get_user_profile", "get_personalized_score"} & set(_nomes(saida))
+    assert not {"get_user_allergies", "get_user_profile"} & set(_nomes(saida))
 
 
 async def test_ingrediente_achado_pelo_trecho_mais_longo():

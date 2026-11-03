@@ -193,6 +193,40 @@ def _esgotado(dominio: str, evidencias: list[tuple], rota: str | None = None, pe
     }
 
 
+def _estado_niacinamida(pergunta: str, efeitos: object) -> dict:
+    return _esgotado("ingrediente", [
+        ("search_ingredient", [{"ingredient_id": 1, "common_name": "NICOTINAMIDA", "inci_name": "NIACINAMIDE"}]),
+        ("get_ingredient_properties", [
+            {"property_name": "anvisa_status", "property_value": "VIGENTE"},
+            {"property_name": "molecular_formula", "property_value": "C6H6N2O"},
+            {"property_name": "cas_number", "property_value": "98-92-0"},
+        ], {"ingredient_id": 1}),
+        ("get_ingredient_effects", efeitos, {"ingredient_id": 1}),
+        ("get_user_allergies", {"encontrado": False, "alergias": [], "mensagem": "sem alergia"}),
+    ], pergunta=pergunta)
+
+
+def test_resposta_segura_de_ingrediente_fica_curta_quando_a_pergunta_e_o_que_e() -> None:
+    # Chatbot real (2026-10-29): "o que é niacinamida?" trazia fórmula, CAS, o
+    # mesmo efeito 3 vezes e "você não declarou nenhuma alergia".
+    efeitos = [{"effect_name": "Controle de oleosidade"}, {"effect_name": "Hiperpigmentação"},
+               {"effect_name": "Controle de oleosidade"}]
+    with patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador", side_effect=AssertionError("sem LLM")):
+        texto = no_orquestrador(_estado_niacinamida("o que é niacinamida e pra que serve?", efeitos))["resposta_final"]
+    assert "Efeitos cadastrados: Controle de oleosidade, Hiperpigmentação." in texto
+    assert "C6H6N2O" not in texto and "98-92-0" not in texto
+    assert "alergia" not in texto
+
+
+def test_resposta_segura_de_ingrediente_traz_quimica_e_alergia_quando_perguntadas() -> None:
+    efeitos = {"encontrado": False, "mensagem": "nenhum efeito cadastrado"}
+    with patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador", side_effect=AssertionError("sem LLM")):
+        quimica = no_orquestrador(_estado_niacinamida("qual a fórmula da niacinamida?", efeitos))["resposta_final"]
+        alergia = no_orquestrador(_estado_niacinamida("posso usar niacinamida?", efeitos))["resposta_final"]
+    assert "C6H6N2O" in quimica and "98-92-0" in quimica
+    assert "não declarou nenhuma alergia" in alergia
+
+
 def test_resposta_segura_de_ingrediente_mostra_o_que_as_tools_trouxeram() -> None:
     estado = _esgotado("ingrediente", [
         ("search_ingredient", [{"ingredient_id": 1, "common_name": "NICOTINAMIDA", "inci_name": "NIACINAMIDE"}]),
@@ -208,7 +242,6 @@ def test_resposta_segura_de_ingrediente_mostra_o_que_as_tools_trouxeram() -> Non
         texto = no_orquestrador(estado)["resposta_final"]
     assert "NICOTINAMIDA (INCI: NIACINAMIDE)" in texto
     assert "VIGENTE desde 2023-09-01" in texto
-    assert "C6H6N2O" in texto
     assert "efeitos e benefícios dele ainda não estão cadastrados" in texto
     assert "texto reprovado" not in texto
 

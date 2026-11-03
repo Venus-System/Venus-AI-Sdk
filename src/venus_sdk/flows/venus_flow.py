@@ -1,8 +1,8 @@
 """Monta o StateGraph principal do Venus.
 
-Liga guardrail de entrada -> carregar memória -> roteador -> especialista ->
-agente juiz -> orquestrador -> guardrail de saída -> atualizar memória, com
-dois desvios previstos pelos próprios prompts dos agentes:
+Liga guardrail de entrada -> carregar memória -> carregar nome -> roteador ->
+especialista -> agente juiz -> orquestrador -> guardrail de saída -> atualizar
+memória, com dois desvios previstos pelos próprios prompts dos agentes:
 
 - Entrada bloqueada pelo guardrail: pula carregar memória/roteador/
   especialistas/juiz/orquestrador e vai direto para o guardrail de saída
@@ -44,7 +44,7 @@ from venus_sdk.nodes.guardrails import (
     no_guardrail_saida,
 )
 from venus_sdk.nodes.juiz import decidir_pos_juiz, no_agente_juiz
-from venus_sdk.nodes.memoria import no_atualizar_memoria, no_carregar_memoria
+from venus_sdk.nodes.memoria import montar_no_carregar_nome, no_atualizar_memoria, no_carregar_memoria
 from venus_sdk.nodes.orquestrador import no_orquestrador
 from venus_sdk.nodes.roteador import decidir_especialista, no_roteador
 from venus_sdk.nodes.state import EstadoVenus
@@ -80,6 +80,7 @@ def montar_grafo_venus(
 
     grafo.add_node("guardrail_entrada", no_guardrail_entrada)
     grafo.add_node("carregar_memoria", no_carregar_memoria)
+    grafo.add_node("carregar_nome", montar_no_carregar_nome(pool))
     grafo.add_node("roteador", no_roteador)
     grafo.add_node("agente_produto", montar_no_agente_produto(pool))
     grafo.add_node("agente_ingrediente", montar_no_agente_ingrediente(pool))
@@ -100,7 +101,8 @@ def montar_grafo_venus(
             "liberado": "carregar_memoria",
         },
     )
-    grafo.add_edge("carregar_memoria", "roteador")
+    grafo.add_edge("carregar_memoria", "carregar_nome")
+    grafo.add_edge("carregar_nome", "roteador")
 
     grafo.add_conditional_edges(
         "roteador",
@@ -172,7 +174,7 @@ def compilar_grafo_venus(
     Note que `EstadoVenus.usuario_id` (acima) é distinto de
     `EstadoVenus.usuario_id_postgres` — o ID inteiro real do usuário no
     Postgres, exigido pelas tools de produto/ingrediente que checam alergia/
-    personalização (`get_user_allergies`, `get_personalized_score`). Quem
+    personalização (`get_user_allergies`, `get_user_profile`). Quem
     invoca o grafo deve passar os dois quando disponíveis; sem
     `usuario_id_postgres`, essas tools não são chamadas (ver
     `prompts/comum.py::IDENTIFICADOR_USUARIO_NOTA`).

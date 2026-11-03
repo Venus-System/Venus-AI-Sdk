@@ -105,12 +105,11 @@ usuário ficou preso numa resposta genérica):
   tool não devolveu — ex.: "nota alta em segurança" quando
   `get_product_score` não tem campo de segurança.
 - Se o usuário contesta algo dito antes ("você contraindicou esse
-  produto"), dizer o que as tools mostram agora (ex.: `recommendation_level`
-  do `get_personalized_score`) responde à contestação — não exija que a
+  produto"), dizer o que as tools mostram agora (ex.: os ingredientes e as
+  alergias declaradas) responde à contestação — não exija que a
   resposta explique ou confirme a fala anterior.
 - Uma nota `null` no retorno de `get_product_score` (ex.:
-  `performance_score: null`) é aquela dimensão sem nota, e `"encontrado":
-  false` em `get_personalized_score` é "não há nota personalizada": dizer
+  `performance_score: null`) é aquela dimensão sem nota: dizer
   isso, com essas ou outras palavras, está CORRETO.
 - No FEEDBACK, cite só tools que aparecem em RESULTADOS_TOOLS ou em
   `fontes_usadas`: você não conhece o catálogo de tools do especialista e

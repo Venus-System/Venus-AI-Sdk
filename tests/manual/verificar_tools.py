@@ -61,7 +61,6 @@ async def main() -> int:
     await checar("search_product", t["search_product"].ainvoke({"termo": "serum"}), ok_lista)
     await checar("get_product", t["get_product"].ainvoke({"product_id": 2}), ok_dict)
     await checar("get_product_score", t["get_product_score"].ainvoke({"product_id": 2}), ok_dict)
-    await checar("get_personalized_score", t["get_personalized_score"].ainvoke({"product_id": 2, "user_id": 1}), ok_dict)
     await checar("get_product_ingredients", t["get_product_ingredients"].ainvoke({"product_id": 2}), ok_lista)
     await checar("get_product_ingredients (produto sem fórmula → não inventa)",
                  t["get_product_ingredients"].ainvoke({"product_id": 10}), lambda r: r.get("encontrado") is False)
@@ -105,7 +104,7 @@ async def main() -> int:
     cfg = {"venus": {"transport": "stdio", "command": sys.executable,
                      "args": ["-m", "venus_sdk.mcp.servidor"], "env": env, "cwd": str(RAIZ)}}
     mcp_tools = {x.name: x for x in await get_mcp_tools(cfg)}
-    # Sem --dados-do-usuario o servidor não expõe as 6 tools com user_id.
+    # Sem --dados-do-usuario o servidor não expõe as 5 tools com user_id.
     registrar("MCP lista as 11 tools sem dados de usuário", len(mcp_tools) == 11, f"{len(mcp_tools)} tools")
     registrar("MCP não expõe get_user_allergies", "get_user_allergies" not in mcp_tools, "")
     if mcp_tools:

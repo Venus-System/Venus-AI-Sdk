@@ -57,13 +57,6 @@ _MAX_PRODUTOS_LISTADOS = 6
 _MAX_INGREDIENTES_LISTADOS = 5
 
 _TIPOS_DE_RESTRICAO = {"prohibited": "proibido", "restricted": "uso restrito"}
-_NIVEIS_DE_RECOMENDACAO = {
-    "contraindicated": "contraindicado",
-    "not_recommended": "não recomendado",
-    "acceptable": "aceitável",
-    "recommended": "recomendado",
-    "highly_recommended": "muito recomendado",
-}
 
 # Texto mais curto que isso não pode ser a tradução de uma resposta de verdade.
 _TAMANHO_MINIMO_TEXTO_FINAL = 12
@@ -182,7 +175,7 @@ def _parte_rotina(evidencias: list[dict] | None) -> str | None:
     return " ".join(frases)
 
 
-_TOOLS_DE_DETALHE_DO_PRODUTO = ("get_product", "get_product_score", "get_personalized_score", "get_product_ingredients")
+_TOOLS_DE_DETALHE_DO_PRODUTO = ("get_product", "get_product_score", "get_product_ingredients")
 
 
 def _produto_consultado(evidencias: list[dict] | None) -> Any:
@@ -241,16 +234,6 @@ def _detalhe_do_produto(
         linhas.append(f"Nota geral: {score['overall_score']}/100.")
     elif isinstance(score, dict) and score.get("encontrado") is False:
         linhas.append("Ele ainda não tem nota calculada aqui.")
-
-    # A nota personalizada é o que diz se o produto é contraindicado para o
-    # usuário — sem ela, "vc acabou de contraindicar esse produto" recebia só a
-    # nota geral (chatbot real, 2026-10-21). O `summary` da tool já vem em português.
-    pessoal = dados_da_evidencia(evidencias, "get_personalized_score", product_id=product_id)
-    if isinstance(pessoal, dict) and pessoal.get("summary"):
-        linhas.append(f"Pra você: {pessoal['summary']}")
-    elif isinstance(pessoal, dict) and pessoal.get("final_score") is not None:
-        nivel = _NIVEIS_DE_RECOMENDACAO.get(str(pessoal.get("recommendation_level")))
-        linhas.append(f"Nota pra você: {pessoal['final_score']}/100" + (f" ({nivel})." if nivel else "."))
 
     ingredientes = dados_da_evidencia(evidencias, "get_product_ingredients", product_id=product_id)
     if isinstance(ingredientes, list) and ingredientes:

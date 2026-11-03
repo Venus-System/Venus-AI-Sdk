@@ -36,7 +36,7 @@ _PROMPTS_COM_RACIOCINIO_INTERNO = [
 ]
 
 # Produto/ingrediente/rotina têm tools que exigem `user_id` (get_user_allergies,
-# get_personalized_score, tools de rotina).
+# get_user_profile, tools de rotina).
 _PROMPTS_COM_IDENTIFICADOR_USUARIO = [
     ESP_PRODUTO_PROMPT_COMPLETO,
     ESP_INGREDIENTE_PROMPT_COMPLETO,

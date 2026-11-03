@@ -12,6 +12,10 @@ release" no README); cada tag tem a sua seção aqui, dividida em:
 ## Não lançado
 
 ### Mudanças incompatíveis
+- **`get_personalized_score` removida.** A tool não existe mais, nem no agente
+  de Produto nem no servidor MCP com `--dados-do-usuario` (agora 5 tools com
+  `user_id`). A Venus cita só a nota geral; quem chamava a tool por MCP precisa
+  ler `venus.personalized_scores` por conta própria. A tabela continua no schema.
 - **Texto final sem LLM em produto, ingrediente, rotina e FAQ.** Antes, o
   especialista redigia, o Juiz conferia e o Orquestrador reescrevia. Agora, o
   código monta a resposta só com tools e documentos, sem o tom da Venus. Para
@@ -25,6 +29,7 @@ release" no README); cada tag tem a sua seção aqui, dividida em:
   só valem com `faq` fora de `VENUS_RESPOSTA_SO_DAS_TOOLS`.
 
 ### Novidades
+- Nó `carregar_nome`: a Venus chama a pessoa pelo primeiro nome do cadastro.
 - `nodes/fluxo_fixo.py`: consulta as tools sem ReAct quando o roteiro é sempre o
   mesmo, com o agente de reserva.
 - `VENUS_CACHE_DE_PROMPT` (padrão ligado) e data no fim do prompt, para o Mistral

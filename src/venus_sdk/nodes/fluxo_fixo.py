@@ -97,8 +97,6 @@ async def evidencias_de_produto(
                       _chamar(tools, "get_product_ingredients", product_id=product_id)]
         if intencao == "informar":
             consultas.append(_chamar(tools, "get_product", product_id=product_id))
-            if usuario is not None:
-                consultas.append(_chamar(tools, "get_personalized_score", product_id=product_id, user_id=usuario))
     detalhes = await asyncio.gather(*consultas)
     return [busca, *detalhes, *await _do_usuario(tools, usuario)], intencao
 

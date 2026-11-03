@@ -112,6 +112,45 @@ def no_carregar_memoria(estado: EstadoVenus, *, store: BaseStore) -> EstadoVenus
     return {"memorias_usuario": perfil or None}
 
 
+# O nome vem de `venus.users`, não do perfil: 96 das 108 contas do QA
+# (2026-10-29) não têm `user_profiles`, e `get_user_profile` só devolvia o nome
+# junto com o perfil — a Venus não sabia o nome da maioria das pessoas.
+_SQL_NOME_DO_USUARIO = "SELECT name FROM venus.users WHERE user_id = $1"
+
+
+def primeiro_nome(nome: str | None) -> str:
+    """"Ana Paula Souza" -> "Ana": o cadastro guarda o nome completo, e a Venus
+    chama a pessoa só pelo primeiro."""
+    partes = (nome or "").split()
+    return partes[0] if partes else ""
+
+
+def montar_no_carregar_nome(pool: Any | None):
+    """Nó que busca o primeiro nome do cadastro e grava em `nome_usuario`.
+
+    Com checkpointer, a busca acontece só no primeiro turno da conversa (o
+    valor fica no estado). Sem `pool` ou sem `usuario_id_postgres`, não faz
+    nada; falha no banco também não — o turno segue sem o nome e tenta de
+    novo no próximo."""
+    if pool is None:
+        # Nó síncrono: sem pool o grafo ainda pode rodar com `.invoke()`.
+        return lambda estado: {}
+
+    async def no_carregar_nome(estado: EstadoVenus) -> EstadoVenus:
+        user_id = estado.get("usuario_id_postgres")
+        if user_id is None or estado.get("nome_usuario") is not None:
+            return {}
+        try:
+            async with pool.acquire() as conn:
+                linha = await conn.fetchrow(_SQL_NOME_DO_USUARIO, user_id)
+        except Exception:
+            logger.exception("Falha ao buscar o nome do usuário (user_id=%s)", user_id)
+            return {}
+        return {"nome_usuario": primeiro_nome(linha["name"] if linha else None)}
+
+    return no_carregar_nome
+
+
 def no_atualizar_memoria(estado: EstadoVenus, *, store: BaseStore) -> EstadoVenus:
     """Ao final do turno, decide (via LLM) se algo dito nesta troca merece
     virar memória de longo prazo e, se sim, funde no perfil existente.
