@@ -9,7 +9,9 @@ release" no README); cada tag tem a sua seção aqui, dividida em:
 - **Novidades:** o que passou a existir, sem quebrar quem já usava.
 - **Correções:** bugs corrigidos.
 
-## Não lançado
+## 0.6.0
+
+Respostas só de fontes, FAQ sem web e redução de custo. Tudo desde `v0.5.0`.
 
 ### Mudanças incompatíveis
 - **`get_personalized_score` removida.** A tool não existe mais, nem no agente
