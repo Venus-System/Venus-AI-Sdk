@@ -21,7 +21,7 @@ em `PRECOS`, no próprio script.
 ## Medição: 2026-11-02, branch `feat/faq-sem-web` (`107d092`)
 
 **Ambiente:**
-- código: cópia exata do commit, sobre a `v0.5.0`, ainda não lançado;
+- código: cópia exata do commit, sobre a `v0.5.0`, lançado na `v0.6.0`;
 - produto, ingrediente, rotina e FAQ com texto montado pelo código
   (`VENUS_RESPOSTA_SO_DAS_TOOLS`), cache de prompt ligado e FAQ sem web;
 - 3 rodadas seguidas, 57 turnos, com as chaves dos planos gratuitos dos provedores.
@@ -89,7 +89,8 @@ só indicativo.
 
 **O que a medição mostra:**
 - **Juiz e Orquestrador não chamam LLM nessas rotas:** o Juiz aprovou os 45 turnos de
-  especialista por regra em código, e o texto final é montado pelo código.
+  especialista sem conferir, porque o texto do especialista não chega ao usuário: o texto
+  final é montado pelo código.
 - **Os especialistas ainda chamam LLM em parte dos turnos:** referência sem produto em
   tela ("qual a nota do primeiro?") e ambiguidade caem no agente ReAct. A rotina também
   usa o agente. Por isso a rotina é a rota mais cara.
