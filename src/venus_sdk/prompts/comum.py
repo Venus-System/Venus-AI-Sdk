@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, timezone
 # Os prompts são montados na importação; a data entra na hora de cada chamada
 # (`com_data_atual`) — senão, numa API que fica dias no ar, "hoje" seria o dia
 # do deploy.
-MARCADOR_DATA_HORA = "<<DATA_HORA_ATUAL>>"
 # Brasil sem horário de verão desde 2019; offset fixo evita depender do tzdata.
 _FUSO_BRASILIA = timezone(timedelta(hours=-3), "BRT")
 # Nomes fixos em português: `strftime` usaria o idioma do servidor (inglês na AWS).
@@ -25,8 +24,9 @@ def data_hora_atual(agora: datetime | None = None) -> str:
 
 
 def com_data_atual(prompt: str) -> str:
-    """O prompt com a data e hora deste momento no lugar do marcador."""
-    return prompt.replace(MARCADOR_DATA_HORA, data_hora_atual())
+    """O prompt com a data e hora deste momento no fim. Muda a cada minuto, então
+    não pode vir antes: o cache de prompt só reaproveita o começo idêntico."""
+    return f"{prompt}\n\n### DATA E HORA ATUAL\n{data_hora_atual()}"
 
 
 # ==============================================================================
@@ -87,10 +87,10 @@ afirma nada que não veio das tools. Sem emojis, sem gírias.
 """
 
 
-CONTEXTO_TEMPORAL = f"""
+CONTEXTO_TEMPORAL = """
 ### CONTEXTO TEMPORAL
-Data e hora atual (fornecida pelo sistema): {MARCADOR_DATA_HORA}
-Use esta referência para interpretar "hoje", "essa semana" e montar rotinas de
+A data e a hora atual estão no fim destas instruções, em DATA E HORA ATUAL.
+Use essa referência para interpretar "hoje", "essa semana" e montar rotinas de
 manhã/noite. Para contar dias ou semanas (ex.: há quanto tempo o usuário usa
 um produto), use a tool de cálculo quando o agente tiver uma.
 """

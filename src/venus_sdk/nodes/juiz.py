@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from typing import Literal
 
@@ -14,11 +15,11 @@ from venus_sdk.nodes._amarracao_produtos import (
     mesmo_nome,
     nomes_por_id,
 )
-from venus_sdk.nodes._evidencias import dados_da_evidencia
+from venus_sdk.nodes._evidencias import dados_da_evidencia, rota_so_com_tools
 from venus_sdk.nodes._historico import historico_recente
 from venus_sdk.prompts.comum import com_data_atual
 from venus_sdk.prompts.juiz import JUIZ_PROMPT_COMPLETO
-from venus_sdk.nodes.state import EstadoVenus
+from venus_sdk.nodes.state import DecisorJuiz, EstadoVenus
 from venus_sdk.texto import remover_acentos
 from venus_sdk.tools.calculos import TOOLS_COM_NUMERO_A_CITAR, formatar_numero
 
@@ -301,8 +302,8 @@ def _pedido_de_esclarecimento_honesto(estado: EstadoVenus) -> bool:
     return not _RE_AFIRMA_DADO.search(texto)
 
 
-def _veredito(aprovado: bool, feedback: str | None, tentativas: int) -> EstadoVenus:
-    return {"aprovado_juiz": aprovado, "feedback_juiz": feedback, "tentativas_juiz": tentativas}
+def _veredito(aprovado: bool, feedback: str | None, tentativas: int, *, por: DecisorJuiz = "regra") -> EstadoVenus:
+    return {"aprovado_juiz": aprovado, "feedback_juiz": feedback, "tentativas_juiz": tentativas, "juiz_decidiu_por": por}
 
 
 def _montar_entrada_juiz(estado: EstadoVenus, amarracao_verificada: str | None = None) -> str:
@@ -357,6 +358,9 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         return _veredito(False, None, MAX_TENTATIVAS_JUIZ)
 
     proxima_tentativa = estado.get("tentativas_juiz", 0) + 1
+    if rota_so_com_tools(estado.get("rota")):
+        # O texto do especialista não chega ao usuário: não há o que conferir.
+        return _veredito(True, None, proxima_tentativa)
     if especialista.get("intencao") in ("nao_suportado", "agendamento"):
         # Recusa fixa escrita no código (ex.: a IA não salva favoritos) — não
         # há dado para auditar.
@@ -397,6 +401,12 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         if amarracao_verificada and _so_nomes_e_notas_conferidos(especialista):
             return _veredito(True, None, proxima_tentativa)
 
+    # `VENUS_JUIZ_LLM_ROTAS` (rotas separadas por vírgula; padrão: todas): fora
+    # dessas rotas, valem só as regras em código acima.
+    rotas_com_llm = os.getenv("VENUS_JUIZ_LLM_ROTAS")
+    if rotas_com_llm is not None and estado.get("rota") not in rotas_com_llm.split(","):
+        return _veredito(True, None, proxima_tentativa)
+
     entrada = _montar_entrada_juiz(estado, amarracao_verificada)
     mensagens = [("system", com_data_atual(JUIZ_PROMPT_COMPLETO)), ("human", entrada)]
     try:
@@ -405,10 +415,10 @@ def no_agente_juiz(estado: EstadoVenus) -> EstadoVenus:
         # LLM do Juiz fora do ar: reprovação sem feedback, que segue o fluxo
         # normal de retry/"esgotado" em vez de derrubar a conversa.
         logger.exception("Falha ao chamar o LLM do Agente Juiz")
-        return _veredito(False, None, proxima_tentativa)
+        return _veredito(False, None, proxima_tentativa, por="falha_llm")
 
     aprovado, feedback = _ler_veredito_do_llm((resposta.content or "").strip())
-    return _veredito(aprovado, feedback, proxima_tentativa)
+    return _veredito(aprovado, feedback, proxima_tentativa, por="llm")
 
 
 def decidir_pos_juiz(estado: EstadoVenus) -> ResultadoJuiz:

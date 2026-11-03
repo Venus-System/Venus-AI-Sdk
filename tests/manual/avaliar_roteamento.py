@@ -29,6 +29,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 FIXTURE = RAIZ / "tests" / "fixtures" / "avaliacao_roteamento.jsonl"
 CATEGORIAS = ("produto", "ingrediente", "rotina", "faq", "direto", "mista", "alergia_no_chat")
 
+from venus_sdk.llm.models import cadeia_rapida  # noqa: E402
 from venus_sdk.nodes.roteador import _RESPOSTA_ALERGIA_NO_CHAT, no_roteador, rota_por_palavras  # noqa: E402
 
 
@@ -69,18 +70,6 @@ def rotear_com_llm(pergunta: str) -> tuple[str, str | None]:
     return resultado.get("rota") or "direto", resultado.get("resposta_final")
 
 
-def _tem_llm() -> bool:
-    from venus_sdk.llm.models import cadeia_rapida
-
-    return bool(cadeia_rapida())
-
-
-def _modelo() -> str:
-    from venus_sdk.llm.models import cadeia_rapida
-
-    return " → ".join(":".join(item) for item in cadeia_rapida()) or "nenhum"
-
-
 def _pct(acertos: int, total: int) -> str:
     return f"{acertos / total:.0%} ({acertos}/{total})" if total else "-"
 
@@ -105,9 +94,10 @@ def main(argv: list[str] | None = None) -> int:
     casos = carregar()
     relatorios = {"palavras-chave": avaliar(casos, rotear_por_palavras)}
     avisos = []
-    if not args.sem_llm and _tem_llm():
+    cadeia = cadeia_rapida()
+    if not args.sem_llm and cadeia:
         relatorios["roteador (LLM + regras)"] = avaliar(casos, rotear_com_llm)
-        avisos.append(f"Cadeia do roteador: {_modelo()}.")
+        avisos.append(f"Cadeia do roteador: {' → '.join(':'.join(item) for item in cadeia)}.")
     else:
         avisos.append("Roteador com LLM não avaliado (--sem-llm ou sem MISTRAL/GROQ/GEMINI_API_KEY).")
 

@@ -21,6 +21,10 @@ def _ev(tool: str, resultado, **argumentos) -> dict:
 
 
 def _rodar(texto_llm: str, evidencias: list[dict], dominio: str = "produto") -> str:
+    return _rodar_estado(texto_llm, evidencias, dominio)["resposta_final"]
+
+
+def _rodar_estado(texto_llm: str, evidencias: list[dict], dominio: str = "produto") -> dict:
     estado = {
         "rota": dominio,
         "aprovado_juiz": True,
@@ -31,7 +35,7 @@ def _rodar(texto_llm: str, evidencias: list[dict], dominio: str = "produto") -> 
     }
     with patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador") as get_llm_mock:
         get_llm_mock.return_value.invoke.return_value = SimpleNamespace(content=texto_llm)
-        return no_orquestrador(estado)["resposta_final"]
+        return no_orquestrador(estado)
 
 
 def _evidencias_do_produto(alergias=_ALERGIAS) -> list[dict]:
@@ -87,3 +91,18 @@ def test_ingrediente_buscado_que_bate_com_a_alergia_recebe_alerta() -> None:
     ]
     texto = _rodar("O ácido salicílico é um esfoliante químico, ótimo para acne.", evidencias, dominio="ingrediente")
     assert "Atenção: Ácido salicílico bate com a sua alergia a Ácido salicílico" in texto
+
+
+# --- Quantos alertas o código anexou: vai para o trace do turno (na API) -------
+
+
+def test_conta_os_alertas_anexados_pelo_codigo() -> None:
+    saida = _rodar_estado("O Sérum Clareador é ótimo para manchas.", _evidencias_do_produto())
+    assert saida["alertas_alergia_anexados"] == 1
+
+
+def test_alerta_que_o_llm_ja_escreveu_nao_conta_como_anexado() -> None:
+    alerta = ("Atenção: Sérum Clareador tem Ácido salicílico, que bate com a sua alergia a Ácido salicílico "
+              "(conferido no seu cadastro).")
+    saida = _rodar_estado(f"Sobre o Sérum Clareador.\n\n{alerta}", _evidencias_do_produto())
+    assert saida["alertas_alergia_anexados"] == 0

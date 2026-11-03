@@ -30,8 +30,9 @@ DecisaoGuardrailEntrada = Literal["bloqueado", "liberado"]
 
 def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
     """Aplica o guardrail de entrada, anonimiza a mensagem e a grava no
-    histórico. Também zera o estado do Juiz: este nó roda uma vez por turno,
-    e sem isso `tentativas_juiz` vinha do turno anterior pelo checkpointer."""
+    histórico. Também zera o estado do Juiz e o resultado do turno: este nó
+    roda uma vez por turno, e sem isso `tentativas_juiz` (e a rota, numa
+    entrada bloqueada) vinha do turno anterior pelo checkpointer."""
     mensagem = estado.get("mensagem_usuario", "") or ""
     bloqueado, motivo = guardrail_entrada(mensagem)
     if (
@@ -51,6 +52,10 @@ def no_guardrail_entrada(estado: EstadoVenus) -> EstadoVenus:
         "tentativas_juiz": 0,
         "aprovado_juiz": None,
         "feedback_juiz": None,
+        "juiz_decidiu_por": None,
+        "alertas_alergia_anexados": 0,
+        # A entrada bloqueada nem passa pelo roteador.
+        "rota": None,
         # Sem isso, a `magoada` de um turno voltava pelo checkpointer no
         # seguinte (a entrada bloqueada nem passa pelo roteador).
         "expressao": "neutra",

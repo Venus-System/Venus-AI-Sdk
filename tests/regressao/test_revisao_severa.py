@@ -109,7 +109,7 @@ def test_acido_hialuronico_serve_de_manha_e_glicolico_nao():
 
 
 def test_alergia_a_alcool_nao_exclui_alcool_graxo_mas_exclui_alcool_denat():
-    termos = rotina._termos_da_alergia("Álcool")
+    termos = rotina.termos_da_alergia("Álcool")
     graxo = {"product_id": 3, "name": "Creme Y", "category_name": "Hidratante", "inci_names": ["cetearyl alcohol"]}
     secante = {"product_id": 4, "name": "Tônico Z", "category_name": "Tônico", "inci_names": ["alcohol denat."]}
     excluidos, _ = rotina._separar_por_alergia([graxo, secante], termos)
@@ -271,10 +271,10 @@ def test_prompt_recebe_a_data_da_chamada_em_portugues():
     assert comum.data_hora_atual(datetime(2026, 9, 29, 17, 5, tzinfo=timezone.utc)) == (
         "terça-feira, 29 de setembro de 2026 — 14:05 (horário de Brasília)"
     )
-    assert comum.MARCADOR_DATA_HORA in ROUTER_PROMPT_COMPLETO
     with patch.object(comum, "data_hora_atual", return_value="AGORA-TESTE"):
         mensagens = roteador._mensagens_para_o_roteador({"mensagem_usuario": "oi"})
-    assert "AGORA-TESTE" in mensagens[0][1] and comum.MARCADOR_DATA_HORA not in mensagens[0][1]
+    # No fim do prompt: o cache de prompt só reaproveita o começo idêntico.
+    assert mensagens[0][1].startswith(ROUTER_PROMPT_COMPLETO) and mensagens[0][1].endswith("AGORA-TESTE")
 
 
 # --- [13/14] orquestrador ---

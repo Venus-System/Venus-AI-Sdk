@@ -15,8 +15,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from venus_sdk.alergias import termo_bate, termos_da_alergia
-from venus_sdk.nodes._evidencias import dados_da_evidencia
+from venus_sdk.alergias import conflitos
+from venus_sdk.nodes._evidencias import alergias_declaradas, dados_da_evidencia
 from venus_sdk.texto import remover_acentos
 
 # Notas que as tools de score devolvem, por tool.
@@ -273,10 +273,7 @@ def conferir_alegacao_de_alergia(especialista: dict, evidencias: list[dict] | No
     if not produtos:
         return ["o texto afirma que um produto não tem ingrediente da alergia, mas o JSON não diz em `produtos` "
                 "qual produto foi conferido"]
-    alergias = dados_da_evidencia(evidencias, "get_user_allergies")
-    nomes_alergia = [
-        str(a.get("allergy_name")) for a in alergias if isinstance(a, dict) and a.get("allergy_name")
-    ] if isinstance(alergias, list) else []
+    nomes_alergia = alergias_declaradas(evidencias)
     problemas = []
     for item in produtos:
         product_id, nome = item.get("product_id"), item.get("nome") or f"product_id {item.get('product_id')}"
@@ -287,14 +284,7 @@ def conferir_alegacao_de_alergia(especialista: dict, evidencias: list[dict] | No
                 f"{product_id} não foram consultados com get_product_ingredients — consulte antes de afirmar"
             )
             continue
-        for alergia in nomes_alergia:
-            termos = termos_da_alergia(alergia)
-            achado = next(
-                (str(i.get("common_name") or i.get("inci_name")) for i in ingredientes if isinstance(i, dict)
-                 if any(termo_bate(t, str(v)) for t in termos for v in (i.get("inci_name"), i.get("common_name")) if v)),
-                None,
-            )
-            if achado:
-                problemas.append(f"{nome} (product_id {product_id}) contém {achado}, que bate com a alergia a {alergia} "
-                                 "— não o sugira como compatível")
+        for achado, alergia in conflitos(ingredientes, nomes_alergia):
+            problemas.append(f"{nome} (product_id {product_id}) contém {achado}, que bate com a alergia a {alergia} "
+                             "— não o sugira como compatível")
     return problemas

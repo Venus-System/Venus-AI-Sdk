@@ -10,9 +10,10 @@ Visão geral dos módulos do SDK Venus (`src/venus_sdk/`):
   - `guardrails.py` — `no_guardrail_entrada`, `no_guardrail_saida`.
   - `memoria.py` — `no_carregar_memoria`, `no_atualizar_memoria` (memória de longo prazo, por `usuario_id`; sem alergias — a fonte é o cadastro —, com `remover`, data por campo em `perfil_datas`, TTL `VENUS_MEMORIA_TTL_DIAS` e `apagar_memoria(store, usuario_id)` para a LGPD) e `montar_no_carregar_nome(pool)` (primeiro nome do cadastro em `nome_usuario`, uma vez por conversa).
   - `roteador.py` — `no_roteador`, `decidir_especialista`.
+  - `fluxo_fixo.py` — consulta as tools de produto e ingrediente sem LLM (achar o item pela pergunta e trazer tudo sobre ele) e escolhe o trecho do FAQ (o LLM rápido só aponta o número do trecho; sem trecho, a resposta é que não encontrou). Item não achado, ambiguidade ou conta com número caem no agente ReAct. A web não é consultada neste fluxo.
   - `especialistas.py` — `montar_no_agente_produto(pool)`/`montar_no_agente_ingrediente(pool)` (fábricas — o agente só é montado, e as tools só exigem `pool` de verdade, no primeiro uso real do nó) e `montar_no_agente_rotina(pool)` (tools Postgres de rotina) e `montar_no_agente_faq(indice, tools_extras)` (RAG: docs locais + web + tools MCP/A2A). O FAQ agora devolve JSON com `fontes_usadas` e passa pelo Agente Juiz.
   - `juiz.py` — `no_agente_juiz`, `decidir_pos_juiz`. Desde 2026-09-10, também recebe `EstadoVenus.evidencias_tools` (retorno bruto de cada tool chamada pelo especialista, ver `nodes/especialistas.py::_extrair_evidencias_tools`) como `RESULTADOS_TOOLS=` na entrada — sem isso, o Juiz só via o JSON final do especialista e aprovava afirmações que a tool citada em `fontes_usadas` nunca sustentou de verdade (achado ao vivo: produto sem ingrediente cadastrado, resposta "inventou" ingredientes, aprovado).
-  - `orquestrador.py` — `no_orquestrador`. Depois da reescrita do LLM, `_alertas_de_alergia` cruza as alergias do cadastro com os ingredientes consultados (`venus_sdk/alergias.py`) e anexa o alerta em texto fixo — o LLM não consegue omitir nem suavizar um conflito.
+  - `orquestrador.py` — `no_orquestrador`. Nas rotas de `VENUS_RESPOSTA_SO_DAS_TOOLS` (padrão: produto, ingrediente, rotina e FAQ) não chama LLM: monta o texto com `_resposta_das_tools` e, em pergunta sobre gravidez, amamentação ou reação na pele, antepõe a orientação fixa de procurar um profissional. Nas outras, depois da reescrita do LLM, `_alertas_de_alergia` cruza as alergias do cadastro com os ingredientes consultados (`venus_sdk/alergias.py`) e anexa o alerta em texto fixo — o LLM não consegue omitir nem suavizar um conflito.
 - **tools/** — tools Postgres (via `asyncpg`, schema `venus`) dos especialistas de produto/ingrediente — consulta estruturada a um catálogo já curado (ETL de ANVISA/CosIng/PubChem), **não é RAG**:
   - `produto.py` — `montar_tools_produto(pool)`: `search_product`, `get_product`, `get_product_score`, `get_product_ingredients`. `search_product` foi adicionada em 2026-09-10 — sem ela, uma pergunta que só citava o NOME do produto não tinha como resolver o `product_id`, e o especialista chutava um id (achado ao vivo: alucinou ingredientes de um produto sem nenhum cadastrado).
   - `ingrediente.py` — `montar_tools_ingrediente(pool)`: `search_ingredient`, `get_ingredient_summary`, `get_ingredient_properties`, `get_ingredient_effects`, `get_ingredient_regulations`.
@@ -34,12 +35,14 @@ Visão geral dos módulos do SDK Venus (`src/venus_sdk/`):
   - `store.py` — memória de LONGO PRAZO, por `usuario_id` (cross-thread — sobrevive à troca de conversa): `criar_store_em_memoria()` (`InMemoryStore` do LangGraph) ou `criar_store_mongo()` (`MongoDBStore`, implementação própria — o LangGraph não publica um `store` oficial pra Mongo, só `checkpointer`).
 
 Estado atual: tools de produto/ingrediente/rotina (Postgres, schema+seed em
-`scripts/sql`), RAG (local + web), MCP e A2A (servidor e client) implementados e
+`scripts/sql`), RAG (local; web só no FAQ com agente), MCP e A2A (servidor e client) implementados e
 verificados por `tests/manual/verificar_tools.py` e pelos testes em `tests/`
 (`pytest -m integration` roda as tools contra um Postgres real). A
 observabilidade fica na API (`venus_api`: Langfuse por nó, com tokens e custo, e
-métricas HTTP no Mongo); custo, latência e ROI em `docs/custo-e-roi.md`; pendente: o resultado de cada turno
-no trace. Avaliações em `docs/avaliacao-*.md` (RAG, guardrail, roteamento, alergias). O roteador tem uma rede de
+métricas HTTP no Mongo, mais o resultado de cada turno no trace, a partir de
+`rota`, `aprovado_juiz`, `juiz_decidiu_por`, `tentativas_juiz` e
+`alertas_alergia_anexados` do estado final); custo, latência e ROI em
+`docs/custo-e-roi.md`. Avaliações em `docs/avaliacao-*.md` (RAG, guardrail, roteamento, alergias). O roteador tem uma rede de
 segurança (`nodes/roteador.py::e_small_talk`) contra saudação roteada para
 especialista.
 

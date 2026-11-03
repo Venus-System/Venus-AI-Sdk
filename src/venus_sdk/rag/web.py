@@ -20,6 +20,7 @@ from typing import Any
 import httpx
 
 from venus_sdk.prompts.guardrail_rules import contem_tentativa_de_injecao
+from venus_sdk.texto import texto_de_blocos
 
 logger = logging.getLogger(__name__)
 
@@ -80,15 +81,6 @@ _TOOL_MCP_TAVILY = "tavily_search"
 _CAMPO_TAVILY = re.compile(r"^(Title|URL|Content|ID|Raw Content|Favicon|Answer|Detailed Results):\s?(.*)$")
 
 
-def _texto_da_saida_mcp(saida: Any) -> str:
-    """A tool MCP devolve texto ou uma lista de blocos `{"type": "text", ...}`."""
-    if isinstance(saida, str):
-        return saida
-    if isinstance(saida, (list, tuple)):
-        return "\n".join(bloco.get("text", "") if isinstance(bloco, dict) else str(bloco) for bloco in saida)
-    return str(saida or "")
-
-
 def resultados_do_tavily_mcp(saida: Any) -> list[dict[str, Any]]:
     """`[{titulo, trecho, url}]` a partir da saída em texto do `tavily_search`
     — o mesmo formato de `buscar_web`, para as fontes chegarem iguais ao
@@ -96,7 +88,7 @@ def resultados_do_tavily_mcp(saida: Any) -> list[dict[str, Any]]:
     resultados: list[dict[str, Any]] = []
     atual: dict[str, Any] | None = None
     campo_aberto: str | None = None
-    for linha in _texto_da_saida_mcp(saida).splitlines():
+    for linha in texto_de_blocos(saida).splitlines():
         match = _CAMPO_TAVILY.match(linha)
         if match:
             campo, valor = match.groups()

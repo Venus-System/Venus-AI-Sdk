@@ -10,6 +10,7 @@ As alergias do catálogo vêm em português/inglês ("Fragrância (Parfum)",
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 from venus_sdk.texto import remover_acentos
 
@@ -82,9 +83,10 @@ _SAL_DE_SULFATO_RE = re.compile(r"^(\S+ sulfate|sulfato de \S+)$")
 # Termos que só valem no começo de uma palavra: "sulfate" dentro de
 # "methosulfate"/"thiosulfate" (condicionador e sal, não surfactante) e
 # "propilenoglicol" dentro de "polipropilenoglicol" (PPG, outra molécula);
-# "soja" dentro de "isojasmonate" (fragrância).
+# "soja" dentro de "isojasmonate" (fragrância); "carya" dentro de "sclerocarya"
+# (marula, que não é noz).
 _TERMOS_NO_INICIO_DA_PALAVRA = {
-    *_TERMOS_DE_SULFATO, "propylene glycol", "propilenoglicol", "propileno glicol", "soja", "soy",
+    *_TERMOS_DE_SULFATO, "propylene glycol", "propilenoglicol", "propileno glicol", "soja", "soy", "carya",
 }
 
 # Alergia a "Álcool" = álcool etílico/desnaturado/isopropílico (INCI "ALCOHOL",
@@ -103,6 +105,9 @@ _TERMOS_GENERICOS_DE_ALCOOL = {"alcool", "alcohol"}
 _TAMANHO_MINIMO_TERMO_ALERGIA = 3
 
 
+# Roda para cada termo × ingrediente: sem o cache, a rotina de quem tem muitas
+# alergias gastava centenas de ms de CPU só normalizando os mesmos nomes.
+@lru_cache(maxsize=4096)
 def _normalizar(texto: str) -> str:
     return remover_acentos(str(texto or "").lower()).strip()
 
@@ -136,3 +141,19 @@ def termo_bate(termo: str, ingrediente: str) -> bool:
 def termos_em_conflito(termos: list[str], ingredientes: list[str]) -> list[str]:
     """Termos de alergia que batem com pelo menos um dos ingredientes."""
     return [termo for termo in termos if any(termo_bate(termo, ingrediente) for ingrediente in ingredientes)]
+
+
+def conflitos(ingredientes: list, alergias: list[str]) -> list[tuple[str, str]]:
+    """`(ingrediente, alergia)` para cada alergia que bate com algum ingrediente
+    (`{"inci_name", "common_name"}`), com o primeiro ingrediente que bate."""
+    pares = []
+    for alergia in alergias:
+        termos = termos_da_alergia(alergia)
+        for ingrediente in ingredientes:
+            if not isinstance(ingrediente, dict):
+                continue
+            variantes = [str(v) for v in (ingrediente.get("inci_name"), ingrediente.get("common_name")) if v]
+            if termos_em_conflito(termos, variantes):
+                pares.append((str(ingrediente.get("common_name") or ingrediente.get("inci_name")), alergia))
+                break
+    return pares

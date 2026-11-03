@@ -54,7 +54,7 @@ O sistema consulta a ontologia de ingredientes, cruza as informações com o per
 
 ### Score geral do produto
 
-É aquilo que pode ser calculated independentemente de quem está usando o aplicativo.
+É aquilo que pode ser calculado independentemente de quem está usando o aplicativo.
 
 Por exemplo, informações objetivas relacionadas aos ingredientes e seus atributos podem ser pré-calculadas quando o produto entra no catálogo. O documento chama esses dados de *informações iguais para todo mundo*, como ingredientes, flags e scores objetivos.
 

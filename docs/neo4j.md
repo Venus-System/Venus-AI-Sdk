@@ -18,9 +18,11 @@ Postgres                     ─┘    (só LÊ o Postgres)                (cóp
    de). Mudança de regra = PR. Ver `src/venus_sdk/data/checkup/README.md`.
 2. **Cópia** — `python -m venus_sdk.checkup.sincronizar` lê produtos,
    ingredientes, composição e favoritos do Postgres e as regras dos CSVs, e
-   refaz o grafo. Roda toda noite e quando os CSVs mudam. Durante a cópia,
-   quem consulta vê os dados anteriores (nada é apagado antes de o novo estar
-   gravado).
+   refaz o grafo. Não é agendada: rode depois de mudar o catálogo de produtos
+   ou os CSVs, pelo workflow manual **Sincronizar Neo4j** do repositório da API
+   (Actions > Sincronizar Neo4j > Run workflow, escolhendo o ambiente) ou com o
+   comando acima. Durante a cópia, quem consulta vê os dados anteriores (nada é
+   apagado antes de o novo estar gravado).
 3. **Chat** — a tool `check_routine_health` monta a rotina do dia (manhã e
    noite, como em `suggest_routine`), roda as 4 consultas em paralelo e
    devolve os avisos do período pedido.

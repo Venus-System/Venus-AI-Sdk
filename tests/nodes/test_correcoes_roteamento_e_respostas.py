@@ -237,7 +237,7 @@ def test_resposta_segura_de_ingrediente_mostra_o_que_as_tools_trouxeram() -> Non
         ], {"ingredient_id": 1}),
         ("get_ingredient_effects", {"encontrado": False, "mensagem": "nenhum efeito cadastrado"}, {"ingredient_id": 1}),
         ("get_ingredient_regulations", {"encontrado": False, "mensagem": "nenhuma restrição"}, {"ingredient_id": 1}),
-    ])
+    ], pergunta="qual a fórmula química da niacinamida?")
     with patch("venus_sdk.nodes.orquestrador.get_llm_orquestrador", side_effect=AssertionError("sem LLM")):
         texto = no_orquestrador(estado)["resposta_final"]
     assert "NICOTINAMIDA (INCI: NIACINAMIDE)" in texto
