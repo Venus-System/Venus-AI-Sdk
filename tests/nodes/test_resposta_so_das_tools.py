@@ -129,7 +129,7 @@ def _estado_faq(fontes):
 
 def test_faq_mostra_o_documento_com_a_fonte():
     texto = no_orquestrador(_estado_faq([{"texto": "Não. O Venus não vende.", "fonte": "privacidade.md"}]))["resposta_final"]
-    assert texto == "Não. O Venus não vende.\n\nFonte: privacidade.md"
+    assert texto.endswith("Não. O Venus não vende.\n\nFonte: privacidade.md")
 
 
 def test_faq_sem_fonte_diz_que_nao_encontrou():

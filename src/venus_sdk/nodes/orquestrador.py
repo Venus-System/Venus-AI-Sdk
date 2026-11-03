@@ -760,7 +760,7 @@ def _com_tom_da_venus(texto: str, estado: EstadoVenus) -> str:
     """Reescreve no tom da Venus o texto já montado das fontes. Se a reescrita não
     passar pelas conferências, vai o texto original: nenhum fato vem só do LLM."""
     if (
-        os.getenv("VENUS_TOM_LLM", "1") == "0"
+        os.getenv("VENUS_TOM_LLM", "0") != "1"
         or not texto
         or len(texto) > _TAMANHO_MAXIMO_PARA_TOM
         or "Atenção:" in texto

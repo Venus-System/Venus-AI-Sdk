@@ -421,7 +421,7 @@ Copie [`.env.example`](.env.example) para `.env`. **Nunca** faça commit do `.en
 | `TAVILY_API_KEY` | não | Busca na web do FAQ com agente (fora do padrão); sem ela, usa DuckDuckGo. |
 | `VENUS_RESPOSTA_SO_DAS_TOOLS` | não | Rotas cujo texto é montado pelo código, só com tools e documentos (padrão: `produto,ingrediente,rotina,faq`; vazia desliga). |
 | `VENUS_JUIZ_LLM_ROTAS` | não | Rotas em que o Juiz usa LLM (padrão: todas; as da variável acima nunca usam). |
-| `VENUS_TOM_LLM` | não | `0` desliga a reescrita no tom da Venus, conferida por código e pelo LLM do Juiz (padrão: ligada). |
+| `VENUS_TOM_LLM` | não | `1` liga a reescrita experimental no tom da Venus, que pode acrescentar fatos (padrão: desligada). |
 | `VENUS_CACHE_DE_PROMPT` | não | `0` desliga o cache de prompt do Mistral (padrão: ligado). |
 | `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | não | Check-up da rotina (extra `neo4j`). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENCRYPTION_KEY` | não | Google Calendar (extra `google_calendar`). A chave é Fernet. |
